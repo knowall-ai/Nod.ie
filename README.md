@@ -45,7 +45,11 @@ docker compose up -d
 ## Installation
 
 ```bash
-cd nodie
+# Clone the repository
+git clone https://github.com/KnowAll-AI/Nod.ie.git
+cd Nod.ie
+
+# Install dependencies
 npm install
 
 # Copy required decoder files (if not already present)
