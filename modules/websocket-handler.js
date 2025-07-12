@@ -12,6 +12,7 @@ class WebSocketHandler {
         this.connectionAttemptInProgress = false;
         this.reconnectTimer = null;
         this.systemPrompt = null; // Will be loaded asynchronously
+        console.info('🎤 WebSocketHandler initialized with voice:', config.voice);
     }
 
     async loadSystemPrompt() {

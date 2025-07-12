@@ -20,7 +20,7 @@ const store = new Store({
     n8nWebhookUrl: process.env.N8N_WEBHOOK_URL,
     unmuteFrontendUrl: process.env.UNMUTE_FRONTEND_URL,
     unmuteBackendUrl: process.env.UNMUTE_BACKEND_URL,
-    voiceModel: process.env.VOICE_MODEL,
+    voice: process.env.VOICE_MODEL || 'unmute-prod-website/ex04_narration_longform_00001.wav',
     ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
     globalHotkey: process.env.GLOBAL_HOTKEY,
     position: { x: null, y: null }
