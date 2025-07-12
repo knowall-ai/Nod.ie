@@ -243,10 +243,33 @@ ipcRenderer.on('n8n-notification', (event, data) => {
 // Reconnect when settings change
 ipcRenderer.on('settings-updated', async () => {
     console.info('⚙️ Settings updated, reconnecting to apply changes...');
-    if (wsHandler) {
-        await wsHandler.disconnect();
+    
+    // Stop audio capture first
+    if (audioCapture) {
+        audioCapture.stop();
+        audioCapture = null;
     }
-    await connectToUnmute();
+    
+    // Stop visualization
+    if (stopVisualization) {
+        stopVisualization();
+        stopVisualization = null;
+    }
+    
+    // Close WebSocket connection
+    if (wsHandler) {
+        wsHandler.close();
+        wsHandler = null;
+    }
+    
+    // Wait a moment for cleanup
+    setTimeout(async () => {
+        await connectToUnmute();
+        // Restart listening if not muted
+        if (!ui.isMuted) {
+            await startListening();
+        }
+    }, 500);
 });
 
 // Initialize
