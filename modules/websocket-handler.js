@@ -71,11 +71,14 @@ class WebSocketHandler {
                 }
                 
                 // Configure session with instructions
+                const sessionId = `nodie-${Date.now()}`;
                 const sessionConfig = {
                     type: 'session.update',
                     session: {
+                        id: sessionId,
                         model: this.config.modelName || 'llama3.2:3b',
                         voice: this.config.voice || 'unmute-prod-website/ex04_narration_longform_00001.wav',
+                        modalities: ['text', 'audio'],
                         allow_recording: false,
                         instructions: {
                             type: 'constant',
@@ -85,6 +88,20 @@ class WebSocketHandler {
                 };
                 console.info('📢 Sending session config with voice:', sessionConfig.session.voice);
                 this.ws.send(JSON.stringify(sessionConfig));
+                
+                // Try sending voice update separately as well
+                setTimeout(() => {
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        const voiceUpdate = {
+                            type: 'session.update',
+                            session: {
+                                voice: this.config.voice || 'unmute-prod-website/ex04_narration_longform_00001.wav'
+                            }
+                        };
+                        console.info('📢 Sending voice update:', voiceUpdate.session.voice);
+                        this.ws.send(JSON.stringify(voiceUpdate));
+                    }
+                }, 1000);
                 
                 if (this.callbacks.onConnect) {
                     this.callbacks.onConnect();
