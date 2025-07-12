@@ -275,21 +275,38 @@
             
             // Load available models
             try {
+                console.log('Fetching Ollama models...');
                 const models = await ipcRenderer.invoke('get-ollama-models');
+                console.log('Received models:', models);
                 const modelSelect = document.getElementById('modelName');
                 modelSelect.innerHTML = '';
                 
-                models.forEach(model => {
+                // If we got models, populate them
+                if (models && models.length > 0) {
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        if (model === (config.modelName || 'llama3.2:3b')) {
+                            option.selected = true;
+                        }
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    // Fallback if no models found
                     const option = document.createElement('option');
-                    option.value = model;
-                    option.textContent = model;
-                    if (model === (config.modelName || 'llama3.2:3b')) {
-                        option.selected = true;
-                    }
+                    option.value = config.modelName || 'llama3.2:3b';
+                    option.textContent = config.modelName || 'llama3.2:3b';
                     modelSelect.appendChild(option);
-                });
+                }
             } catch (error) {
                 console.error('Failed to load models:', error);
+                // Add current model as fallback
+                const modelSelect = document.getElementById('modelName');
+                const option = document.createElement('option');
+                option.value = config.modelName || 'llama3.2:3b';
+                option.textContent = config.modelName || 'llama3.2:3b';
+                modelSelect.appendChild(option);
             }
         }
         

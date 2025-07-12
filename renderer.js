@@ -162,6 +162,7 @@ function toggleMute() {
 // Connect to Unmute backend
 async function connectToUnmute() {
     const config = await ipcRenderer.invoke('get-config');
+    console.info('🔄 Connecting with config:', { voice: config.voice, model: config.modelName });
     
     wsHandler = new WebSocketHandler(config, {
         onConnect: () => {

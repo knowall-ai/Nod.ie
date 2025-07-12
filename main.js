@@ -285,17 +285,49 @@ ipcMain.handle('notify-settings-updated', () => {
 // Get available Ollama models
 ipcMain.handle('get-ollama-models', async () => {
   try {
-    const fetch = require('node-fetch');
-    const ollamaUrl = store.get('ollamaUrl') || 'http://localhost:11434';
-    const response = await fetch(`${ollamaUrl}/api/tags`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch models');
-    }
-    const data = await response.json();
-    return data.models.map(m => m.name);
+    const http = require('http');
+    const url = new URL(store.get('ollamaUrl') || 'http://localhost:11434');
+    
+    return new Promise((resolve) => {
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 11434,
+        path: '/api/tags',
+        method: 'GET'
+      };
+      
+      const req = http.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.models && Array.isArray(parsed.models)) {
+              const modelNames = parsed.models.map(m => m.name);
+              console.log('Ollama models found:', modelNames);
+              resolve(modelNames);
+            } else {
+              console.log('No models in response');
+              resolve(['llama3.2:3b']);
+            }
+          } catch (e) {
+            console.error('Failed to parse Ollama response:', e);
+            resolve(['llama3.2:3b']);
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        console.error('Failed to connect to Ollama:', error.message);
+        resolve(['llama3.2:3b']);
+      });
+      
+      req.end();
+    });
   } catch (error) {
     console.error('Failed to get Ollama models:', error);
-    // Return default model if can't connect
     return ['llama3.2:3b'];
   }
 });

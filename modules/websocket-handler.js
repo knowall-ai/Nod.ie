@@ -70,7 +70,7 @@ class WebSocketHandler {
                 }
                 
                 // Configure session with instructions
-                this.ws.send(JSON.stringify({
+                const sessionConfig = {
                     type: 'session.update',
                     session: {
                         model: this.config.modelName || 'llama3.2:3b',
@@ -81,7 +81,9 @@ class WebSocketHandler {
                             text: this.systemPrompt
                         }
                     }
-                }));
+                };
+                console.info('📢 Sending session config with voice:', sessionConfig.session.voice);
+                this.ws.send(JSON.stringify(sessionConfig));
                 
                 if (this.callbacks.onConnect) {
                     this.callbacks.onConnect();
@@ -163,18 +165,19 @@ class WebSocketHandler {
         }
         
         if (this.ws) {
-            // Remove onclose handler to prevent reconnection
-            const originalOnClose = this.ws.onclose;
-            this.ws.onclose = (event) => {
-                console.info('✅ Connection closed (final)');
-                this.isConnected = false;
-                this.connectionAttemptInProgress = false;
-            };
+            // Remove all handlers to prevent reconnection
+            this.ws.onclose = null;
+            this.ws.onerror = null;
+            this.ws.onmessage = null;
+            this.ws.onopen = null;
             
             if (this.ws.readyState !== WebSocket.CLOSED) {
                 this.ws.close();
             }
             this.ws = null;
+            this.isConnected = false;
+            this.connectionAttemptInProgress = false;
+            console.info('✅ Connection closed completely');
         }
     }
 
