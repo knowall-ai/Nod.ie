@@ -44,7 +44,16 @@ class AudioOutputProcessor extends AudioWorkletProcessor {
         this.initState();
         return;
       }
+      if (event.data.command == "clear") {
+        debug("Clear audio processor state.");
+        this.initState();
+        return;
+      }
       let frame = event.data.frame;
+      if (!frame) {
+        debug("Received message without frame data:", event.data);
+        return;
+      }
       this.frames.push(frame);
       if (this.currentSamples() >= this.initialBufferSamples && !this.started) {
         this.start();
@@ -136,8 +145,13 @@ class AudioOutputProcessor extends AudioWorkletProcessor {
 
   currentSamples() {
     let samples = 0;
+    if (!this.frames || this.frames.length === 0) {
+      return 0;
+    }
     for (let k = 0; k < this.frames.length; k++) {
-      samples += this.frames[k].length;
+      if (this.frames[k] && this.frames[k].length) {
+        samples += this.frames[k].length;
+      }
     }
     samples -= this.offsetInFirstBuffer;
     return samples;

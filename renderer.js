@@ -243,10 +243,36 @@ ipcRenderer.on('n8n-notification', (event, data) => {
 
 // Reconnect when settings change
 ipcRenderer.on('settings-updated', async () => {
-    console.info('⚙️ Settings updated, restarting everything...');
+    console.info('⚙️ Settings updated, reconnecting...');
     
-    // Reload the window to ensure fresh start
-    window.location.reload();
+    try {
+        // Clean up existing connections
+        if (wsHandler) {
+            wsHandler.close();
+            wsHandler = null;
+        }
+        if (audioCapture) {
+            audioCapture.stop();
+            audioCapture = null;
+        }
+        if (stopVisualization) {
+            stopVisualization();
+            stopVisualization = null;
+        }
+        if (audioPlayback) {
+            await audioPlayback.cleanup();
+            audioPlayback = null;
+        }
+        
+        // Wait a moment for cleanup
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Reconnect with new settings
+        await connectToUnmute();
+    } catch (error) {
+        console.error('Error during settings update:', error);
+        ui.showNotification('Error updating settings. Please restart.', 'error');
+    }
 });
 
 // Initialize
