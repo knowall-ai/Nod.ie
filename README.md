@@ -15,7 +15,7 @@ Nod.ie (pronounced "Nodey" or "Node-ee") is an always-available AI voice assista
 ## Prerequisites
 
 ### System Requirements
-- **OS**: Linux (Ubuntu 22.04+) or macOS
+- **OS**: Linux (built and tested on Kubuntu 24.04) or macOS
 - **RAM**: 8GB minimum (16GB recommended)
 - **Storage**: 2GB for Unmute models
 - **Microphone**: Any standard USB or built-in microphone
