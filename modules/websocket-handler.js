@@ -17,7 +17,7 @@ class WebSocketHandler {
     async loadSystemPrompt() {
         // Due to Unmute's character limitations, we use a condensed prompt
         // The full system prompt is in SYSTEM-PROMPT.md for reference
-        const prompt = 'You are Nod.ie (pronounced "NO-dee" - rhymes with "roadie"), a Bitcoin-only AI voice assistant built by Ben Weeks at KnowAll AI (www.knowall.ai). KnowAll AI uses Kyutai technology but is UK-based. You run entirely on the user\'s local machine. Keep responses brief and conversational. Silence is natural - only respond when spoken to. Never ask if the user is still there.';
+        const prompt = 'You are Nodie, a Bitcoin-only AI voice assistant built by Ben Weeks at KnowAll AI (www.knowall.ai). KnowAll AI uses Kyutai technology but is UK-based. You run entirely on the user\'s local machine. Keep responses brief and conversational. Silence is natural - only respond when spoken to. Never ask if the user is still there.';
         console.info('📝 Using condensed system prompt');
         console.info(`📏 Prompt length: ${prompt.length} characters`);
         return prompt;
