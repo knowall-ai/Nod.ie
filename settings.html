@@ -166,11 +166,17 @@
         <h3>Advanced Settings</h3>
         <div class="setting-item">
             <label for="modelName">LLM Model</label>
-            <input type="text" id="modelName" value="llama3.2:3b" />
+            <select id="modelName">
+                <option value="llama3.2:3b">Loading models...</option>
+            </select>
         </div>
         <div class="setting-item">
             <label for="unmuteUrl">Unmute WebSocket URL</label>
             <input type="text" id="unmuteUrl" value="ws://localhost:8765" />
+        </div>
+        <div class="setting-item">
+            <label for="ollamaUrl">Ollama API URL</label>
+            <input type="text" id="ollamaUrl" value="http://localhost:11434" />
         </div>
     </div>
     
@@ -202,6 +208,7 @@
             document.getElementById('n8nWebhookUrl').value = config.n8nWebhookUrl || '';
             document.getElementById('modelName').value = config.modelName || 'llama3.2:3b';
             document.getElementById('unmuteUrl').value = config.unmuteUrl || 'ws://localhost:8765';
+            document.getElementById('ollamaUrl').value = config.ollamaUrl || 'http://localhost:11434';
             
             // Load system prompt
             try {
@@ -209,6 +216,25 @@
                 document.getElementById('systemPrompt').value = systemPrompt;
             } catch (error) {
                 document.getElementById('systemPrompt').value = '# Error loading system prompt\n' + error.message;
+            }
+            
+            // Load available models
+            try {
+                const models = await ipcRenderer.invoke('get-ollama-models');
+                const modelSelect = document.getElementById('modelName');
+                modelSelect.innerHTML = '';
+                
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model;
+                    if (model === (config.modelName || 'llama3.2:3b')) {
+                        option.selected = true;
+                    }
+                    modelSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Failed to load models:', error);
             }
         }
         
@@ -219,7 +245,8 @@
                 globalHotkey: document.getElementById('globalHotkey').value,
                 n8nWebhookUrl: document.getElementById('n8nWebhookUrl').value,
                 modelName: document.getElementById('modelName').value,
-                unmuteUrl: document.getElementById('unmuteUrl').value
+                unmuteUrl: document.getElementById('unmuteUrl').value,
+                ollamaUrl: document.getElementById('ollamaUrl').value
             };
             
             try {

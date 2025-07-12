@@ -21,6 +21,7 @@ const store = new Store({
     unmuteFrontendUrl: process.env.UNMUTE_FRONTEND_URL,
     unmuteBackendUrl: process.env.UNMUTE_BACKEND_URL,
     voiceModel: process.env.VOICE_MODEL,
+    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
     globalHotkey: process.env.GLOBAL_HOTKEY,
     position: { x: null, y: null }
   }
@@ -135,7 +136,7 @@ function createSettingsWindow() {
   
   settingsWindow = new BrowserWindow({
     width: 600,
-    height: 650,
+    height: 700,
     frame: true,
     transparent: false,
     alwaysOnTop: false,
@@ -279,6 +280,24 @@ ipcMain.handle('notify-settings-updated', () => {
     mainWindow.webContents.send('settings-updated');
   }
   return true;
+});
+
+// Get available Ollama models
+ipcMain.handle('get-ollama-models', async () => {
+  try {
+    const fetch = require('node-fetch');
+    const ollamaUrl = store.get('ollamaUrl') || 'http://localhost:11434';
+    const response = await fetch(`${ollamaUrl}/api/tags`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch models');
+    }
+    const data = await response.json();
+    return data.models.map(m => m.name);
+  } catch (error) {
+    console.error('Failed to get Ollama models:', error);
+    // Return default model if can't connect
+    return ['llama3.2:3b'];
+  }
 });
 
 // Handle window dragging
