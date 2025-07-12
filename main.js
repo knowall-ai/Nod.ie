@@ -273,6 +273,14 @@ ipcMain.handle('write-system-prompt', async (event, content) => {
   }
 });
 
+// Notify main window when settings are updated
+ipcMain.handle('notify-settings-updated', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('settings-updated');
+  }
+  return true;
+});
+
 // Handle window dragging
 ipcMain.on('move-window', (event, { deltaX, deltaY }) => {
   if (mainWindow) {

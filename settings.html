@@ -234,6 +234,9 @@
                 
                 showStatus('Settings saved successfully!', 'success');
                 
+                // Notify renderer to reconnect with new settings
+                await ipcRenderer.invoke('notify-settings-updated');
+                
                 // Close window after a delay
                 setTimeout(() => {
                     window.close();

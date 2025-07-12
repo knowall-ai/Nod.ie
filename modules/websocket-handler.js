@@ -73,8 +73,8 @@ class WebSocketHandler {
                 this.ws.send(JSON.stringify({
                     type: 'session.update',
                     session: {
-                        model: 'llama3.2:3b',  // This was missing!
-                        voice: 'unmute-prod-website/ex04_narration_longform_00001.wav',
+                        model: this.config.modelName || 'llama3.2:3b',
+                        voice: this.config.voice || 'unmute-prod-website/ex04_narration_longform_00001.wav',
                         allow_recording: false,
                         instructions: {
                             type: 'constant',

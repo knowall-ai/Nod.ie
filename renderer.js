@@ -240,6 +240,15 @@ ipcRenderer.on('n8n-notification', (event, data) => {
     }
 });
 
+// Reconnect when settings change
+ipcRenderer.on('settings-updated', async () => {
+    console.info('⚙️ Settings updated, reconnecting to apply changes...');
+    if (wsHandler) {
+        await wsHandler.disconnect();
+    }
+    await connectToUnmute();
+});
+
 // Initialize
 console.info('🚀 Nod.ie renderer starting...');
 ui.setStatus('loading');
