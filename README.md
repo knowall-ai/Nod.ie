@@ -130,6 +130,71 @@ Nod.ie can work alongside Claude Code. While Claude Code handles text-based inte
 ### Overview
 Nod.ie is built as an Electron desktop application that provides an always-on voice interface to AI models through Kyutai Unmute's real-time voice conversation system.
 
+```mermaid
+graph TB
+    subgraph User_Interface ["👤 User Interface"]
+        User["👤 User"]
+        Mic["🎤 Microphone"]
+        Speaker["🔊 Speaker"]
+    end
+    
+    subgraph Nod_ie ["🟣 Nod.ie Electron App"]
+        direction TB
+        MainProcess["Main Process<br/>(main.js)"]
+        Renderer["Renderer Process<br/>(renderer.js)"]
+        UI["Circular UI<br/>(index.html)"]
+        
+        subgraph Modules ["Modules"]
+            WSHandler["WebSocket Handler"]
+            AudioCapture["Audio Capture<br/>(opus-recorder)"]
+            AudioPlayback["Audio Playback<br/>(AudioWorklet)"]
+            UIManager["UI Manager"]
+        end
+        
+        MainProcess --> Renderer
+        Renderer --> Modules
+        UI --> UIManager
+    end
+    
+    subgraph Local_Services ["🖥️ Local Services (Docker)"]
+        direction TB
+        UnmuteBackend["Unmute Backend<br/>:8765"]
+        
+        subgraph Unmute_Stack ["Unmute Stack"]
+            STT["Speech-to-Text<br/>(Moshi)"]
+            TTS["Text-to-Speech<br/>(Moshi)"]
+            LLM["LLM<br/>(Ollama)"]
+        end
+        
+        UnmuteBackend --> STT
+        UnmuteBackend --> TTS
+        UnmuteBackend --> LLM
+    end
+    
+    %% User interactions
+    User --> Mic
+    Speaker --> User
+    Mic --> AudioCapture
+    AudioPlayback --> Speaker
+    
+    %% WebSocket connections
+    WSHandler -.->|"WebSocket<br/>ws://localhost:8765"| UnmuteBackend
+    
+    %% Audio flow
+    AudioCapture -->|"Base64 Opus<br/>250ms chunks"| WSHandler
+    WSHandler -->|"response.audio.delta"| AudioPlayback
+    
+    %% Visual feedback
+    UIManager -->|"Visual States"| UI
+    AudioCapture -->|"Audio Activity"| UIManager
+    
+    style Nod_ie fill:#9333ea,stroke:#7c3aed,color:#fff
+    style Local_Services fill:#1e293b,stroke:#334155,color:#fff
+    style User_Interface fill:#059669,stroke:#047857,color:#fff
+```
+
+### System Architecture
+
 ### Technology Stack
 - **Electron**: Cross-platform desktop application framework
 - **WebSocket**: Real-time bidirectional communication with Unmute backend
@@ -163,17 +228,57 @@ Nod.ie is built as an Electron desktop application that provides an always-on vo
 
 ### Audio Pipeline
 
+```mermaid
+sequenceDiagram
+    participant User
+    participant Nod.ie
+    participant Unmute
+    participant STT
+    participant LLM
+    participant TTS
+    
+    User->>Nod.ie: Speaks into microphone
+    activate Nod.ie
+    Note over Nod.ie: opus-recorder captures<br/>audio in OGG Opus format
+    Nod.ie->>Unmute: input_audio_buffer.append<br/>(Base64 Opus, 250ms chunks)
+    activate Unmute
+    
+    Unmute->>STT: Stream audio
+    activate STT
+    STT-->>Unmute: Transcription<br/>(real-time)
+    deactivate STT
+    
+    Note over Unmute: Detects end of speech<br/>(semantic VAD)
+    
+    Unmute->>LLM: Generate response<br/>(with system prompt)
+    activate LLM
+    LLM-->>Unmute: Text response<br/>(streaming)
+    deactivate LLM
+    
+    Unmute->>TTS: Convert text to speech
+    activate TTS
+    TTS-->>Unmute: Audio chunks<br/>(Opus format)
+    deactivate TTS
+    
+    Unmute-->>Nod.ie: response.audio.delta<br/>(Base64 Opus)
+    deactivate Unmute
+    
+    Note over Nod.ie: AudioWorklet decodes<br/>and plays audio
+    Nod.ie-->>User: Plays response
+    deactivate Nod.ie
+```
+
 #### Input (Speech-to-Text)
-1. **Capture**: MediaRecorder with `audio/webm;codecs=opus` or `audio/ogg;codecs=opus`
+1. **Capture**: opus-recorder with OGG Opus container format
 2. **Streaming**: 250ms chunks sent via WebSocket
 3. **Format**: Base64-encoded Opus audio in `input_audio_buffer.append` messages
-4. **Processing**: Unmute handles STT using Whisper models
+4. **Processing**: Unmute handles STT using Moshi models (~2.6GB VRAM)
 
 #### Output (Text-to-Speech)
 1. **Reception**: `response.audio.delta` messages with base64 Opus audio
-2. **Playback**: HTML5 Audio element with blob URLs
-3. **Queueing**: Sequential playback of audio chunks
-4. **Voice**: Configurable (default: unmute-prod-website/ex04_narration_longform_00001.wav)
+2. **Decoding**: AudioWorklet with Opus decoder (WASM)
+3. **Playback**: Real-time audio streaming through Web Audio API
+4. **Voice**: Configurable (8 available voices)
 
 ### WebSocket Protocol
 Nod.ie uses a subset of Unmute's WebSocket API:

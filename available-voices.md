@@ -1,6 +1,6 @@
 # Available Voices for Nod.ie
 
-You can change the voice in Nod.ie by editing the `modules/websocket-handler.js` file and replacing the `voice` parameter in the `session.update` message.
+You can change the voice in Nod.ie through the Settings window (right-click → Settings) or by editing the `modules/websocket-handler.js` file.
 
 ## English Voices
 
@@ -40,10 +40,53 @@ You can change the voice in Nod.ie by editing the `modules/websocket-handler.js`
 
 ## How to Change the Voice
 
+### Method 1: Using Settings (Recommended)
+1. Right-click on Nod.ie
+2. Select "Settings"
+3. Choose a voice from the "Voice Model" dropdown
+4. Click "Save Settings"
+
+### Method 2: Manual Edit
 1. Open `modules/websocket-handler.js`
-2. Find line 61 where it says `voice: 'unmute-prod-website/p329_022.wav'`
-3. Replace with any of the paths listed above
+2. Find the line with `voice: this.config.voice ||`
+3. Replace the default voice path with any of the paths listed above
 4. Save the file and restart Nod.ie
+
+## Additional Voices Available
+
+According to Kyutai's TTS page (https://kyutai.org/next/tts), many more voices are available:
+
+### US Voices (Expresso Dataset)
+- Angry (female/male)
+- Calming (female/male)
+- Confused (female/male)
+- Desire (female/male)
+- Fearful (female)
+- Jazz radio (male)
+- Narration (female)
+- Sad (female/male)
+- Sarcastic (female/male)
+- Show host (male)
+- Whisper (female)
+
+### UK Voices (VCTK Dataset)
+- VCTK 226 (male)
+- VCTK 228 (female)
+- VCTK 231 (female)
+- VCTK 255 (male)
+- VCTK 277 (female)
+- VCTK 292 (male)
+
+### French Voices (CML Dataset)
+- CML 12977 (female)
+- CML 1406 (male)
+- CML 2154 (female)
+- CML 4724 (male)
+
+### EARS Dataset Voices
+- Multiple speakers (003, 013, 022, 031, 040, 051, 060, 070, 080, 091, 105)
+
+**Note**: File paths for these additional voices are not yet documented. You may need to experiment with paths like `expresso/[filename].wav` or `vctk/[speaker].wav`.
 
 ## Note About 'nova' Voice
 

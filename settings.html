@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Nod.ie Settings</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+            user-select: none;
+        }
+        
+        h1 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #a855f7;
+        }
+        
+        .setting-group {
+            margin-bottom: 20px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+        }
+        
+        .setting-item {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: #a855f7;
+        }
+        
+        input[type="text"], 
+        select {
+            width: 100%;
+            padding: 8px;
+            background: #2a2a2a;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: white;
+            font-size: 14px;
+            -webkit-appearance: none;
+        }
+        
+        select {
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 20px;
+            padding-right: 35px;
+        }
+        
+        select option {
+            background: #1a1a1a;
+            color: white;
+            padding: 8px;
+        }
+        
+        textarea {
+            width: 100%;
+            padding: 8px;
+            background: #2a2a2a;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: white;
+            font-size: 13px;
+            font-family: monospace;
+            resize: vertical;
+            min-height: 150px;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #a855f7;
+        }
+        
+        input[type="text"]:focus, 
+        select:focus {
+            outline: none;
+            border-color: #a855f7;
+        }
+        
+        button {
+            background: #a855f7;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background: #9333ea;
+        }
+        
+        button.secondary {
+            background: rgba(255, 255, 255, 0.1);
+        }
+        
+        button.secondary:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+        
+        .status.success {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+    </style>
+</head>
+<body>
+    <h1>Nod.ie Settings</h1>
+    
+    <div class="setting-group">
+        <h3>Voice Settings</h3>
+        <div class="setting-item">
+            <label for="voice">Voice Model</label>
+            <select id="voice">
+                <optgroup label="English Voices">
+                    <option value="unmute-prod-website/ex04_narration_longform_00001.wav">Explanation (Default)</option>
+                    <option value="unmute-prod-website/p329_022.wav">Watercooler</option>
+                    <option value="unmute-prod-website/freesound/519189_request-42---hmm-i-dont-knowwav.mp3">Quiz Show (British male)</option>
+                    <option value="unmute-prod-website/freesound/440565_why-is-there-educationwav.mp3">Gertrude (warm female)</option>
+                    <option value="unmute-prod-website/developer-1.mp3">Developer (News)</option>
+                </optgroup>
+                <optgroup label="French/Multilingual Voices">
+                    <option value="unmute-prod-website/degaulle-2.wav">Charles de Gaulle</option>
+                    <option value="unmute-prod-website/developpeuse-3.wav">Développeuse (French female)</option>
+                    <option value="unmute-prod-website/fabieng-enhanced-v2.wav">Fabieng (French business coach)</option>
+                </optgroup>
+            </select>
+        </div>
+    </div>
+    
+    <div class="setting-group">
+        <h3>Hotkey Settings</h3>
+        <div class="setting-item">
+            <label for="globalHotkey">Global Hotkey</label>
+            <input type="text" id="globalHotkey" placeholder="e.g., CommandOrControl+Shift+Space" />
+        </div>
+    </div>
+    
+    <div class="setting-group">
+        <h3>Integration Settings</h3>
+        <div class="setting-item">
+            <label for="n8nWebhookUrl">n8n Webhook URL</label>
+            <input type="text" id="n8nWebhookUrl" placeholder="https://your-n8n-instance.com/webhook/..." />
+        </div>
+    </div>
+    
+    <div class="setting-group">
+        <h3>Advanced Settings</h3>
+        <div class="setting-item">
+            <label for="modelName">LLM Model</label>
+            <select id="modelName">
+                <option value="llama3.2:3b">Loading models...</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label for="unmuteUrl">Unmute WebSocket URL</label>
+            <input type="text" id="unmuteUrl" value="ws://localhost:8765" />
+        </div>
+        <div class="setting-item">
+            <label for="ollamaUrl">Ollama API URL</label>
+            <input type="text" id="ollamaUrl" value="http://localhost:11434" />
+        </div>
+    </div>
+    
+    <div class="setting-group">
+        <h3>System Prompt</h3>
+        <div class="setting-item">
+            <label for="systemPrompt">Customize Nod.ie's personality and behavior (Note: Only a condensed version is used due to Unmute's limits)</label>
+            <textarea id="systemPrompt" placeholder="Loading system prompt..."></textarea>
+        </div>
+    </div>
+    
+    <div>
+        <button onclick="saveSettings()">Save Settings</button>
+        <button class="secondary" onclick="window.close()">Cancel</button>
+    </div>
+    
+    <div id="status" class="status"></div>
+    
+    <script>
+        const { ipcRenderer } = require('electron');
+        
+        // Load current settings
+        async function loadSettings() {
+            const config = await ipcRenderer.invoke('get-config');
+            
+            // Set values
+            document.getElementById('voice').value = config.voice || 'unmute-prod-website/ex04_narration_longform_00001.wav';
+            document.getElementById('globalHotkey').value = config.globalHotkey || 'CommandOrControl+Shift+Space';
+            document.getElementById('n8nWebhookUrl').value = config.n8nWebhookUrl || '';
+            document.getElementById('modelName').value = config.modelName || 'llama3.2:3b';
+            document.getElementById('unmuteUrl').value = config.unmuteUrl || 'ws://localhost:8765';
+            document.getElementById('ollamaUrl').value = config.ollamaUrl || 'http://localhost:11434';
+            
+            // Load system prompt
+            try {
+                const systemPrompt = await ipcRenderer.invoke('read-system-prompt');
+                document.getElementById('systemPrompt').value = systemPrompt;
+            } catch (error) {
+                document.getElementById('systemPrompt').value = '# Error loading system prompt\n' + error.message;
+            }
+            
+            // Load available models
+            try {
+                console.log('Fetching Ollama models...');
+                const models = await ipcRenderer.invoke('get-ollama-models');
+                console.log('Received models:', models);
+                const modelSelect = document.getElementById('modelName');
+                modelSelect.innerHTML = '';
+                
+                // If we got models, populate them
+                if (models && models.length > 0) {
+                    models.forEach(model => {
+                        const option = document.createElement('option');
+                        option.value = model;
+                        option.textContent = model;
+                        if (model === (config.modelName || 'llama3.2:3b')) {
+                            option.selected = true;
+                        }
+                        modelSelect.appendChild(option);
+                    });
+                } else {
+                    // Fallback if no models found
+                    const option = document.createElement('option');
+                    option.value = config.modelName || 'llama3.2:3b';
+                    option.textContent = config.modelName || 'llama3.2:3b';
+                    modelSelect.appendChild(option);
+                }
+            } catch (error) {
+                console.error('Failed to load models:', error);
+                // Add current model as fallback
+                const modelSelect = document.getElementById('modelName');
+                const option = document.createElement('option');
+                option.value = config.modelName || 'llama3.2:3b';
+                option.textContent = config.modelName || 'llama3.2:3b';
+                modelSelect.appendChild(option);
+            }
+        }
+        
+        // Save settings
+        async function saveSettings() {
+            const settings = {
+                voice: document.getElementById('voice').value,
+                globalHotkey: document.getElementById('globalHotkey').value,
+                n8nWebhookUrl: document.getElementById('n8nWebhookUrl').value,
+                modelName: document.getElementById('modelName').value,
+                unmuteUrl: document.getElementById('unmuteUrl').value,
+                ollamaUrl: document.getElementById('ollamaUrl').value
+            };
+            
+            try {
+                // Save config settings
+                for (const [key, value] of Object.entries(settings)) {
+                    await ipcRenderer.invoke('set-config', key, value);
+                }
+                
+                // Save system prompt
+                const systemPrompt = document.getElementById('systemPrompt').value;
+                await ipcRenderer.invoke('write-system-prompt', systemPrompt);
+                
+                showStatus('Settings saved successfully!', 'success');
+                
+                // Notify renderer to reconnect with new settings
+                await ipcRenderer.invoke('notify-settings-updated');
+                
+                // Close window after a delay
+                setTimeout(() => {
+                    window.close();
+                }, 1000);
+            } catch (error) {
+                showStatus('Error saving settings: ' + error.message, 'error');
+            }
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+        
+        // Load settings on startup
+        loadSettings();
+    </script>
+</body>
+</html>

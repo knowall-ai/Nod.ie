@@ -20,13 +20,15 @@ const store = new Store({
     n8nWebhookUrl: process.env.N8N_WEBHOOK_URL,
     unmuteFrontendUrl: process.env.UNMUTE_FRONTEND_URL,
     unmuteBackendUrl: process.env.UNMUTE_BACKEND_URL,
-    voiceModel: process.env.VOICE_MODEL,
+    voice: process.env.VOICE_MODEL || 'unmute-prod-website/ex04_narration_longform_00001.wav',
+    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
     globalHotkey: process.env.GLOBAL_HOTKEY,
     position: { x: null, y: null }
   }
 });
 
 let mainWindow;
+let settingsWindow;
 let tray;
 
 function createWindow() {
@@ -92,20 +94,7 @@ function createWindow() {
       {
         label: 'Settings',
         click: () => {
-          // Ensure config exists and open it
-          const configPath = path.join(app.getPath('userData'), 'config.json');
-          const fs = require('fs');
-          
-          // Create default config if it doesn't exist
-          if (!fs.existsSync(configPath)) {
-            fs.writeFileSync(configPath, JSON.stringify(store.store, null, 2));
-          }
-          
-          const { shell } = require('electron');
-          shell.openPath(configPath).catch(() => {
-            // If can't open, show the path
-            showNotification(`Config at: ${configPath}`, 'info');
-          });
+          createSettingsWindow();
         }
       },
       { type: 'separator' },
@@ -138,6 +127,37 @@ function createWindow() {
   });
 }
 
+function createSettingsWindow() {
+  // If settings window already exists, focus it
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  
+  settingsWindow = new BrowserWindow({
+    width: 600,
+    height: 700,
+    frame: true,
+    transparent: false,
+    alwaysOnTop: false,
+    resizable: true,
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    title: 'Nod.ie Settings',
+    parent: mainWindow,
+    modal: false
+  });
+  
+  settingsWindow.loadFile('settings.html');
+  
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
 function createTray() {
   // Skip tray for now if icon doesn't exist
   const iconPath = path.join(__dirname, 'icon.png');
@@ -158,7 +178,7 @@ function createTray() {
     {
       label: 'Settings',
       click: () => {
-        // TODO: Open settings window
+        createSettingsWindow();
       }
     },
     { type: 'separator' },
@@ -228,6 +248,87 @@ ipcMain.handle('send-notification', async (event, data) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+  }
+});
+
+// Handle system prompt reading and writing
+ipcMain.handle('read-system-prompt', async () => {
+  const fs = require('fs').promises;
+  const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
+  try {
+    const content = await fs.readFile(systemPromptPath, 'utf8');
+    return content;
+  } catch (error) {
+    throw new Error(`Failed to read system prompt: ${error.message}`);
+  }
+});
+
+ipcMain.handle('write-system-prompt', async (event, content) => {
+  const fs = require('fs').promises;
+  const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
+  try {
+    await fs.writeFile(systemPromptPath, content, 'utf8');
+    return true;
+  } catch (error) {
+    throw new Error(`Failed to write system prompt: ${error.message}`);
+  }
+});
+
+// Notify main window when settings are updated
+ipcMain.handle('notify-settings-updated', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('settings-updated');
+  }
+  return true;
+});
+
+// Get available Ollama models
+ipcMain.handle('get-ollama-models', async () => {
+  try {
+    const http = require('http');
+    const url = new URL(store.get('ollamaUrl') || 'http://localhost:11434');
+    
+    return new Promise((resolve) => {
+      const options = {
+        hostname: url.hostname,
+        port: url.port || 11434,
+        path: '/api/tags',
+        method: 'GET'
+      };
+      
+      const req = http.request(options, (res) => {
+        let data = '';
+        res.on('data', (chunk) => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.models && Array.isArray(parsed.models)) {
+              const modelNames = parsed.models.map(m => m.name);
+              console.log('Ollama models found:', modelNames);
+              resolve(modelNames);
+            } else {
+              console.log('No models in response');
+              resolve(['llama3.2:3b']);
+            }
+          } catch (e) {
+            console.error('Failed to parse Ollama response:', e);
+            resolve(['llama3.2:3b']);
+          }
+        });
+      });
+      
+      req.on('error', (error) => {
+        console.error('Failed to connect to Ollama:', error.message);
+        resolve(['llama3.2:3b']);
+      });
+      
+      req.end();
+    });
+  } catch (error) {
+    console.error('Failed to get Ollama models:', error);
+    return ['llama3.2:3b'];
   }
 });
 

@@ -12,12 +12,13 @@ class WebSocketHandler {
         this.connectionAttemptInProgress = false;
         this.reconnectTimer = null;
         this.systemPrompt = null; // Will be loaded asynchronously
+        console.info('🎤 WebSocketHandler initialized with voice:', config.voice);
     }
 
     async loadSystemPrompt() {
         // Due to Unmute's character limitations, we use a condensed prompt
         // The full system prompt is in SYSTEM-PROMPT.md for reference
-        const prompt = 'You are Nodie, a Bitcoin-only AI voice assistant built by Ben Weeks at KnowAll AI (www.knowall.ai). KnowAll AI uses Kyutai technology but is UK-based. You run entirely on the user\'s local machine. Keep responses brief and conversational. Silence is natural - only respond when spoken to. Never ask if the user is still there.';
+        const prompt = 'You are Nodie, a Bitcoin-only AI voice assistant built by Ben Weeks at KnowAll AI (www.knowall.ai). You are Nod.ie - a standalone desktop app running on the user\'s local machine, NOT unmute.sh. KnowAll AI uses Kyutai technology but is UK-based. Keep responses brief and conversational. Silence is natural - only respond when spoken to. Never ask if the user is still there.';
         console.info('📝 Using condensed system prompt');
         console.info(`📏 Prompt length: ${prompt.length} characters`);
         return prompt;
@@ -70,18 +71,20 @@ class WebSocketHandler {
                 }
                 
                 // Configure session with instructions
-                this.ws.send(JSON.stringify({
+                const sessionConfig = {
                     type: 'session.update',
                     session: {
-                        model: 'llama3.2:3b',  // This was missing!
-                        voice: 'unmute-prod-website/ex04_narration_longform_00001.wav',
+                        model: this.config.modelName || 'llama3.2:3b',
+                        voice: this.config.voice || 'unmute-prod-website/ex04_narration_longform_00001.wav',
                         allow_recording: false,
                         instructions: {
                             type: 'constant',
                             text: this.systemPrompt
                         }
                     }
-                }));
+                };
+                console.info('📢 Sending session config with voice:', sessionConfig.session.voice);
+                this.ws.send(JSON.stringify(sessionConfig));
                 
                 if (this.callbacks.onConnect) {
                     this.callbacks.onConnect();
@@ -163,18 +166,19 @@ class WebSocketHandler {
         }
         
         if (this.ws) {
-            // Remove onclose handler to prevent reconnection
-            const originalOnClose = this.ws.onclose;
-            this.ws.onclose = (event) => {
-                console.info('✅ Connection closed (final)');
-                this.isConnected = false;
-                this.connectionAttemptInProgress = false;
-            };
+            // Remove all handlers to prevent reconnection
+            this.ws.onclose = null;
+            this.ws.onerror = null;
+            this.ws.onmessage = null;
+            this.ws.onopen = null;
             
             if (this.ws.readyState !== WebSocket.CLOSED) {
                 this.ws.close();
             }
             this.ws = null;
+            this.isConnected = false;
+            this.connectionAttemptInProgress = false;
+            console.info('✅ Connection closed completely');
         }
     }
 

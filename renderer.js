@@ -162,6 +162,7 @@ function toggleMute() {
 // Connect to Unmute backend
 async function connectToUnmute() {
     const config = await ipcRenderer.invoke('get-config');
+    console.info('🔄 Connecting with config:', { voice: config.voice, model: config.modelName });
     
     wsHandler = new WebSocketHandler(config, {
         onConnect: () => {
@@ -237,6 +238,40 @@ ipcRenderer.on('n8n-notification', (event, data) => {
     if (wsHandler?.isConnected) {
         // Note: Unmute doesn't support text input, only audio
         console.debug('n8n notification received:', data.message);
+    }
+});
+
+// Reconnect when settings change
+ipcRenderer.on('settings-updated', async () => {
+    console.info('⚙️ Settings updated, reconnecting...');
+    
+    try {
+        // Clean up existing connections
+        if (wsHandler) {
+            wsHandler.close();
+            wsHandler = null;
+        }
+        if (audioCapture) {
+            audioCapture.stop();
+            audioCapture = null;
+        }
+        if (stopVisualization) {
+            stopVisualization();
+            stopVisualization = null;
+        }
+        if (audioPlayback) {
+            await audioPlayback.cleanup();
+            audioPlayback = null;
+        }
+        
+        // Wait a moment for cleanup
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Reconnect with new settings
+        await connectToUnmute();
+    } catch (error) {
+        console.error('Error during settings update:', error);
+        ui.showNotification('Error updating settings. Please restart.', 'error');
     }
 });
 

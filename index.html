@@ -138,7 +138,36 @@
             border-radius: 10px;
             display: none;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 400px;
+            margin: 0 auto;
+            text-align: center;
+            transition: opacity 0.3s ease-in-out;
             font-size: 12px;
+        }
+        
+        .notification.error {
+            background: rgba(220, 38, 38, 0.9);
+            border: 1px solid rgba(239, 68, 68, 0.5);
+        }
+        
+        .notification.success {
+            background: rgba(34, 197, 94, 0.9);
+            border: 1px solid rgba(74, 222, 128, 0.5);
+        }
+        
+        .notification.info {
+            background: rgba(59, 130, 246, 0.9);
+            border: 1px solid rgba(96, 165, 250, 0.5);
+        }
+        
+        .notification.transcript {
+            background: rgba(139, 92, 246, 0.9);
+            border: 1px solid rgba(167, 139, 250, 0.5);
+        }
+        
+        .notification.response {
+            background: rgba(236, 72, 153, 0.9);
+            border: 1px solid rgba(244, 114, 182, 0.5);
         }
     </style>
 </head>
