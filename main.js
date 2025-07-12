@@ -27,6 +27,7 @@ const store = new Store({
 });
 
 let mainWindow;
+let settingsWindow;
 let tray;
 
 function createWindow() {
@@ -92,20 +93,7 @@ function createWindow() {
       {
         label: 'Settings',
         click: () => {
-          // Ensure config exists and open it
-          const configPath = path.join(app.getPath('userData'), 'config.json');
-          const fs = require('fs');
-          
-          // Create default config if it doesn't exist
-          if (!fs.existsSync(configPath)) {
-            fs.writeFileSync(configPath, JSON.stringify(store.store, null, 2));
-          }
-          
-          const { shell } = require('electron');
-          shell.openPath(configPath).catch(() => {
-            // If can't open, show the path
-            showNotification(`Config at: ${configPath}`, 'info');
-          });
+          createSettingsWindow();
         }
       },
       { type: 'separator' },
@@ -138,6 +126,36 @@ function createWindow() {
   });
 }
 
+function createSettingsWindow() {
+  // If settings window already exists, focus it
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.focus();
+    return;
+  }
+  
+  settingsWindow = new BrowserWindow({
+    width: 600,
+    height: 700,
+    frame: true,
+    transparent: false,
+    alwaysOnTop: false,
+    resizable: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    title: 'Nod.ie Settings',
+    parent: mainWindow,
+    modal: false
+  });
+  
+  settingsWindow.loadFile('settings.html');
+  
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
 function createTray() {
   // Skip tray for now if icon doesn't exist
   const iconPath = path.join(__dirname, 'icon.png');
@@ -158,7 +176,7 @@ function createTray() {
     {
       label: 'Settings',
       click: () => {
-        // TODO: Open settings window
+        createSettingsWindow();
       }
     },
     { type: 'separator' },
