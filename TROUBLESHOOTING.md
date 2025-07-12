@@ -13,6 +13,7 @@
 | Can't drag the window | Click and drag on transparent area around circle<br>Circle itself is for mute/unmute toggle |
 | Audio format error: "unexpected ogg capture pattern" | MediaRecorder produces WebM, Unmute expects OGG<br>Fixed by switching to opus-recorder library |
 | Too many Electron processes | Multiple Nod.ie instances running<br>1. Kill all: `pkill -f "electron.*nodie"`<br>2. Check if killed: `ps aux \| grep -E "electron.*nodie" \| grep -v grep`<br>3. If persists, force kill: `killall -9 electron` |
+| Slow responses (10+ seconds) | Ollama running on CPU instead of GPU<br>1. Check GPU memory: `nvidia-smi`<br>2. Stop other GPU services<br>3. Restart Ollama: `docker restart ollama`<br>4. See "Performance Issues" section below |
 
 ## Detailed Solutions
 
@@ -78,6 +79,66 @@
 | Global hotkey not working | Check for conflicts, try different combination in config.json |
 | Voice selection not changing | Use full voice paths from available-voices.md |
 | n8n webhooks not triggering | Verify webhook URL is accessible from Nod.ie |
+
+### 🚀 Performance Issues
+
+| Problem | Solution |
+|---------|----------|
+| Very slow responses (10-30s) | LLM running on CPU - check GPU memory availability |
+| High CPU usage from Ollama | Model can't fit in GPU memory, falling back to CPU |
+| Multiple AI services competing | Stop unused services to free GPU memory |
+| GPU memory fragmentation | Restart Docker services to clean up memory |
+
+**Diagnosing GPU Issues:**
+
+1. **Check what's using GPU memory:**
+   ```bash
+   nvidia-smi
+   # Look for processes using significant memory
+   ```
+
+2. **Check if Ollama is using GPU:**
+   ```bash
+   nvidia-smi | grep ollama
+   # Should show ollama process if using GPU
+   ```
+
+3. **Common GPU memory hogs:**
+   - Text Generation Inference (TGI) containers
+   - Other AI models (Stable Diffusion, etc.)
+   - Multiple Ollama models loaded simultaneously
+   - Browser tabs with GPU acceleration
+
+**Optimizing for Nod.ie:**
+
+1. **Configure Ollama for single model:**
+   ```bash
+   # Set in Ollama container environment:
+   OLLAMA_MAX_LOADED_MODELS=1
+   OLLAMA_NUM_PARALLEL=1
+   OLLAMA_KEEP_ALIVE=5m
+   ```
+
+2. **Free up GPU memory:**
+   ```bash
+   # Stop unused containers
+   docker ps | grep -E "tgi|text-generation"
+   docker stop <container_id>
+   
+   # Unload Ollama models
+   docker exec ollama ollama rm <unused_model>
+   ```
+
+3. **Monitor GPU usage during operation:**
+   ```bash
+   watch -n 1 nvidia-smi
+   ```
+
+**Expected GPU Usage:**
+- Moshi STT: ~2.6GB
+- Moshi TTS: ~6.4GB
+- Ollama (llama3.2:3b): ~4GB
+- **Total**: ~13GB minimum
 
 ## Debugging Audio Lag
 

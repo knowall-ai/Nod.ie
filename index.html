@@ -47,12 +47,31 @@
             animation: pulse 2s ease-in-out infinite;
         }
         
+        #circle.loading {
+            /* Gray gradient with spinning animation */
+            background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);
+            animation: spin 1s linear infinite;
+        }
+        
+        #circle.loading #icon {
+            opacity: 0.5;
+        }
+        
         @keyframes pulse {
             0%, 100% {
                 transform: scale(1);
             }
             50% {
                 transform: scale(1.05);
+            }
+        }
+        
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
             }
         }
         

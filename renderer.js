@@ -166,6 +166,8 @@ async function connectToUnmute() {
     wsHandler = new WebSocketHandler(config, {
         onConnect: () => {
             console.debug('🔗 WebSocket connected callback fired');
+            // Clear loading state
+            ui.setStatus('idle');
             // Start listening if not muted
             if (!ui.isMuted) {
                 console.info('🎙️ Will start listening in 1 second...');
@@ -240,6 +242,7 @@ ipcRenderer.on('n8n-notification', (event, data) => {
 
 // Initialize
 console.info('🚀 Nod.ie renderer starting...');
+ui.setStatus('loading');
 connectToUnmute();
 
 // Keep visualization alive

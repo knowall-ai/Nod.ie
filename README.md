@@ -19,6 +19,7 @@ Nod.ie (pronounced "Nodey" or "Node-ee") is an always-available AI voice assista
 ### System Requirements
 - **OS**: Linux (built and tested on Kubuntu 24.04) or macOS
 - **RAM**: 8GB minimum (16GB recommended)
+- **GPU**: NVIDIA GPU with 12GB+ VRAM recommended for optimal performance
 - **Storage**: 2GB for Unmute models
 - **Microphone**: Any standard USB or built-in microphone
 - **Audio Output**: Speakers or headphones
@@ -34,15 +35,17 @@ Nod.ie (pronounced "Nodey" or "Node-ee") is an always-available AI voice assista
 ### AI Stack Requirements
 The following services must be running (typically via Docker):
 - **unmute-backend**: WebSocket server on port 8765
-- **unmute-stt**: Speech-to-text service
-- **unmute-tts**: Text-to-speech service
-- **ollama**: LLM inference (connected to Unmute)
+- **unmute-stt**: Speech-to-text service (Moshi-based, ~2.6GB VRAM)
+- **unmute-tts**: Text-to-speech service (Moshi-based, ~6.4GB VRAM)
+- **ollama**: LLM inference (requires ~4-8GB VRAM for good performance)
 
 To start these services:
 ```bash
 # Navigate to your Unmute/AI stack directory
 docker compose up -d
 ```
+
+**GPU Memory Requirements**: The full stack requires ~12-16GB VRAM total. Ensure other GPU-intensive services are stopped to avoid CPU fallback.
 
 ## Installation
 
@@ -92,6 +95,14 @@ Nod.ie is an always-listening voice assistant that responds to your voice comman
 - **Right-click**: Open menu
 - **Ctrl+Shift+Space**: Toggle mute from anywhere
 - **Ctrl+Shift+A**: Show Nod.ie window
+
+### Visual States
+
+- **Gray spinning**: Loading/connecting to services
+- **Purple**: Listening (unmuted)
+- **Purple pulsing**: Processing/thinking
+- **Red**: Muted
+- **White ring**: Audio activity visualization
 
 ## Configuration
 
