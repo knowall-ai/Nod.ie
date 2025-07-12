@@ -41,11 +41,26 @@
         select {
             width: 100%;
             padding: 8px;
-            background: rgba(255, 255, 255, 0.1);
+            background: #2a2a2a;
             border: 1px solid rgba(255, 255, 255, 0.2);
             border-radius: 4px;
             color: white;
             font-size: 14px;
+            -webkit-appearance: none;
+        }
+        
+        select {
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 20px;
+            padding-right: 35px;
+        }
+        
+        select option {
+            background: #1a1a1a;
+            color: white;
+            padding: 8px;
         }
         
         input[type="text"]:focus, 
@@ -141,6 +156,14 @@
         </div>
     </div>
     
+    <div class="setting-group">
+        <h3>System Prompt</h3>
+        <div class="setting-item">
+            <label for="systemPromptFile">Edit SYSTEM-PROMPT.md to customize Nod.ie's personality and behavior</label>
+            <button onclick="openSystemPrompt()" style="width: 100%;">Open System Prompt Editor</button>
+        </div>
+    </div>
+    
     <div>
         <button onclick="saveSettings()">Save Settings</button>
         <button class="secondary" onclick="window.close()">Cancel</button>
@@ -194,6 +217,16 @@
             status.textContent = message;
             status.className = `status ${type}`;
             status.style.display = 'block';
+        }
+        
+        // Open system prompt file
+        function openSystemPrompt() {
+            const { shell } = require('electron');
+            const path = require('path');
+            const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
+            shell.openPath(systemPromptPath).catch((error) => {
+                showStatus('Could not open system prompt file: ' + error.message, 'error');
+            });
         }
         
         // Load settings on startup

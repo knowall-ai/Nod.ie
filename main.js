@@ -135,11 +135,12 @@ function createSettingsWindow() {
   
   settingsWindow = new BrowserWindow({
     width: 600,
-    height: 700,
+    height: 580,
     frame: true,
     transparent: false,
     alwaysOnTop: false,
     resizable: true,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
