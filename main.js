@@ -1,6 +1,7 @@
 const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
+require('dotenv').config();
 
 // Ensure single instance
 const gotTheLock = app.requestSingleInstanceLock();
@@ -15,12 +16,12 @@ if (!gotTheLock) {
 // Configuration store
 const store = new Store({
   defaults: {
-    assistantName: 'Nodie',
-    n8nWebhookUrl: process.env.N8N_WEBHOOK_URL || '',
-    unmuteFrontendUrl: process.env.UNMUTE_FRONTEND_URL || 'http://localhost:3000',
-    unmuteBackendUrl: process.env.UNMUTE_BACKEND_URL || 'ws://localhost:8765',
-    voiceModel: process.env.VOICE_MODEL || 'unmute-prod-website/ex04_narration_longform_00001.wav',
-    globalHotkey: process.env.GLOBAL_HOTKEY || 'CommandOrControl+Shift+Space',
+    assistantName: process.env.ASSISTANT_NAME,
+    n8nWebhookUrl: process.env.N8N_WEBHOOK_URL,
+    unmuteFrontendUrl: process.env.UNMUTE_FRONTEND_URL,
+    unmuteBackendUrl: process.env.UNMUTE_BACKEND_URL,
+    voiceModel: process.env.VOICE_MODEL,
+    globalHotkey: process.env.GLOBAL_HOTKEY,
     position: { x: null, y: null }
   }
 });

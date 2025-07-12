@@ -50,6 +50,10 @@ npm install
 
 # Copy required decoder files (if not already present)
 cp node_modules/opus-recorder/dist/decoderWorker.min.wasm .
+
+# Create environment configuration
+cp .env.example .env
+# Edit .env with your configuration
 ```
 
 ### Required Files
