@@ -205,20 +205,7 @@ ipcMain.handle('set-config', (event, key, value) => {
   store.set(key, value);
 });
 
-ipcMain.handle('get-prompt', async () => {
-  const fs = require('fs');
-  try {
-    const promptPath = path.join(__dirname, 'PROMPT-SHORT.md');
-    const content = fs.readFileSync(promptPath, 'utf8');
-    // Extract the prompt from the markdown between the first ``` markers
-    const match = content.match(/```\n([\s\S]*?)\n```/);
-    return match ? match[1] : 'You are Nod.ie, a friendly AI voice assistant.';
-  } catch (error) {
-    console.error('Error loading PROMPT-SHORT.md:', error);
-    console.warn('Using fallback prompt');
-    return 'You are Nod.ie, a friendly AI voice assistant.';
-  }
-});
+// Removed IPC handler for get-prompt - prompt is now hardcoded in websocket-handler.js
 
 ipcMain.handle('send-to-claude', async (event, text) => {
   // Integration with Claude CLI
