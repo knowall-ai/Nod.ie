@@ -63,6 +63,24 @@
             padding: 8px;
         }
         
+        textarea {
+            width: 100%;
+            padding: 8px;
+            background: #2a2a2a;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            color: white;
+            font-size: 13px;
+            font-family: monospace;
+            resize: vertical;
+            min-height: 150px;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: #a855f7;
+        }
+        
         input[type="text"]:focus, 
         select:focus {
             outline: none;
@@ -159,8 +177,8 @@
     <div class="setting-group">
         <h3>System Prompt</h3>
         <div class="setting-item">
-            <label for="systemPromptFile">Edit SYSTEM-PROMPT.md to customize Nod.ie's personality and behavior</label>
-            <button onclick="openSystemPrompt()" style="width: 100%;">Open System Prompt Editor</button>
+            <label for="systemPrompt">Customize Nod.ie's personality and behavior (Note: Only a condensed version is used due to Unmute's limits)</label>
+            <textarea id="systemPrompt" placeholder="Loading system prompt..."></textarea>
         </div>
     </div>
     
@@ -184,6 +202,14 @@
             document.getElementById('n8nWebhookUrl').value = config.n8nWebhookUrl || '';
             document.getElementById('modelName').value = config.modelName || 'llama3.2:3b';
             document.getElementById('unmuteUrl').value = config.unmuteUrl || 'ws://localhost:8765';
+            
+            // Load system prompt
+            try {
+                const systemPrompt = await ipcRenderer.invoke('read-system-prompt');
+                document.getElementById('systemPrompt').value = systemPrompt;
+            } catch (error) {
+                document.getElementById('systemPrompt').value = '# Error loading system prompt\n' + error.message;
+            }
         }
         
         // Save settings
@@ -197,9 +223,14 @@
             };
             
             try {
+                // Save config settings
                 for (const [key, value] of Object.entries(settings)) {
                     await ipcRenderer.invoke('set-config', key, value);
                 }
+                
+                // Save system prompt
+                const systemPrompt = document.getElementById('systemPrompt').value;
+                await ipcRenderer.invoke('write-system-prompt', systemPrompt);
                 
                 showStatus('Settings saved successfully!', 'success');
                 
@@ -217,16 +248,6 @@
             status.textContent = message;
             status.className = `status ${type}`;
             status.style.display = 'block';
-        }
-        
-        // Open system prompt file
-        function openSystemPrompt() {
-            const { shell } = require('electron');
-            const path = require('path');
-            const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
-            shell.openPath(systemPromptPath).catch((error) => {
-                showStatus('Could not open system prompt file: ' + error.message, 'error');
-            });
         }
         
         // Load settings on startup

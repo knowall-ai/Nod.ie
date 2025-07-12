@@ -135,7 +135,7 @@ function createSettingsWindow() {
   
   settingsWindow = new BrowserWindow({
     width: 600,
-    height: 580,
+    height: 650,
     frame: true,
     transparent: false,
     alwaysOnTop: false,
@@ -247,6 +247,29 @@ ipcMain.handle('send-notification', async (event, data) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
+  }
+});
+
+// Handle system prompt reading and writing
+ipcMain.handle('read-system-prompt', async () => {
+  const fs = require('fs').promises;
+  const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
+  try {
+    const content = await fs.readFile(systemPromptPath, 'utf8');
+    return content;
+  } catch (error) {
+    throw new Error(`Failed to read system prompt: ${error.message}`);
+  }
+});
+
+ipcMain.handle('write-system-prompt', async (event, content) => {
+  const fs = require('fs').promises;
+  const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
+  try {
+    await fs.writeFile(systemPromptPath, content, 'utf8');
+    return true;
+  } catch (error) {
+    throw new Error(`Failed to write system prompt: ${error.message}`);
   }
 });
 
