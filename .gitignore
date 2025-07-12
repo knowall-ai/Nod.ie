@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build output
+dist/
+build/
+out/
+
+# Logs
+*.log
+logs/
+*.log.*
+nodie-crash.log
+conversation-test.log
+nodie-debug-*.log
+
+# Test artifacts
+test-results.json
+failed-audio-chunk.*
+*.test.js.tmp
+
+# Screenshots and media
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.mp4
+*.mov
+screenshots/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+
+# User configuration
+~/.config/nodie/
+
+# Debug files
+debug-*.js
+!debug-audio-detailed.js
+
+# Audio test files
+test-audio-*.ogg
+test-audio-*.wav

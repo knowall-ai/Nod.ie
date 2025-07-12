@@ -1,0 +1,29 @@
+{
+  "name": "nodie",
+  "version": "1.0.0",
+  "description": "Nod.ie - AI voice assistant with Unmute integration",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron . --no-sandbox",
+    "dev": "electron . --dev --no-sandbox",
+    "test": "node tests/test-suite.js"
+  },
+  "keywords": [
+    "voice",
+    "assistant",
+    "ai",
+    "unmute",
+    "nodie"
+  ],
+  "author": "Ben Weeks",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^27.0.0"
+  },
+  "dependencies": {
+    "electron-store": "^8.1.0",
+    "opus-recorder": "^8.0.5",
+    "playwright": "^1.54.1",
+    "ws": "^8.14.2"
+  }
+}

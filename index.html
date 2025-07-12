@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Nod.ie</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+            overflow: hidden;
+            user-select: none;
+            /* No -webkit-app-region here - using custom drag handling */
+        }
+        
+        #circle {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background 0.3s ease, transform 0.3s ease;
+            /* No app-region - using mouse events for drag */
+            position: relative;
+        }
+        
+        #circle:hover {
+            /* No hover effect */
+        }
+        
+        #circle.idle {
+            /* Default purple gradient */
+        }
+        
+        #circle.listening {
+            /* Same purple gradient */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        
+        #circle.thinking {
+            /* Keep purple gradient, add subtle pulsing animation */
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+        
+        #circle.muted {
+            opacity: 0.9;
+            background: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
+        }
+        
+        #mute-icon {
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            width: 30px;
+            height: 30px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            pointer-events: none;
+        }
+        
+        #circle.muted #mute-icon {
+            display: flex;
+        }
+        
+        /* Animations removed to prevent alignment issues */
+        
+        #icon {
+            width: 50px;
+            height: 50px;
+            fill: white;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        
+        #waveform {
+            position: absolute;
+            width: 100px;
+            height: 100px;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            z-index: 200;
+        }
+        
+        .audio-ring {
+            /* Disabled - we don't want the spinning ring */
+            display: none;
+        }
+        
+        .notification {
+            position: fixed;
+            bottom: 130px;
+            left: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 10px;
+            display: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div id="circle">
+        <svg id="icon" viewBox="0 0 24 24">
+            <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z"/>
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+        </svg>
+        <canvas id="waveform"></canvas>
+        <div class="audio-ring" id="audioRing"></div>
+        <div id="mute-icon">🔇</div>
+    </div>
+    
+    <div id="notification" class="notification"></div>
+    
+    <script src="renderer.js"></script>
+</body>
+</html>
