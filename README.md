@@ -4,6 +4,8 @@
 
 Nod.ie (pronounced "Nodey" or "Node-ee") is an always-available AI voice assistant that integrates with Kyutai Unmute for natural voice conversations. Originally created to assist with running Bitcoin and Lightning nodes, Nod.ie can manage LND channels, execute Lightning payments, and serve as a general PC assistant or interactive tutor. Designed to work with the black-panther home server.
 
+![Nod.ie running on Kubuntu desktop](docs/images/nodie-screenshot.png)
+
 ## Features
 
 - 🎤 Push-to-talk with global hotkey (Ctrl+Shift+Space)

@@ -47,6 +47,9 @@ failed-audio-chunk.*
 *.mp4
 *.mov
 screenshots/
+# But keep documentation images
+!docs/images/*.png
+!docs/images/*.jpg
 
 # Temporary files
 tmp/
