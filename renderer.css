@@ -1,0 +1,250 @@
+/**
+ * Unified CSS for both Electron and Web environments
+ * Uses data-platform attribute for platform-specific styling
+ */
+
+/* Base styles */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow: hidden;
+    user-select: none;
+}
+
+/* Platform-specific body styles */
+body[data-platform="electron"] {
+    background: transparent;
+}
+
+body[data-platform="web"] {
+    background: #1a1a1a;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+/* App container */
+#app {
+    position: relative;
+    width: 300px;
+    height: 300px;
+}
+
+/* Circle styles */
+#circle {
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: visible;
+}
+
+/* Circle size - same for both platforms */
+#circle {
+    width: 250px;
+    height: 250px;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+}
+
+/* Circle states - Electron */
+body[data-platform="electron"] #circle.idle,
+body[data-platform="electron"] #circle.listening {
+    background: transparent; /* Show avatar instead of purple */
+    opacity: 1; /* Remove any transparency */
+}
+
+body[data-platform="electron"] #circle.thinking {
+    background: transparent; /* Show avatar instead of purple */
+    opacity: 1; /* Remove any transparency */
+}
+
+body[data-platform="electron"] #circle.muted {
+    opacity: 0.9;
+    background: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
+}
+
+body[data-platform="electron"] #circle.loading {
+    background: transparent; /* Show avatar during loading */
+}
+
+/* Circle states - Web */
+body[data-platform="web"] #circle.idle,
+body[data-platform="web"] #circle.listening {
+    background: transparent; /* Show avatar instead of purple */
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+}
+
+body[data-platform="web"] #circle.thinking {
+    background: transparent; /* Show avatar instead of purple */
+    box-shadow: 0 10px 30px rgba(102, 126, 234, 0.5);
+}
+
+body[data-platform="web"] #circle.muted {
+    background: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
+    box-shadow: 0 10px 30px rgba(255, 71, 87, 0.5);
+}
+
+body[data-platform="web"] #circle.loading {
+    background: transparent; /* Show avatar during loading */
+    box-shadow: 0 10px 30px rgba(45, 52, 54, 0.5);
+}
+
+/* Waveform canvas */
+#waveform {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: 10;
+}
+
+/* Avatar styles */
+#avatar-container {
+    position: relative;
+    width: 250px;
+    height: 250px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    opacity: 1; /* Ensure full opacity */
+}
+
+#avatar-image,
+#avatar-video {
+    position: absolute;
+    width: 250px;
+    height: 250px;
+    object-fit: cover;
+    border-radius: 50%;
+    display: none;
+}
+
+/* Avatar is always visible */
+#avatar-image {
+    display: block;
+}
+
+#avatar-video {
+    display: none; /* Use static image by default */
+}
+
+/* Avatar is always visible - removed hiding rules */
+
+/* Status text */
+#status-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 16px;
+    font-weight: 500;
+    text-align: center;
+    z-index: 20;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    pointer-events: none;
+}
+
+/* Notification styles */
+.notification {
+    position: fixed;
+    display: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    color: white;
+    transition: all 0.3s ease;
+    z-index: 1000;
+}
+
+/* Platform-specific notification positioning */
+body[data-platform="electron"] .notification {
+    bottom: 130px;
+    left: 10px;
+    right: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    font-size: 12px;
+    text-align: center;
+}
+
+body[data-platform="web"] .notification {
+    top: 20px;
+    right: 20px;
+    background: #2c3e50;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+    font-size: 14px;
+}
+
+.notification.success {
+    background: #27ae60;
+}
+
+.notification.error {
+    background: #e74c3c;
+}
+
+.notification.info {
+    background: #3498db;
+}
+
+/* Debug info panel - only visible on web */
+#debug-info {
+    display: none;
+}
+
+body[data-platform="web"] #debug-info {
+    display: block;
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    padding: 10px;
+    font-size: 12px;
+    font-family: monospace;
+    border-radius: 5px;
+    max-width: 400px;
+}
+
+/* Animations */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        opacity: 1;
+    }
+    50% {
+        transform: scale(1.05);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Loading text animation */
+.loading-text {
+    animation: fadeIn 0.5s ease;
+}

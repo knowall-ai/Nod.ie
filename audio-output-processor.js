@@ -22,10 +22,10 @@ class AudioOutputProcessor extends AudioWorkletProcessor {
     // Buffer length definitions
     const frameSize = asSamples(80);
     // initialBufferSamples: we wait to have at least that many samples before starting to play
-    this.initialBufferSamples = 1 * frameSize;
+    this.initialBufferSamples = 2 * frameSize; // Moderate buffer size
     // once we have enough samples, we further wait that long before starting to play.
     // This allows to have buffer lengths that are not a multiple of frameSize.
-    this.partialBufferSamples = asSamples(10);
+    this.partialBufferSamples = asSamples(20); // Moderate buffer size
     // If the buffer length goes over that many, we will drop the oldest packets until
     // we reach back initialBufferSamples + partialBufferSamples.
     this.maxBufferSamples = asSamples(DEFAULT_MAX_BUFFER_MS);
@@ -118,7 +118,7 @@ class AudioOutputProcessor extends AudioWorkletProcessor {
     this.pidx = 0;
 
     // For now let's reset the buffer params.
-    this.partialBufferSamples = asSamples(10);
+    this.partialBufferSamples = asSamples(20); // Reset to match constructor
     this.maxBufferSamples = asSamples(DEFAULT_MAX_BUFFER_MS);
   }
 

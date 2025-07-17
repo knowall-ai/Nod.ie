@@ -10,7 +10,10 @@ Nod.ie is an Electron-based desktop application that provides an always-availabl
 
 ### 1. Electron Framework
 - **Main Process** (`main.js`): Manages the application lifecycle, window creation, and system integration
-- **Renderer Process** (`renderer.js`): Handles UI, audio processing, and WebSocket communication
+- **Renderer Process**: 
+  - `renderer-common.js`: Shared core functionality
+  - `renderer-electron.js`: Electron-specific implementation
+  - `renderer-web.js`: Web browser version for testing
 - **Preload Script**: Not used (direct Node.js integration in renderer)
 
 ### 2. Audio Pipeline
@@ -89,6 +92,7 @@ Unmute → WebSocket → Base64 Opus → Decoder → AudioWorklet → Speakers
 - Draggable via transparent background
 
 #### State Management (`modules/ui-manager.js`)
+- **Loading** (orange pulse): Initializing connections
 - **Idle** (purple): Listening for input
 - **Muted** (red): Not capturing audio
 - **Thinking** (yellow spin): Processing
@@ -132,6 +136,43 @@ Unmute → WebSocket → Base64 Opus → Decoder → AudioWorklet → Speakers
 - Reusable components
 - Clear data flow
 
+## Loading State Detection
+
+Nod.ie implements intelligent loading state management to ensure a smooth user experience:
+
+### Loading State Components
+1. **Visual Feedback**: Orange pulsing animation with "Loading Nod.ie..." text
+2. **Connection Detection**: Monitors WebSocket connection to Unmute backend
+3. **Resource Loading**: Tracks avatar video/image loading status
+4. **User Interaction**: Prevents actions until fully loaded
+
+### Loading State Flow
+```javascript
+// Initial state
+state.isLoading = true
+showLoadingText("Loading Nod.ie...")
+
+// WebSocket connection established
+ws.onopen → checkIfFullyLoaded()
+
+// All resources ready
+state.isLoading = false
+hideLoadingText()
+setStatus('idle')
+```
+
+### Loading Indicators
+- **Center Text**: Status messages appear in the center of the circle
+- **Pulse Animation**: Gentle scale animation (1.0 → 1.02 → 1.0)
+- **Orange Gradient**: Visual distinction from other states
+- **10s Timeout**: Fallback if connection fails
+
+### Benefits
+- Users know when Nod.ie is ready
+- Prevents errors from premature interaction
+- Clear feedback during slow connections
+- Graceful handling of connection failures
+
 ## Performance Optimizations
 
 ### Audio Latency Reduction
@@ -148,11 +189,14 @@ Unmute → WebSocket → Base64 Opus → Decoder → AudioWorklet → Speakers
 
 ## Integration Points
 
-### Unmute Backend
-- Provides STT (Whisper), LLM (Ollama), and TTS
-- Handles all voice processing
-- Manages conversation state
-- Supports multiple voices
+### Unmute Backend Services
+- **unmute-backend**: Main orchestrator on port 8000 (regular) or 8001 (MCP version)
+- **unmute-stt**: Speech-to-text using Moshi models
+- **unmute-tts**: Text-to-speech using Moshi models  
+- **ollama**: LLM inference backend
+- **musetalk** (optional): Lip-sync avatar generation on port 8766
+
+All services run on the `ai-stack` Docker network for inter-service communication.
 
 ### External Services
 - **n8n webhooks**: Automation and notifications
@@ -185,6 +229,73 @@ Unmute → WebSocket → Base64 Opus → Decoder → AudioWorklet → Speakers
 - **Audio Context Suspended**: User interaction required
 - **WebSocket Errors**: Check Unmute is running
 - **No Audio**: Verify decoder is working
+
+## Testing Architecture
+
+### Test Organization
+- All tests located in `tests/` directory
+- Playwright for UI testing (cross-platform consistency)
+- Screenshots saved to `tests/screenshots/` (gitignored)
+- Full console output captured for debugging
+
+### Test Strategy
+1. **Unit Tests**: Individual module functionality
+2. **Integration Tests**: Component interactions
+3. **E2E Tests**: Full voice conversation flow
+4. **Visual Tests**: Screenshot-based regression testing
+
+### Web Testing Mode
+- Separate web version (`test-web.html` + `renderer-web.js`)
+- Allows Playwright automation without Electron complexity
+- Shared code via `renderer-common.js`
+- Debug UI shows real-time status
+
+## Available Voice Configuration
+
+Nod.ie supports multiple voices through the Unmute system. Voices are configured via the `voice` parameter in the WebSocket session.
+
+### English Voices
+
+1. **Watercooler** (Default VCTK dataset voice)
+   - Path: `unmute-prod-website/p329_022.wav`
+   - Description: Natural conversational voice
+   
+2. **Quiz Show** (UK male, skeptical)
+   - Path: `unmute-prod-website/freesound/519189_request-42---hmm-i-dont-knowwav.mp3`
+   - Description: British male voice with a skeptical tone
+   
+3. **Gertrude** (Kind and sympathetic)
+   - Path: `unmute-prod-website/freesound/440565_why-is-there-educationwav.mp3`
+   - Description: Warm female voice, good for advice-giving
+   
+4. **Dev (news)** (Václav from Kyutai)
+   - Path: `unmute-prod-website/developer-1.mp3`
+   - Description: Developer voice, good for technical/news content
+   
+5. **Explanation** (Expresso dataset)
+   - Path: `unmute-prod-website/ex04_narration_longform_00001.wav`
+   - Description: Clear voice for explanatory content
+
+### French/Multilingual Voices
+
+6. **Charles** (Charles de Gaulle)
+   - Path: `unmute-prod-website/degaulle-2.wav`
+   - Description: Historical figure voice, speaks French/English
+   
+7. **Développeuse** (French developer)
+   - Path: `unmute-prod-website/developpeuse-3.wav`
+   - Description: French female developer voice
+   
+8. **Fabieng** (French business coach)
+   - Path: `unmute-prod-website/fabieng-enhanced-v2.wav`
+   - Description: Dynamic French voice with English mixed in
+
+### Voice Configuration
+
+Voice selection is configured in:
+- Environment variable: `VOICE_MODEL`
+- Config file: `~/.config/nodie/config.json`
+- Session update message: `voice` parameter
 
 ## Future Architecture Considerations
 

@@ -34,10 +34,12 @@ Nod.ie (pronounced "Nodey" or "Node-ee") is an always-available AI voice assista
 
 ### AI Stack Requirements
 The following services must be running (typically via Docker):
-- **unmute-backend**: WebSocket server on port 8765
+- **unmute-backend**: WebSocket server on port 8765 (regular) or 8766 (MCP version)
 - **unmute-stt**: Speech-to-text service (Moshi-based, ~2.6GB VRAM)
 - **unmute-tts**: Text-to-speech service (Moshi-based, ~6.4GB VRAM)
 - **ollama**: LLM inference (requires ~4-8GB VRAM for good performance)
+- **musetalk** (optional): Lip-sync avatar service on port 8766
+  - Models available at: https://huggingface.co/TMElyralab/MuseTalk
 
 To start these services:
 ```bash
@@ -244,7 +246,37 @@ node tests/serve-browser-test.js
 # Then open http://localhost:8090
 ```
 
-Key tests include WebSocket connectivity, audio format validation, and end-to-end voice interaction testing.
+## Testing
+
+All tests are located in the `tests/` directory and use Playwright for UI testing.
+
+### Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run specific test
+node tests/test-playwright-avatar.js
+
+# Run web version for visual testing
+node serve-web.js
+# Then open http://localhost:8080 in browser
+```
+
+### Test Features
+- **Screenshot capture**: All screenshots saved to `tests/screenshots/`
+- **Console logging**: Full console output captured for debugging
+- **Headless mode**: Set `headless: true` for CI/CD
+- **Fake media streams**: Automatic microphone permission handling
+
+### What Gets Tested
+1. Window size and positioning (250x250 circle)
+2. WebSocket connection to unmute-backend
+3. Orange waveform visualization
+4. Avatar video loading and display
+5. Mute/unmute state transitions
+6. Error handling and recovery
 
 ## Troubleshooting
 

@@ -3,40 +3,72 @@
  */
 
 const Store = require('electron-store');
+const MuseTalkStaticVideo = require('./musetalk-static-video');
 
 class AvatarManager {
     constructor() {
-        this.store = new Store();
-        this.enabled = this.store.get('avatarEnabled', true);
+        // Delay store access to avoid early IPC issues
+        this.store = null;
+        this.enabled = true; // Default to true
         this.animated = false;
         this.frameQueue = [];
         this.maxQueueSize = 5;
+        this.staticVideo = new MuseTalkStaticVideo();
     }
 
     initialize() {
+        // Initialize store now that IPC is ready
+        try {
+            this.store = new Store();
+            this.enabled = this.store.get('avatarEnabled', true);
+        } catch (error) {
+            console.warn('Could not access store, using defaults:', error);
+            this.enabled = true;
+        }
+        
         // Apply initial avatar state
         if (this.enabled) {
             this.showAvatar();
         }
         
+        // Initialize static video player
+        this.staticVideo.initialize();
+        
         // Set up frame update handler
         window.updateAvatarFrame = this.updateFrame.bind(this);
+        
+        // Set up audio playback hooks
+        window.onAudioPlaybackStart = () => {
+            if (this.enabled) {
+                this.staticVideo.onAudioStart();
+            }
+        };
+        
+        window.onAudioPlaybackStop = () => {
+            if (this.enabled) {
+                this.staticVideo.onAudioStop();
+            }
+        };
     }
 
     showAvatar() {
         const circle = document.getElementById('circle');
         circle.classList.add('avatar-active', 'avatar-static');
+        document.body.classList.add('avatar-enabled');
     }
 
     hideAvatar() {
         const circle = document.getElementById('circle');
         circle.classList.remove('avatar-active', 'avatar-animated', 'avatar-static');
+        document.body.classList.remove('avatar-enabled');
         this.animated = false;
     }
 
     setEnabled(enabled) {
         this.enabled = enabled;
-        this.store.set('avatarEnabled', enabled);
+        if (this.store) {
+            this.store.set('avatarEnabled', enabled);
+        }
         
         if (enabled) {
             this.showAvatar();
@@ -75,34 +107,50 @@ class AvatarManager {
     }
 
     displayFrame(frame) {
+        // Re-enabled with video support
+        
         const videoEl = document.getElementById('avatar-video');
+        const imageEl = document.getElementById('avatar-image');
         const circle = document.getElementById('circle');
         
         try {
-            // Convert base64 to blob URL
-            const binaryData = atob(frame.data);
-            const arrayBuffer = new ArrayBuffer(binaryData.length);
-            const uint8Array = new Uint8Array(arrayBuffer);
-            
-            for (let i = 0; i < binaryData.length; i++) {
-                uint8Array[i] = binaryData.charCodeAt(i);
+            // Handle different frame types
+            if (frame.type === 'video_url') {
+                console.log('🎭 Received video URL from MuseTalk:', frame.url);
+                
+                // Update animation state
+                if (!this.animated) {
+                    this.setAnimationMode(true);
+                    // Hide static image, show video
+                    imageEl.style.display = 'none';
+                    videoEl.style.display = 'block';
+                }
+                
+                // Set the video source to the MuseTalk generated video
+                videoEl.src = frame.url;
+                videoEl.play().catch(e => {
+                    console.warn('Video autoplay failed:', e);
+                });
+                
+                return;
             }
             
-            const blob = new Blob([uint8Array], { type: 'image/jpeg' });
-            const url = URL.createObjectURL(blob);
+            console.debug('🎭 Displaying frame, data length:', frame.data ? frame.data.length : 0);
+            
+            // For video element, we need to use an img element that updates rapidly
+            // Convert base64 to data URL (simpler approach)
+            const dataUrl = `data:image/jpeg;base64,${frame.data}`;
             
             // Update animation state if needed
             if (!this.animated) {
                 this.setAnimationMode(true);
+                // Hide static image, show video
+                imageEl.style.display = 'none';
+                videoEl.style.display = 'block';
             }
             
-            // Update video source
-            videoEl.src = url;
-            
-            // Clean up old blob URL after frame is loaded
-            videoEl.onload = () => {
-                setTimeout(() => URL.revokeObjectURL(url), 100);
-            };
+            // Update video element (which is actually an img for rapid updates)
+            videoEl.src = dataUrl;
             
         } catch (error) {
             console.error('Error displaying avatar frame:', error);

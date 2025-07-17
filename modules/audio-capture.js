@@ -9,10 +9,13 @@ class AudioCapture {
         this.recorder = null;
         this.onAudioData = onAudioData;
         this.isCapturing = false;
+        this.isPaused = false;
         this.stream = null;
         this.audioContext = null;
         this.analyser = null;
         this.source = null;
+        this.gainNode = null;
+        this.originalGain = 1.0;
     }
 
     async start() {
@@ -35,9 +38,17 @@ class AudioCapture {
             // Create audio context for visualization
             this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
             this.source = this.audioContext.createMediaStreamSource(this.stream);
+            
+            // Create gain node for ducking
+            this.gainNode = this.audioContext.createGain();
+            this.gainNode.gain.value = this.originalGain;
+            
             this.analyser = this.audioContext.createAnalyser();
             this.analyser.fftSize = 2048;
-            this.source.connect(this.analyser);
+            
+            // Connect: source -> gainNode -> analyser
+            this.source.connect(this.gainNode);
+            this.gainNode.connect(this.analyser);
             
             // Match Unmute's recorder options exactly
             const recorderOptions = {
@@ -68,6 +79,12 @@ class AudioCapture {
             this.recorder = new Recorder(recorderOptions);
             
             this.recorder.ondataavailable = (data) => {
+                // Skip processing if paused
+                if (this.isPaused) {
+                    console.debug('⏸️ Skipping audio data while paused');
+                    return;
+                }
+                
                 // Log like Unmute does
                 if (chunk_idx < 3) {
                     console.debug(
@@ -84,6 +101,13 @@ class AudioCapture {
                 }
                 
                 if (this.onAudioData) {
+                    // Skip empty or too-short data to prevent backend crashes
+                    // Backend expects at least 6 bytes to check opus_bytes[5]
+                    if (data.length < 6) {
+                        console.debug('⚠️ Skipping too-short audio data, length:', data.length);
+                        return;
+                    }
+                    
                     // Base64 encode exactly like Unmute
                     let binary = "";
                     for (let i = 0; i < data.length; i++) {
@@ -127,6 +151,28 @@ class AudioCapture {
         // Keep the audio context and analyser alive for visualization
         // Just stop the recording, don't destroy everything
         console.debug('📊 Keeping audio context alive for visualization');
+    }
+
+    setGain(gain) {
+        if (this.gainNode) {
+            console.debug(`🎚️ Setting microphone gain to ${gain}`);
+            this.gainNode.gain.value = gain;
+        }
+    }
+
+    pause() {
+        if (this.isCapturing && !this.isPaused) {
+            console.debug('⏸️ Pausing audio capture');
+            this.isPaused = true;
+            // Don't stop the recorder, just flag to skip processing audio data
+        }
+    }
+
+    resume() {
+        if (this.isCapturing && this.isPaused) {
+            console.debug('▶️ Resuming audio capture');
+            this.isPaused = false;
+        }
     }
 
     getAnalyser() {

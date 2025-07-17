@@ -1,338 +1,617 @@
 /**
- * Nod.ie Renderer Process - Main entry point
+ * Unified renderer for both Electron and Web environments
  */
 
-const { ipcRenderer } = require('electron');
-const WebSocketHandler = require('./modules/websocket-handler');
-const AudioCapture = require('./modules/audio-capture');
-const UIManager = require('./modules/ui-manager');
-const AudioPlayback = require('./modules/audio-playback');
-const AvatarManager = require('./modules/avatar-manager');
+// Platform detection - minimal, just for necessary differences
+const isElectron = typeof require !== 'undefined' && typeof process !== 'undefined' && process.versions && process.versions.electron;
 
-// Initialize modules
-const ui = new UIManager();
-const avatar = new AvatarManager();
-let wsHandler = null;
-let audioCapture = null;
-let audioPlayback = null;
-let stopVisualization = null;
-
-// Initialize audio playback
-async function initAudioPlayback() {
-    if (!audioPlayback) {
-        audioPlayback = new AudioPlayback();
-        await audioPlayback.initialize();
-        console.info('🎵 Audio playback initialized');
-    }
-    return audioPlayback;
+// Set platform attribute for CSS styling
+function setPlatformAttribute() {
+    document.body.setAttribute('data-platform', isElectron ? 'electron' : 'web');
 }
 
-// Handle incoming messages from Unmute
-async function handleUnmuteMessage(data) {
-    console.debug('📨 Unmute message:', data.type);
-    
-    // Handle errors
-    if (data.type === 'error') {
-        console.error('Unmute error:', JSON.stringify(data.error));
-        ui.showNotification(`Error: ${data.error.message || 'Unknown error'}`, 'error');
-        return;
-    }
-    
-    switch (data.type) {
-        case 'response.audio.delta':
-            // Play audio response
-            if (data.delta) {
-                console.debug('Received audio delta');
-                if (!audioPlayback) {
-                    await initAudioPlayback();
-                }
-                // Decode base64 to Uint8Array
-                const binaryString = atob(data.delta);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                await audioPlayback.processAudioDelta(bytes);
-                ui.showAudioActivity();
-            }
-            break;
-            
-        case 'response.audio_transcript.delta':
-            // Show what Nod.ie is saying
-            if (data.delta) {
-                ui.showNotification(`Nod.ie: ${data.delta}`, 'response');
-            }
-            break;
-            
-        case 'conversation.item.input_audio_transcription.delta':
-            // Show what user said
-            if (data.transcript) {
-                ui.showNotification(`You: ${data.transcript}`, 'transcript');
-            }
-            break;
-            
-        case 'response.created':
-            ui.setStatus('thinking');
-            break;
-            
-        case 'response.done':
-            ui.setStatus('idle');
-            // Send to n8n if configured
-            sendToN8N({
-                event: 'nodie_response',
-                response: data.response,
-                timestamp: new Date().toISOString()
-            });
-            // Keep listening for continuous conversation
-            if (!ui.isMuted && wsHandler?.isConnected) {
-                console.debug('🔄 Ready for next interaction');
-                // Ensure audio capture continues
-                if (!audioCapture?.isCapturing) {
-                    console.debug('🎤 Restarting audio capture');
-                    setTimeout(() => startListening(), 1000);
-                }
-            }
-            break;
-    }
-}
+// Load modules based on environment
+const { ipcRenderer } = isElectron ? require('electron') : {};
+// Use web-compatible modules that work in both environments
+const AudioCapture = isElectron ? require('./modules/audio-capture') : window.AudioCaptureWeb;
+const AudioPlayback = isElectron ? require('./modules/audio-playback') : window.AudioPlaybackWeb;
 
-// Start audio capture
-async function startListening() {
-    console.debug('🎤 startListening called', {
-        wsConnected: wsHandler?.isConnected,
-        muted: ui.isMuted
-    });
-    
-    if (!wsHandler?.isConnected || ui.isMuted) {
-        console.warn('⚠️ Cannot start listening - not connected or muted');
-        return;
-    }
-    
-    try {
-        audioCapture = new AudioCapture((base64Audio) => {
-            // Send audio to Unmute
-            console.debug('🎤 Audio chunk captured, sending to Unmute...');
-            wsHandler.send({
-                type: 'input_audio_buffer.append',
-                audio: base64Audio
-            });
-        });
+// Unified Renderer object
+const NodieRenderer = {
+    // State
+    state: {
+        isConnected: false,
+        isMuted: false, // Start unmuted to see waveform
+        wsHandler: null,
+        audioContext: null,
+        mediaStream: null,
+        analyser: null,
+        avatarEnabled: true,
+        isLoading: true,
+        audioCapture: null,
+        audioPlayback: null
+    },
+
+    // UI Functions
+    setStatus(status) {
+        const circle = document.getElementById('circle');
+        if (!circle) return;
         
-        await audioCapture.start();
-        console.info('✅ Audio capture started');
-        
-        // Start visualization
-        const analyser = audioCapture.getAnalyser();
-        if (analyser) {
-            stopVisualization = ui.visualizeAudio(analyser);
+        circle.className = '';
+        if (this.state.isLoading) {
+            circle.classList.add('loading');
+        } else if (this.state.isMuted) {
+            circle.classList.add('muted');
+        } else if (status === 'thinking') {
+            circle.classList.add('thinking');
+        } else if (status === 'listening') {
+            circle.classList.add('listening');
+        } else {
+            circle.classList.add('idle');
         }
         
-    } catch (error) {
-        console.error('Failed to start listening:', error);
-        ui.showNotification('Microphone access denied', 'error');
-    }
-}
+        console.log('Status changed to:', status);
+        
+        // Update debug info if in web mode
+        const statusEl = document.getElementById('status');
+        if (statusEl) {
+            statusEl.textContent = this.state.isLoading ? 'Loading...' : status;
+        }
+    },
 
-// Stop audio capture
-function stopListening() {
-    console.info('🚫 Stopping audio capture');
-    
-    if (stopVisualization) {
-        stopVisualization();
-        stopVisualization = null;
-    }
-    
-    if (audioCapture) {
-        audioCapture.stop();
-        audioCapture = null;
-    }
-    
-    ui.setStatus('idle');
-}
+    showNotification(text, type = 'info') {
+        // Try to show in center first
+        const statusText = document.getElementById('status-text');
+        if (statusText) {
+            statusText.textContent = text;
+            statusText.style.display = 'block';
+            setTimeout(() => {
+                statusText.style.display = 'none';
+            }, 3000);
+        }
+        
+        // Fallback to corner notification
+        const notification = document.getElementById('notification');
+        if (notification) {
+            notification.textContent = text;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        }
+        
+        console.log('Notification:', text);
+    },
 
-// Toggle mute state
-function toggleMute() {
-    ui.setMuted(!ui.isMuted);
-    
-    if (ui.isMuted) {
-        stopListening();
-    } else if (wsHandler?.isConnected) {
-        startListening();
-    }
-}
+    // Avatar Functions
+    showAvatar() {
+        if (!this.state.avatarEnabled) return;
+        
+        const container = document.getElementById('avatar-container');
+        
+        if (container) {
+            container.style.display = 'block';
+            this.updateAvatarStatus('Visible');
+        }
+    },
 
-// Connect to Unmute backend
-async function connectToUnmute() {
-    const config = await ipcRenderer.invoke('get-config');
-    
-    wsHandler = new WebSocketHandler(config, {
-        onConnect: () => {
-            console.debug('🔗 WebSocket connected callback fired');
-            // Clear loading state
-            ui.setStatus('idle');
-            // Start listening if not muted
-            if (!ui.isMuted) {
-                console.info('🎙️ Will start listening in 1 second...');
-                setTimeout(() => startListening(), 1000);
+    hideAvatar() {
+        const container = document.getElementById('avatar-container');
+        
+        if (container) {
+            container.style.display = 'none';
+            this.updateAvatarStatus('Hidden');
+        }
+    },
+
+    updateAvatarStatus(text) {
+        const el = document.getElementById('avatar-status');
+        if (el) el.textContent = text;
+    },
+
+    updateWSStatus(text) {
+        const el = document.getElementById('ws-status');
+        if (el) el.textContent = text;
+    },
+
+    // Audio Visualization
+    startWaveform() {
+        const canvas = document.getElementById('waveform');
+        if (!canvas) {
+            console.error('❌ Waveform canvas not found');
+            return;
+        }
+        
+        // Always show the waveform - it will be static without analyser, dynamic with analyser
+        
+        console.log('✅ Starting waveform visualization');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 300;
+        canvas.height = 300;
+        
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        // Match the avatar diameter exactly (250px)
+        const radius = 125; // Avatar is 250px diameter, so radius is 125px
+        
+        let animationId;
+        
+        const draw = () => {
+            animationId = requestAnimationFrame(draw);
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw orange waveform ring with glow
+            ctx.shadowColor = 'rgba(247, 147, 26, 1)';
+            ctx.shadowBlur = 20;
+            ctx.strokeStyle = 'rgba(247, 147, 26, 1)';
+            ctx.lineWidth = 6;
+            
+            // Rotating offset for visual interest (10 second rotation)
+            const rotationOffset = (Date.now() % 10000) / 10000 * Math.PI * 2;
+            
+            // Check if we have significant audio activity
+            let hasAudioActivity = false;
+            if (this.state.analyser) {
+                const bufferLength = this.state.analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                this.state.analyser.getByteFrequencyData(dataArray);
+                
+                // Check for audio activity
+                for (let i = 0; i < bufferLength; i++) {
+                    if (dataArray[i] > 25) { // Threshold for activity
+                        hasAudioActivity = true;
+                        break;
+                    }
+                }
+                
+                // If audio activity, draw reactive waveform
+                if (hasAudioActivity) {
+                    ctx.beginPath();
+                    const segments = 120;
+                    
+                    for (let i = 0; i <= segments; i++) {
+                        const angle = (i / segments) * Math.PI * 2 + rotationOffset;
+                        const freqIndex = Math.floor((i / segments) * bufferLength * 0.5);
+                        const amplitude = dataArray[freqIndex] / 255;
+                        const deformation = amplitude > 0.1 ? amplitude * 15 : 0;
+                        const r = radius + deformation;
+                        
+                        const x = centerX + r * Math.cos(angle);
+                        const y = centerY + r * Math.sin(angle);
+                        
+                        if (i === 0) {
+                            ctx.moveTo(x, y);
+                        } else {
+                            ctx.lineTo(x, y);
+                        }
+                    }
+                    ctx.closePath();
+                    ctx.stroke();
+                } else {
+                    // No activity - draw perfect smooth circle
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
             } else {
-                console.info('🔇 Muted, not starting audio capture');
+                // No analyser - draw perfect smooth circle
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.stroke();
             }
-        },
-        onMessage: handleUnmuteMessage,
-        onError: (error) => {
-            ui.showNotification('Connection error', 'error');
+        };
+        
+        draw();
+        
+        return () => {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        };
+    },
+
+    // WebSocket Connection
+    async getConfig() {
+        if (isElectron && ipcRenderer) {
+            try {
+                return await ipcRenderer.invoke('get-config');
+            } catch (error) {
+                console.error('Failed to get config from main process:', error);
+            }
         }
+        
+        // Web environment or fallback
+        const defaultConfig = (() => {
+            try {
+                return require('./config');
+            } catch (e) {
+                return {
+                    UNMUTE_BACKEND_URL: 'ws://localhost:8767',
+                    VOICE_MODEL: 'unmute-prod-website/ex04_narration_longform_00001.wav'
+                };
+            }
+        })();
+        
+        return window.NodieConfig || window.ENV_CONFIG || defaultConfig;
+    },
+
+
+    async connectToUnmute() {
+        try {
+            this.updateWSStatus('Connecting...');
+            
+            // Get backend URL from config
+            const config = await this.getConfig();
+            const backendUrl = config.UNMUTE_BACKEND_URL || 'ws://localhost:8000';
+            
+            const ws = new WebSocket(`${backendUrl}/v1/realtime`, ['realtime']);
+            
+            ws.onopen = () => {
+                console.log('✅ Connected to Unmute');
+                this.state.isConnected = true;
+                this.updateWSStatus('Connected');
+                
+                // Configure session
+                ws.send(JSON.stringify({
+                    type: 'session.update',
+                    session: {
+                        model: 'llama3.2:3b',
+                        voice: config.VOICE_MODEL || 'unmute-prod-website/ex04_narration_longform_00001.wav',
+                        instructions: {
+                            type: 'constant',
+                            text: 'You are Nodey, a helpful AI assistant. When speaking, always refer to yourself as "Nodey". If asked to spell your name, spell it "N-O-D dot I-E" (nod.ie). When users say words that sound like: Noddy, Nody, Nodey, Node-ee, Nodi, Navy, Nandi, Maddie, Maggie, Nogi, Nadie, Moby, or similar sounds, they are addressing you by YOUR name "Nodey" (these are variations of your name, not the user\'s name). Do not call the user by these names. Keep responses brief and conversational.'
+                        },
+                        allow_recording: true  // Enable recording for voice input
+                    }
+                }));
+                
+                this.showNotification('Connected to Unmute', 'success');
+                this.checkIfFullyLoaded();
+            };
+            
+            ws.onmessage = async (event) => {
+                const data = JSON.parse(event.data);
+                console.debug('Message:', data.type);
+                
+                // Log error details
+                if (data.type === 'error') {
+                    console.error('❌ Unmute error:', data.error || data);
+                }
+                
+                // Reset audio playback notification flag for new responses
+                if (data.type === 'response.created') {
+                    if (this.state.audioPlayback) {
+                        this.state.audioPlayback.hasNotifiedPlaybackStart = false;
+                    }
+                }
+                
+                if (data.type === 'response.audio.delta' && data.delta) {
+                    console.info('🔊 Received audio response from backend');
+                    
+                    // Initialize audio playback if needed
+                    if (!this.state.audioPlayback && AudioPlayback) {
+                        this.state.audioPlayback = new AudioPlayback();
+                        await this.state.audioPlayback.initialize();
+                    }
+                    
+                    
+                    // Decode base64 to Uint8Array
+                    const binaryString = atob(data.delta);
+                    const bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                    
+                    // Debug the data format
+                    if (!this.debuggedAudio) {
+                        console.debug('🎵 Audio delta format:', {
+                            length: bytes.length,
+                            first10: Array.from(bytes.slice(0, 10)),
+                            isTypedArray: bytes instanceof Uint8Array,
+                            hasBuffer: !!bytes.buffer
+                        });
+                        this.debuggedAudio = true;
+                    }
+                    
+                    if (this.state.audioPlayback) {
+                        await this.state.audioPlayback.processAudioDelta(bytes);
+                    }
+                }
+                
+                if (data.type === 'response.audio_transcript.delta' && data.delta) {
+                    console.debug('Assistant says:', data.delta);
+                }
+                
+                if (data.type === 'conversation.item.input_audio_transcription.delta' && data.delta) {
+                    console.info('You said:', data.delta);
+                }
+                
+            };
+            
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                this.updateWSStatus('Error');
+                this.showNotification('Connection error', 'error');
+            };
+            
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                this.state.isConnected = false;
+                this.updateWSStatus('Disconnected');
+                this.setStatus('idle');
+            };
+            
+            this.state.wsHandler = ws;
+            
+        } catch (error) {
+            console.error('Failed to connect:', error);
+            this.updateWSStatus('Failed');
+            this.showNotification('Failed to connect to Unmute', 'error');
+        }
+    },
+
+    // Microphone Access
+    async startMicrophone() {
+        try {
+            // Use AudioCapture module if available (Electron)
+            if (AudioCapture) {
+                this.state.audioCapture = new AudioCapture((audioData) => {
+                    // Validate audio data before sending
+                    // Backend expects at least 6 bytes to check opus_bytes[5]
+                    if (!audioData || audioData.length === 0) {
+                        console.debug('⚠️ Skipping empty audio data in renderer');
+                        return;
+                    }
+                    
+                    // Additional validation for base64 length
+                    // Base64 encoding of 6 bytes = 8 characters minimum
+                    if (audioData.length < 8) {
+                        console.debug('⚠️ Skipping too-short base64 audio data in renderer, length:', audioData.length);
+                        return;
+                    }
+                    
+                    // Send audio to WebSocket
+                    if (this.state.wsHandler && this.state.wsHandler.readyState === WebSocket.OPEN) {
+                        this.state.wsHandler.send(JSON.stringify({
+                            type: 'input_audio_buffer.append',
+                            audio: audioData
+                        }));
+                    }
+                });
+                
+                await this.state.audioCapture.start();
+                this.state.analyser = this.state.audioCapture.getAnalyser();
+                
+                console.log('🎤 Audio capture started, analyser:', !!this.state.analyser);
+                
+                // Waveform is already running, now it will be dynamic with analyser
+                console.log('🌊 Waveform now has analyser for dynamic visualization');
+            } else {
+                console.error('❌ AudioCapture module not available');
+                this.showNotification('Audio capture not available', 'error');
+            }
+            
+            console.log('✅ Microphone started');
+            this.showNotification('Microphone active', 'success');
+            
+        } catch (error) {
+            console.error('Microphone failed:', error);
+            this.showNotification('Microphone access denied', 'error');
+        }
+    },
+
+    // Toggle Mute
+    toggleMute() {
+        this.state.isMuted = !this.state.isMuted;
+        this.setStatus('idle');
+        
+        if (this.state.isMuted) {
+            this.showNotification('Muted', 'info');
+            this.showAvatar(); // Show avatar when muted
+            
+            // Stop audio capture
+            if (this.state.audioCapture) {
+                this.state.audioCapture.stop();
+                this.state.audioCapture = null;
+            }
+            
+            // Stop media stream
+            if (this.state.mediaStream) {
+                this.state.mediaStream.getTracks().forEach(track => track.stop());
+                this.state.mediaStream = null;
+            }
+        } else {
+            this.showNotification('Unmuted', 'success');
+            this.showAvatar(); // Always show avatar - don't hide when unmuted
+            if (this.state.isConnected) {
+                this.startMicrophone();
+            }
+        }
+    },
+
+    // Avatar Loading
+    async loadVideoAvatar() {
+        const video = document.getElementById('avatar-video');
+        const image = document.getElementById('avatar-image');
+        
+        if (!video || !this.state.avatarEnabled) return;
+        
+        try {
+            // Try to load a test video - handle both electron and web paths
+            const videoUrl = window.location.pathname.includes('tests/') 
+                ? '../assets/avatars/nodie-video-01.mp4'
+                : 'assets/avatars/nodie-video-01.mp4';
+            
+            this.updateAvatarStatus('Loading video...');
+            console.log('🎥 Loading video from:', videoUrl);
+            
+            video.src = videoUrl;
+            video.style.display = 'block';
+            if (image) image.style.display = 'none';
+            
+            await new Promise((resolve, reject) => {
+                video.onloadeddata = () => {
+                    this.updateAvatarStatus('Video loaded');
+                    console.log('✅ Video avatar loaded successfully');
+                    resolve();
+                };
+                video.onerror = (e) => {
+                    this.updateAvatarStatus('Video failed, using image');
+                    console.error('Video loading failed:', e);
+                    reject(e);
+                };
+            });
+            
+        } catch (error) {
+            console.error('Failed to load video avatar:', error);
+            // Fall back to image
+            video.style.display = 'none';
+            if (image) {
+                image.style.display = 'block';
+                this.updateAvatarStatus('Using static image');
+            }
+        }
+    },
+
+    // Loading state management
+    showLoadingText(text) {
+        const statusText = document.getElementById('status-text');
+        if (statusText) {
+            statusText.textContent = text;
+            statusText.style.display = 'block';
+        }
+    },
+
+    hideLoadingText() {
+        const statusText = document.getElementById('status-text');
+        if (statusText) {
+            statusText.style.display = 'none';
+        }
+    },
+
+    checkIfFullyLoaded() {
+        if (this.state.isConnected) {
+            this.state.isLoading = false;
+            this.setStatus('idle');
+            this.hideLoadingText();
+            console.log('✅ Fully loaded and ready');
+            console.log('📊 Mute state:', this.state.isMuted);
+            
+            // Start microphone if unmuted
+            if (!this.state.isMuted) {
+                console.log('🎤 Starting microphone because unmuted');
+                this.startMicrophone();
+            } else {
+                console.log('🔇 Not starting microphone because muted');
+            }
+        }
+    },
+
+    // Initialize
+    initialize() {
+        console.log('📄 Renderer initializing...');
+        
+        // Set platform attribute
+        setPlatformAttribute();
+        
+        // Show loading state
+        this.state.isLoading = true;
+        this.setStatus('loading');
+        this.showLoadingText('Loading Nod.ie...');
+        
+        // Set up click handler
+        const circle = document.getElementById('circle');
+        if (circle) {
+            circle.addEventListener('click', () => {
+                if (!this.state.isLoading) {
+                    this.toggleMute();
+                } else {
+                    this.showNotification('Still loading, please wait...', 'info');
+                }
+            });
+        }
+        
+        // Initialize connections
+        this.connectToUnmute();
+        this.loadVideoAvatar();
+        
+        // Start waveform (will be static until analyser is available)
+        this.startWaveform();
+        
+        // Fallback timeout in case connection fails
+        setTimeout(() => {
+            if (this.state.isLoading) {
+                this.state.isLoading = false;
+                this.setStatus('idle');
+                if (!this.state.isConnected) {
+                    this.showNotification('Failed to connect to backend', 'error');
+                }
+            }
+        }, 10000); // 10 second timeout
+        
+        console.log('✅ Renderer initialized');
+    },
+
+    // Audio playback handlers to prevent initial self-interruption using gain ducking
+    onAudioPlaybackStart() {
+        // Duck microphone gain instead of pausing to preserve echo cancellation
+        if (this.state.audioCapture) {
+            this.state.audioCapture.setGain(0.1); // Reduce to 10% for initial period
+            
+            // Restore normal gain after a short delay
+            setTimeout(() => {
+                if (this.state.audioCapture) {
+                    this.state.audioCapture.setGain(1.0);
+                }
+            }, 200); // 200ms delay - enough to prevent immediate self-interruption
+        }
+    },
+
+    onAudioPlaybackStop() {
+        // Ensure microphone gain is restored when audio playback stops
+        if (this.state.audioCapture) {
+            console.debug('🎤 Ensuring microphone gain is restored after audio playback');
+            this.state.audioCapture.setGain(1.0);
+        }
+    }
+};
+
+// Track console errors for debug UI (works in both environments)
+let errorCount = 0;
+const originalError = console.error;
+console.error = function(...args) {
+    errorCount++;
+    const el = document.getElementById('console-errors');
+    if (el) el.textContent = `${errorCount} errors`;
+    originalError.apply(console, args);
+};
+
+// Initialize when DOM is ready
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        NodieRenderer.initialize();
     });
-    
-    wsHandler.connect();
+} else {
+    // DOM already loaded
+    NodieRenderer.initialize();
 }
 
-// n8n integration
-async function sendToN8N(data) {
-    await ipcRenderer.invoke('send-notification', data);
+// Export for testing and global access
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = NodieRenderer;
 }
 
-// Handle drag functionality
-let isDragging = false;
-let dragStartX = 0;
-let dragStartY = 0;
+// Ensure global access in browser
+if (typeof window !== 'undefined') {
+    window.NodieRenderer = NodieRenderer;
+    console.debug('🌐 NodieRenderer attached to window globally');
+}
 
-document.body.addEventListener('mousedown', (e) => {
-    if (!e.target.closest('#circle')) {
-        isDragging = true;
-        dragStartX = e.screenX;
-        dragStartY = e.screenY;
-    }
-});
-
-document.addEventListener('mousemove', (e) => {
-    if (isDragging) {
-        const deltaX = e.screenX - dragStartX;
-        const deltaY = e.screenY - dragStartY;
-        
-        ipcRenderer.send('move-window', { deltaX, deltaY });
-        
-        dragStartX = e.screenX;
-        dragStartY = e.screenY;
-    }
-});
-
-document.addEventListener('mouseup', () => {
-    isDragging = false;
-});
-
-// Event handlers
-ui.circle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    toggleMute();
-});
-
-// IPC handlers
-ipcRenderer.on('toggle-mute', () => {
-    toggleMute();
-});
-
-ipcRenderer.on('n8n-notification', (event, data) => {
-    ui.showNotification(data.message, 'n8n');
-    
-    // Speak the notification if connected
-    if (wsHandler?.isConnected) {
-        // Note: Unmute doesn't support text input, only audio
-        console.debug('n8n notification received:', data.message);
-    }
-});
-
-// Initialize
-console.info('🚀 Nod.ie renderer starting...');
-ui.setStatus('loading');
-connectToUnmute();
-
-// Keep visualization alive
-setInterval(() => {
-    if (audioCapture && !stopVisualization) {
-        const analyser = audioCapture.getAnalyser();
-        if (analyser) {
-            console.debug('🔄 Restarting visualization');
-            stopVisualization = ui.visualizeAudio(analyser);
-        }
-    }
-}, 5000);
-
-// Show ready state
-setTimeout(() => {
-    console.debug('🔍 Ready check:', {
-        wsConnected: wsHandler?.isConnected,
-        muted: ui.isMuted
-    });
-    if (wsHandler?.isConnected && !ui.isMuted) {
-        ui.showNotification('Nod.ie is ready! Say hello to get started.', 'success');
-        ui.showAudioActivity();
-    }
-}, 2000);
-
-// Clean up on window close
-window.addEventListener('beforeunload', () => {
-    console.info('🧹 Window unloading, cleaning up...');
-    if (wsHandler) {
-        wsHandler.close();
-    }
-    if (audioCapture) {
-        audioCapture.stop();
-    }
-    if (audioPlayback) {
-        audioPlayback.cleanup();
-    }
-});
-
-// Handle app quit signal from main process
-ipcRenderer.on('app-will-quit', () => {
-    console.info('🧹 App is quitting, cleaning up...');
-    if (wsHandler) {
-        wsHandler.close();
-    }
-    if (audioCapture) {
-        audioCapture.stop();
-    }
-    if (audioPlayback) {
-        audioPlayback.cleanup();
-    }
-});
-
-// Initialize avatar manager
-avatar.initialize();
-
-// Handle avatar setting changes
-ipcRenderer.on('avatar-setting-changed', (event, enabled) => {
-    avatar.setEnabled(enabled);
-    
-    // Update audio playback setting
-    if (audioPlayback) {
-        audioPlayback.setAvatarEnabled(enabled);
-        avatar.updateStatus(audioPlayback);
-    }
-});
-
-// Handle cleanup signal
-ipcRenderer.on('cleanup-connections', () => {
-    console.info('🧹 Cleanup requested, closing connections...');
-    if (wsHandler) {
-        wsHandler.close();
-    }
-});
-
-// Clean up when page becomes hidden (minimized/background)
-document.addEventListener('visibilitychange', () => {
-    if (document.hidden) {
-        console.debug('🧹 Page hidden, pausing connections...');
-        // Don't close WebSocket on hide, just stop audio capture to save resources
-        if (audioCapture) {
-            audioCapture.stop();
-        }
-    } else {
-        console.debug('👁️ Page visible again');
-        // Restart audio capture if unmuted
-        if (!ui.isMuted && wsHandler?.isConnected) {
-            setTimeout(() => startListening(), 1000);
-        }
-    }
+// Global error handling
+window.addEventListener('error', (e) => {
+    console.error('Global error:', e.error);
 });

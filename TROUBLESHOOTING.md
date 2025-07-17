@@ -6,6 +6,7 @@
 |---------|----------|
 | Nod.ie can't hear me | 1. Check microphone permissions in system settings<br>2. Click circle to unmute (red = muted, purple = listening)<br>3. Run `arecord -l` to verify microphone detected |
 | Can't hear Nod.ie's responses | 1. Check system audio: `speaker-test -t wav -c 2`<br>2. Verify Unmute services: `cd ../unmute && docker compose ps`<br>3. Open Developer Tools → Console, look for "response.audio.delta" messages |
+| "Internal server error" messages | **FIXED** - Empty audio data crashes backend<br>1. Update to latest version with audio validation<br>2. Check console for "Skipping too-short audio data" messages<br>3. Restart if using older version without validation |
 | "Too many people are connected" error | 1. Kill all Nod.ie processes: `pkill -f "electron.*nodie"`<br>2. Restart Unmute: `cd ../unmute && docker compose restart`<br>3. Close any browser tabs with http://localhost:3000 open<br>4. Increase batch_size in STT/TTS configs (see below) |
 | WebSocket connection failed | 1. Verify Unmute is running: `curl http://localhost:8765/v1/health`<br>2. Check port 8765 is available: `sudo netstat -tlnp \| grep 8765`<br>3. Restart Unmute services if needed |
 | White waveform disappearing | Canvas element ID mismatch - Fixed in ui-manager.js<br>Check audio context state in Console: `audioCapture?.audioContext?.state` |
@@ -14,6 +15,7 @@
 | Audio format error: "unexpected ogg capture pattern" | MediaRecorder produces WebM, Unmute expects OGG<br>Fixed by switching to opus-recorder library |
 | Too many Electron processes | Multiple Nod.ie instances running<br>1. Kill all: `pkill -f "electron.*nodie"`<br>2. Check if killed: `ps aux \| grep -E "electron.*nodie" \| grep -v grep`<br>3. If persists, force kill: `killall -9 electron` |
 | Slow responses (10+ seconds) | Ollama running on CPU instead of GPU<br>1. Check GPU memory: `nvidia-smi`<br>2. Stop other GPU services<br>3. Restart Ollama: `docker restart ollama`<br>4. See "Performance Issues" section below |
+| STT mishears "Nod.ie" | Common mis-transcriptions: Navy, Nandi, Nody, Hody<br>The LLM is configured to recognize these as "Nod.ie"<br>Say "Node-ee" or "Noddy" for better recognition |
 
 ## Detailed Solutions
 
@@ -35,6 +37,38 @@
 | No audio despite receiving data | Check audio context state: `audioPlayback?.audioContext?.state` |
 | Audio cutting out | Check for errors in Console related to audio processing |
 | Response lag/latency | Audio chunks may be buffering - check Console for "Decoded audio frame" timing |
+
+### 🚨 Critical Bug: "Internal server error" (FIXED)
+
+**Problem**: Backend crashes with "Internal server error" messages and WebSocket disconnections.
+
+**Root Cause**: 
+- Unmute backend tries to access `opus_bytes[5]` without validating data length
+- Empty or malformed audio data (< 6 bytes) causes IndexError in backend
+- This was a regression introduced during avatar implementation work
+
+**Fix Applied**:
+Multi-layer validation prevents invalid audio data from reaching the backend:
+
+1. **Audio Capture Level**: Skip data < 6 bytes
+2. **Renderer Level**: Skip base64 data < 8 characters  
+3. **Backend Protection**: Backend expects minimum 6 bytes for BOS flag check
+
+**How to Verify Fix**:
+```bash
+# 1. Check console for validation messages
+Open Developer Tools → Console
+Look for: "⚠️ Skipping too-short audio data"
+
+# 2. Test with debug script
+node debug-audio-detailed.js
+# Should NOT crash backend with "Internal server error"
+
+# 3. Verify audio capture working
+# Console should show: "📤 Calling onAudioData with base64 chunk"
+```
+
+**Prevention**: Always validate audio data length before sending to WebSocket.
 
 ### 🔄 Process Management
 

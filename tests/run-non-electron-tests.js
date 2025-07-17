@@ -7,17 +7,18 @@
 const { spawn, exec } = require('child_process');
 const path = require('path');
 
+// Load environment variables
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
 console.log('🚀 Running Non-Electron Tests\n');
 
 // Tests that don't require Electron
 const nonElectronTests = [
-    'test-audio-fix.js',
-    'test-audio-flow-analysis.js', 
-    'test-websocket-cleanup.js',
-    'test-unmute-direct.js',
-    'test-questions-audible.js',
-    'test-unmute-audio-format.js',
-    'test-voice-response.js'
+    'test-complete.js',
+    'test-final.js',
+    'test-functionality.js',
+    'check-avatar-status.js',
+    'check-musetalk-api.js'
 ];
 
 let passed = 0;
@@ -59,15 +60,16 @@ async function runAll() {
     // Check prerequisites
     console.log('📋 Checking prerequisites...');
     try {
+        const backendPort = process.env.UNMUTE_BACKEND_PORT || 8000;
         await new Promise((resolve, reject) => {
-            exec('curl -s http://localhost:8765/v1/health | grep -q "true"', (error) => {
+            exec(`curl -s http://localhost:${backendPort}/ | grep -q "message"`, (error) => {
                 error ? reject(error) : resolve();
             });
         });
         console.log('✅ Unmute backend is running\n');
     } catch {
         console.log('❌ Unmute backend not running!');
-        console.log('Start it with: cd ../unmute && docker compose up -d\n');
+        console.log('Start it with: cd /mnt/raid1/GitHub/black-panther/ai-stack && docker compose up -d\n');
         process.exit(1);
     }
     

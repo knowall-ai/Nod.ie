@@ -276,7 +276,7 @@
         
         async function checkAvatarStatus() {
             try {
-                const response = await fetch('http://localhost:8765/health');
+                const response = await fetch('http://localhost:8767/health');
                 const health = await response.json();
                 
                 const statusEl = document.getElementById('avatarStatus');

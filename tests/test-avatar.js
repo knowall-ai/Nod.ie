@@ -21,7 +21,7 @@ async function startElectronApp() {
 // Helper to check if MuseTalk is running
 async function checkMuseTalkHealth() {
   try {
-    const response = await fetch('http://localhost:8765/health');
+    const response = await fetch('http://localhost:8767/health');
     const data = await response.json();
     return data.status === 'healthy';
   } catch (error) {

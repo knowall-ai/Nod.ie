@@ -47,6 +47,7 @@ failed-audio-chunk.*
 *.mp4
 *.mov
 screenshots/
+tests/screenshots/
 # But keep documentation images
 !docs/images/*.png
 !docs/images/*.jpg

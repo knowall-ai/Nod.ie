@@ -51,7 +51,16 @@ class WebSocketHandler {
             await new Promise(resolve => setTimeout(resolve, 100));
         }
         
-        const wsUrl = this.config.unmuteBackendUrl || 'ws://localhost:8765';
+        // Load config from file or fallback to default
+        const defaultConfig = (() => {
+            try {
+                return require('../config');
+            } catch (e) {
+                return { UNMUTE_BACKEND_URL: 'ws://localhost:8767' };
+            }
+        })();
+        
+        const wsUrl = this.config.unmuteBackendUrl || defaultConfig.UNMUTE_BACKEND_URL;
         
         console.info('📡 Connecting to:', wsUrl);
         

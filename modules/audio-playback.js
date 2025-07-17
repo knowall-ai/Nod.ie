@@ -3,8 +3,6 @@
  * Handles Opus audio decoding and playback
  */
 
-const MuseTalkClient = require('./musetalk-client');
-
 class AudioPlayback {
     constructor() {
         this.audioContext = null;
@@ -13,7 +11,6 @@ class AudioPlayback {
         this.isInitialized = false;
         this.isPlaying = false;
         this.analyser = null;
-        this.musetalkClient = null;
         this.avatarEnabled = false;
         this.currentTimestamp = 0;
     }
@@ -83,20 +80,15 @@ class AudioPlayback {
                 resampleQuality: 0
             });
 
-            // Initialize MuseTalk client if avatar is enabled
-            const Store = require('electron-store');
-            const configStore = new Store();
-            this.avatarEnabled = configStore.get('avatarEnabled', true);
-            
-            if (this.avatarEnabled) {
-                this.musetalkClient = new MuseTalkClient();
-                const musetalkReady = await this.musetalkClient.initialize();
-                if (musetalkReady) {
-                    console.info('🎭 MuseTalk client initialized');
-                    this.setupAvatarHandling();
-                } else {
-                    console.warn('🎭 MuseTalk unavailable, using static avatar');
-                }
+            // Check avatar settings
+            try {
+                const Store = require('electron-store');
+                const configStore = new Store();
+                this.avatarEnabled = configStore.get('avatarEnabled', true);
+                console.info('🎭 Avatar enabled:', this.avatarEnabled);
+            } catch (error) {
+                console.warn('Could not access store for avatar setting, using default:', error);
+                this.avatarEnabled = true;
             }
 
             this.isInitialized = true;
@@ -136,11 +128,9 @@ class AudioPlayback {
             // Update timestamp for synchronization
             this.currentTimestamp = Date.now();
             
-            // Send to MuseTalk in parallel (non-blocking)
-            if (this.avatarEnabled && this.musetalkClient && this.musetalkClient.isAvailable()) {
-                this.musetalkClient.processAudioFrame(opusBytes, this.currentTimestamp).catch(err => {
-                    console.debug('MuseTalk processing error (non-fatal):', err);
-                });
+            // Trigger avatar video playback
+            if (this.avatarEnabled && window.onAudioPlaybackStart) {
+                window.onAudioPlaybackStart();
             }
             
             // Send Opus data to decoder
@@ -166,6 +156,26 @@ class AudioPlayback {
         if (this.outputWorklet) {
             this.outputWorklet.port.postMessage({ command: 'clear' });
         }
+        
+        // Trigger avatar video stop
+        if (this.avatarEnabled && window.onAudioPlaybackStop) {
+            window.onAudioPlaybackStop();
+        }
+    }
+
+    setupSimpleAvatarHandling() {
+        if (!this.videoAvatar) return;
+        
+        console.info('🎬 Setting up simple avatar video handling');
+        
+        // Show static avatar initially
+        const avatarImage = document.getElementById('avatar-image');
+        const circle = document.getElementById('circle');
+        
+        if (avatarImage && circle) {
+            avatarImage.style.display = 'block';
+            circle.classList.add('avatar-active', 'avatar-static');
+        }
     }
 
     setupAvatarHandling() {
@@ -180,9 +190,13 @@ class AudioPlayback {
 
     setAvatarEnabled(enabled) {
         this.avatarEnabled = enabled;
-        const Store = require('electron-store');
-        const configStore = new Store();
-        configStore.set('avatarEnabled', enabled);
+        try {
+            const Store = require('electron-store');
+            const configStore = new Store();
+            configStore.set('avatarEnabled', enabled);
+        } catch (error) {
+            console.warn('Could not save avatar setting:', error);
+        }
         
         // Initialize or cleanup MuseTalk based on setting
         if (enabled && !this.musetalkClient) {
