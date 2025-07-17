@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  musetalk:
+    build: .
+    container_name: nodie-musetalk
+    ports:
+      - "8765:8765"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODEL_PATH=/app/models
+      - FACE_SIZE=256
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./models:/app/models
+      - ./avatars:/app/avatars
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

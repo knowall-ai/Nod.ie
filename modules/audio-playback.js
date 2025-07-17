@@ -3,6 +3,8 @@
  * Handles Opus audio decoding and playback
  */
 
+const MuseTalkClient = require('./musetalk-client');
+
 class AudioPlayback {
     constructor() {
         this.audioContext = null;
@@ -11,6 +13,9 @@ class AudioPlayback {
         this.isInitialized = false;
         this.isPlaying = false;
         this.analyser = null;
+        this.musetalkClient = null;
+        this.avatarEnabled = false;
+        this.currentTimestamp = 0;
     }
 
     async initialize() {
@@ -78,6 +83,22 @@ class AudioPlayback {
                 resampleQuality: 0
             });
 
+            // Initialize MuseTalk client if avatar is enabled
+            const Store = require('electron-store');
+            const configStore = new Store();
+            this.avatarEnabled = configStore.get('avatarEnabled', true);
+            
+            if (this.avatarEnabled) {
+                this.musetalkClient = new MuseTalkClient();
+                const musetalkReady = await this.musetalkClient.initialize();
+                if (musetalkReady) {
+                    console.info('🎭 MuseTalk client initialized');
+                    this.setupAvatarHandling();
+                } else {
+                    console.warn('🎭 MuseTalk unavailable, using static avatar');
+                }
+            }
+
             this.isInitialized = true;
             console.info('Audio playback initialized');
         } catch (error) {
@@ -112,6 +133,16 @@ class AudioPlayback {
                 destination: this.audioContext.destination
             });
 
+            // Update timestamp for synchronization
+            this.currentTimestamp = Date.now();
+            
+            // Send to MuseTalk in parallel (non-blocking)
+            if (this.avatarEnabled && this.musetalkClient && this.musetalkClient.isAvailable()) {
+                this.musetalkClient.processAudioFrame(opusBytes, this.currentTimestamp).catch(err => {
+                    console.debug('MuseTalk processing error (non-fatal):', err);
+                });
+            }
+            
             // Send Opus data to decoder
             console.debug('🎵 Sending to decoder...');
             this.decoder.postMessage({
@@ -137,6 +168,44 @@ class AudioPlayback {
         }
     }
 
+    setupAvatarHandling() {
+        // Set up frame callback to update UI
+        this.musetalkClient.setFrameCallback((frame) => {
+            // Send frame to UI
+            if (window.updateAvatarFrame) {
+                window.updateAvatarFrame(frame);
+            }
+        });
+    }
+
+    setAvatarEnabled(enabled) {
+        this.avatarEnabled = enabled;
+        const Store = require('electron-store');
+        const configStore = new Store();
+        configStore.set('avatarEnabled', enabled);
+        
+        // Initialize or cleanup MuseTalk based on setting
+        if (enabled && !this.musetalkClient) {
+            this.musetalkClient = new MuseTalkClient();
+            this.musetalkClient.initialize().then(ready => {
+                if (ready) {
+                    this.setupAvatarHandling();
+                }
+            });
+        } else if (!enabled && this.musetalkClient) {
+            this.musetalkClient.cleanup();
+            this.musetalkClient = null;
+        }
+    }
+
+    getAvatarStatus() {
+        return {
+            enabled: this.avatarEnabled,
+            available: this.musetalkClient?.isAvailable() || false,
+            fallbackToStatic: this.musetalkClient?.fallbackToStatic || true
+        };
+    }
+
     async cleanup() {
         this.stop();
         
@@ -148,6 +217,11 @@ class AudioPlayback {
         if (this.audioContext) {
             await this.audioContext.close();
             this.audioContext = null;
+        }
+        
+        if (this.musetalkClient) {
+            this.musetalkClient.cleanup();
+            this.musetalkClient = null;
         }
         
         this.outputWorklet = null;

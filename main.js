@@ -28,12 +28,13 @@ const store = new Store({
 
 let mainWindow;
 let tray;
+let settingsWindow;
 
 function createWindow() {
   // Create a small circular window
   mainWindow = new BrowserWindow({
-    width: 120,
-    height: 120,
+    width: 250,
+    height: 250,
     frame: false,
     transparent: true,
     alwaysOnTop: true,
@@ -92,20 +93,7 @@ function createWindow() {
       {
         label: 'Settings',
         click: () => {
-          // Ensure config exists and open it
-          const configPath = path.join(app.getPath('userData'), 'config.json');
-          const fs = require('fs');
-          
-          // Create default config if it doesn't exist
-          if (!fs.existsSync(configPath)) {
-            fs.writeFileSync(configPath, JSON.stringify(store.store, null, 2));
-          }
-          
-          const { shell } = require('electron');
-          shell.openPath(configPath).catch(() => {
-            // If can't open, show the path
-            showNotification(`Config at: ${configPath}`, 'info');
-          });
+          showSettingsDialog();
         }
       },
       { type: 'separator' },
@@ -138,6 +126,36 @@ function createWindow() {
   });
 }
 
+function showSettingsDialog() {
+  if (settingsWindow) {
+    settingsWindow.focus();
+    return;
+  }
+
+  settingsWindow = new BrowserWindow({
+    width: 500,
+    height: 600,
+    frame: true,
+    transparent: false,
+    alwaysOnTop: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    parent: mainWindow,
+    modal: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  settingsWindow.loadFile('settings.html');
+
+  settingsWindow.on('closed', () => {
+    settingsWindow = null;
+  });
+}
+
 function createTray() {
   // Skip tray for now if icon doesn't exist
   const iconPath = path.join(__dirname, 'icon.png');
@@ -158,7 +176,7 @@ function createTray() {
     {
       label: 'Settings',
       click: () => {
-        // TODO: Open settings window
+        showSettingsDialog();
       }
     },
     { type: 'separator' },
@@ -241,6 +259,15 @@ ipcMain.on('move-window', (event, { deltaX, deltaY }) => {
       width: bounds.width,
       height: bounds.height
     });
+  }
+});
+
+// Handle settings updates
+ipcMain.on('settings-updated', (event, settings) => {
+  console.log('Settings updated:', settings);
+  // Notify renderer about avatar setting change
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('avatar-setting-changed', settings.avatarEnabled);
   }
 });
 

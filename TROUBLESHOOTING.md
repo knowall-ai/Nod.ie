@@ -6,7 +6,7 @@
 |---------|----------|
 | Nod.ie can't hear me | 1. Check microphone permissions in system settings<br>2. Click circle to unmute (red = muted, purple = listening)<br>3. Run `arecord -l` to verify microphone detected |
 | Can't hear Nod.ie's responses | 1. Check system audio: `speaker-test -t wav -c 2`<br>2. Verify Unmute services: `cd ../unmute && docker compose ps`<br>3. Open Developer Tools → Console, look for "response.audio.delta" messages |
-| "Too many people are connected" error | 1. Kill all Nod.ie processes: `pkill -f "electron.*nodie"`<br>2. Restart Unmute: `cd ../unmute && docker compose restart`<br>3. Close any browser tabs with http://localhost:3000 open<br>4. Connection handling has been improved to prevent leaks |
+| "Too many people are connected" error | 1. Kill all Nod.ie processes: `pkill -f "electron.*nodie"`<br>2. Restart Unmute: `cd ../unmute && docker compose restart`<br>3. Close any browser tabs with http://localhost:3000 open<br>4. Increase batch_size in STT/TTS configs (see below) |
 | WebSocket connection failed | 1. Verify Unmute is running: `curl http://localhost:8765/v1/health`<br>2. Check port 8765 is available: `sudo netstat -tlnp \| grep 8765`<br>3. Restart Unmute services if needed |
 | White waveform disappearing | Canvas element ID mismatch - Fixed in ui-manager.js<br>Check audio context state in Console: `audioCapture?.audioContext?.state` |
 | Circle shows thinking state on startup | Fixed - only shows thinking when actually processing<br>Clear cache and restart if persists |
@@ -285,6 +285,70 @@ The following issues have been fixed:
 | Model parameter fix | Added missing 'model: llama3.2:3b' to session config |
 | PROMPT.md system | Created prompt loading system (simplified for size constraints) |
 | Renderer process fix | Removed Node.js fs/path modules from renderer |
+
+## STT/TTS Connection Limits
+
+The Unmute backend uses batch processing for STT (Speech-to-Text) and TTS (Text-to-Speech) services. By default, the development configuration only allows 1 STT connection and 2 TTS connections.
+
+### Increasing Connection Limits
+
+If you get "Too many people are connected" errors or need multiple Nod.ie instances:
+
+1. **Edit STT configuration** (`../unmute/services/moshi-server/configs/stt.toml`):
+   ```toml
+   # Change from:
+   batch_size = 1
+   # To (adjust based on GPU memory):
+   batch_size = 8
+   ```
+
+2. **Edit TTS configuration** (`../unmute/services/moshi-server/configs/tts.toml`):
+   ```toml
+   # Change from:
+   batch_size = 2
+   # To (adjust based on GPU memory):
+   batch_size = 8
+   ```
+
+3. **Rebuild and restart services**:
+   ```bash
+   cd ../unmute
+   docker compose build stt tts
+   docker compose restart stt tts
+   ```
+
+### GPU Memory Considerations
+
+Each additional connection uses more GPU memory:
+- **STT**: ~300-400 MB per connection
+- **TTS**: ~500-700 MB per connection
+
+Check your GPU memory before increasing batch size:
+```bash
+nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free --format=csv
+```
+
+**Recommended batch sizes by GPU:**
+- RTX 3090 (24GB): batch_size = 8-16
+- RTX 3080 (10GB): batch_size = 4-8
+- RTX 3070 (8GB): batch_size = 2-4
+
+### Production vs Development Config
+
+The Unmute repository includes production configs with higher batch sizes:
+- `stt-prod.toml`: batch_size = 64
+- `tts-prod.toml`: batch_size = 64
+
+To use production configs, modify the docker-compose.yml:
+```yaml
+stt:
+  command: worker --config configs/stt-prod.toml
+
+tts:
+  command: worker --config configs/tts-prod.toml
+```
+
+**Note**: Production configs are optimized for server deployments with multiple GPUs.
 
 ## Still Having Issues?
 

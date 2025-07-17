@@ -7,9 +7,11 @@ const WebSocketHandler = require('./modules/websocket-handler');
 const AudioCapture = require('./modules/audio-capture');
 const UIManager = require('./modules/ui-manager');
 const AudioPlayback = require('./modules/audio-playback');
+const AvatarManager = require('./modules/avatar-manager');
 
 // Initialize modules
 const ui = new UIManager();
+const avatar = new AvatarManager();
 let wsHandler = null;
 let audioCapture = null;
 let audioPlayback = null;
@@ -293,6 +295,20 @@ ipcRenderer.on('app-will-quit', () => {
     }
     if (audioPlayback) {
         audioPlayback.cleanup();
+    }
+});
+
+// Initialize avatar manager
+avatar.initialize();
+
+// Handle avatar setting changes
+ipcRenderer.on('avatar-setting-changed', (event, enabled) => {
+    avatar.setEnabled(enabled);
+    
+    // Update audio playback setting
+    if (audioPlayback) {
+        audioPlayback.setAvatarEnabled(enabled);
+        avatar.updateStatus(audioPlayback);
     }
 });
 

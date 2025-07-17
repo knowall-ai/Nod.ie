@@ -14,8 +14,8 @@
         }
         
         #circle {
-            width: 100px;
-            height: 100px;
+            width: 230px;
+            height: 230px;
             border-radius: 50%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             margin: 10px;
@@ -26,6 +26,7 @@
             transition: background 0.3s ease, transform 0.3s ease;
             /* No app-region - using mouse events for drag */
             position: relative;
+            overflow: hidden;
         }
         
         #circle:hover {
@@ -112,10 +113,49 @@
             pointer-events: none;
         }
         
+        #avatar-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+        
+        #avatar-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+        
+        #avatar-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: none;
+        }
+        
+        .avatar-active #avatar-image,
+        .avatar-active.avatar-static #avatar-image {
+            display: block;
+        }
+        
+        .avatar-active.avatar-animated #avatar-video {
+            display: block;
+        }
+        
+        .avatar-active.avatar-animated #avatar-image {
+            display: none;
+        }
+        
         #waveform {
             position: absolute;
-            width: 100px;
-            height: 100px;
+            width: 230px;
+            height: 230px;
             top: 0;
             left: 0;
             pointer-events: none;
@@ -144,6 +184,10 @@
 </head>
 <body>
     <div id="circle">
+        <div id="avatar-container">
+            <img id="avatar-image" src="assets/avatars/nodie-default.png" alt="Nod.ie Avatar">
+            <video id="avatar-video" autoplay muted playsinline></video>
+        </div>
         <svg id="icon" viewBox="0 0 24 24">
             <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z"/>
             <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
