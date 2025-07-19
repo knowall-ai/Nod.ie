@@ -56,7 +56,7 @@ class WebSocketHandler {
             try {
                 return require('../config');
             } catch (e) {
-                return { UNMUTE_BACKEND_URL: 'ws://localhost:8767' };
+                return { UNMUTE_BACKEND_URL: undefined }; // Must be configured in .env
             }
         })();
         

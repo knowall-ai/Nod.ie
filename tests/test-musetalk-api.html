@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MuseTalk API Test</title>
+</head>
+<body>
+    <h1>MuseTalk API Test</h1>
+    <div id="status">Checking API...</div>
+    
+    <script>
+        async function checkAPI() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                const response = await fetch('http://localhost:8765/health');
+                const data = await response.json();
+                
+                statusEl.innerHTML = `
+                    <h2>API Status:</h2>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+                
+                if (data.status === 'healthy' && data.model_loaded) {
+                    statusEl.innerHTML += '<p style="color: green;">✅ MuseTalk is ready!</p>';
+                } else {
+                    statusEl.innerHTML += '<p style="color: orange;">⚠️ MuseTalk is still initializing...</p>';
+                }
+                
+            } catch (error) {
+                statusEl.innerHTML = `<p style="color: red;">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        checkAPI();
+        // Check every 5 seconds
+        setInterval(checkAPI, 5000);
+    </script>
+</body>
+</html>

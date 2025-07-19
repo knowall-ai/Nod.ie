@@ -53,6 +53,12 @@ class AudioPlaybackWeb {
                         type: 'audio',
                         micDuration: 0
                     });
+                    
+                    // Also send PCM audio to MuseTalk
+                    if (window.NodieRenderer && window.NodieRenderer.onDecodedAudio) {
+                        // frame is Float32Array of PCM audio at outputBufferSampleRate
+                        window.NodieRenderer.onDecodedAudio(frame);
+                    }
                 }
             };
             

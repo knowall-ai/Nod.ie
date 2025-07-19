@@ -10,8 +10,11 @@
         <canvas id="waveform"></canvas>
         <div id="circle" class="listening">
             <div id="avatar-container">
-                <img id="avatar-image" src="assets/avatars/nodie-default.png" alt="Nod.ie Avatar">
-                <video id="avatar-video" alt="Nod.ie Avatar Animated" autoplay loop muted></video>
+                <canvas id="avatar-canvas" width="250" height="250" style="border-radius: 50%;"></canvas>
+                <video id="avatar-video" alt="Nod.ie Avatar Animated" autoplay loop muted style="display: block;">
+                    <source src="assets/avatars/nodie-video-01.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
             </div>
             <div id="status-text" class="loading-text" style="display: none;"></div>
         </div>

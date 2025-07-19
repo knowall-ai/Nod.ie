@@ -15,6 +15,7 @@ const { ipcRenderer } = isElectron ? require('electron') : {};
 // Use web-compatible modules that work in both environments
 const AudioCapture = isElectron ? require('./modules/audio-capture') : window.AudioCaptureWeb;
 const AudioPlayback = isElectron ? require('./modules/audio-playback') : window.AudioPlaybackWeb;
+const AvatarManagerClass = isElectron ? require('./modules/avatar-manager') : window.AvatarManager;
 
 // Unified Renderer object
 const NodieRenderer = {
@@ -29,8 +30,18 @@ const NodieRenderer = {
         avatarEnabled: true,
         isLoading: true,
         audioCapture: null,
-        audioPlayback: null
+        audioPlayback: null,
+        avatarManager: null
     },
+    
+    // Audio accumulation for MuseTalk (since individual deltas may be fragments)
+    museTalkAudioAccumulator: new Uint8Array(0),
+    museTalkFlushTimeout: null,
+    
+    // PCM audio accumulation for MuseTalk
+    pcmAudioAccumulator: [],
+    pcmFlushTimeout: null,
+    
 
     // UI Functions
     setStatus(status) {
@@ -112,8 +123,16 @@ const NodieRenderer = {
     },
 
     updateWSStatus(text) {
+        // Update generic ws-status (for backward compatibility)
         const el = document.getElementById('ws-status');
         if (el) el.textContent = text;
+        
+        // Update specific Unmute status
+        const unmuteEl = document.getElementById('unmute-ws-status');
+        if (unmuteEl) {
+            unmuteEl.textContent = text;
+            unmuteEl.className = text === 'Connected' ? 'connected' : 'disconnected';
+        }
     },
 
     // Audio Visualization
@@ -230,7 +249,7 @@ const NodieRenderer = {
                 return require('./config');
             } catch (e) {
                 return {
-                    UNMUTE_BACKEND_URL: 'ws://localhost:8767',
+                    UNMUTE_BACKEND_URL: undefined, // Must be configured in .env
                     VOICE_MODEL: 'unmute-prod-website/ex04_narration_longform_00001.wav'
                 };
             }
@@ -246,7 +265,12 @@ const NodieRenderer = {
             
             // Get backend URL from config
             const config = await this.getConfig();
-            const backendUrl = config.UNMUTE_BACKEND_URL || 'ws://localhost:8000';
+            const backendUrl = config.UNMUTE_BACKEND_URL;
+            if (!backendUrl) {
+                console.error('❌ UNMUTE_BACKEND_URL not configured in .env');
+                this.showNotification('Backend URL not configured', 'error');
+                return;
+            }
             
             const ws = new WebSocket(`${backendUrl}/v1/realtime`, ['realtime']);
             
@@ -263,7 +287,7 @@ const NodieRenderer = {
                         voice: config.VOICE_MODEL || 'unmute-prod-website/ex04_narration_longform_00001.wav',
                         instructions: {
                             type: 'constant',
-                            text: 'You are Nodey, a helpful AI assistant. When speaking, always refer to yourself as "Nodey". If asked to spell your name, spell it "N-O-D dot I-E" (nod.ie). When users say words that sound like: Noddy, Nody, Nodey, Node-ee, Nodi, Navy, Nandi, Maddie, Maggie, Nogi, Nadie, Moby, or similar sounds, they are addressing you by YOUR name "Nodey" (these are variations of your name, not the user\'s name). Do not call the user by these names. Keep responses brief and conversational.'
+                            text: 'You are Nodey, a helpful female AI assistant. Speak naturally in first person - say "I" not "Nodey" when referring to yourself. If asked to spell your name, spell it "N-O-D dot I-E" (nod.ie). When users say words that sound like: Noddy, Nody, Nodey, Node-ee, Nodi, Navy, Nandi, Maddie, Maggie, Nogi, Nadie, Moby, or similar sounds, they are addressing you by YOUR name "Nodey" (these are variations of your name, not the user\'s name). Do not call the user by these names. Keep responses brief and conversational.'
                         },
                         allow_recording: true  // Enable recording for voice input
                     }
@@ -308,9 +332,13 @@ const NodieRenderer = {
                     
                     // Debug the data format
                     if (!this.debuggedAudio) {
+                        const first4 = Array.from(bytes.slice(0, 4));
+                        const isOgg = first4[0] === 79 && first4[1] === 103 && first4[2] === 103 && first4[3] === 83;
                         console.debug('🎵 Audio delta format:', {
                             length: bytes.length,
                             first10: Array.from(bytes.slice(0, 10)),
+                            isOgg: isOgg,
+                            first4Hex: first4.map(b => b.toString(16).padStart(2, '0')).join(' '),
                             isTypedArray: bytes instanceof Uint8Array,
                             hasBuffer: !!bytes.buffer
                         });
@@ -320,10 +348,51 @@ const NodieRenderer = {
                     if (this.state.audioPlayback) {
                         await this.state.audioPlayback.processAudioDelta(bytes);
                     }
+                    
+                    // Send TTS audio to MuseTalk
+                    if (this.state.avatarManager) {
+                        // For now, just accumulate all audio data
+                        // The issue is that individual OGG segments are too small to decode
+                        const newAccumulator = new Uint8Array(this.museTalkAudioAccumulator.length + bytes.length);
+                        newAccumulator.set(this.museTalkAudioAccumulator);
+                        newAccumulator.set(bytes, this.museTalkAudioAccumulator.length);
+                        this.museTalkAudioAccumulator = newAccumulator;
+                        
+                        // Clear existing timeout
+                        if (this.museTalkFlushTimeout) {
+                            clearTimeout(this.museTalkFlushTimeout);
+                        }
+                        
+                        // Only send when we have a reasonable amount of data
+                        // Need enough for meaningful audio processing
+                        const shouldFlushNow = this.museTalkAudioAccumulator.length > 10000; // ~10KB threshold
+                        
+                        if (shouldFlushNow) {
+                            this.flushMuseTalkAudio();
+                        } else {
+                            // Set timeout to flush after delay
+                            this.museTalkFlushTimeout = setTimeout(() => {
+                                this.flushMuseTalkAudio();
+                            }, 1000); // 1 second delay to accumulate more
+                        }
+                    }
                 }
                 
                 if (data.type === 'response.audio_transcript.delta' && data.delta) {
                     console.debug('Assistant says:', data.delta);
+                }
+                
+                // Handle when response ends (return avatar to idle)
+                if (data.type === 'response.done') {
+                    console.debug('🎭 Response completed, returning avatar to idle');
+                    
+                    // Flush any remaining audio to MuseTalk
+                    this.flushMuseTalkAudio();
+                    
+                    // Return avatar to idle
+                    if (this.state.avatarManager) {
+                        this.state.avatarManager.setIdle();
+                    }
                 }
                 
                 if (data.type === 'conversation.item.input_audio_transcription.delta' && data.delta) {
@@ -381,6 +450,7 @@ const NodieRenderer = {
                             audio: audioData
                         }));
                     }
+                    
                 });
                 
                 await this.state.audioCapture.start();
@@ -511,6 +581,34 @@ const NodieRenderer = {
         }
     },
 
+    // Flush accumulated MuseTalk audio
+    flushMuseTalkAudio() {
+        // Only send if we have a substantial amount of audio data (avoid "End of file" errors)
+        if (this.museTalkAudioAccumulator.length > 5000 && this.state.avatarManager) {
+            // Debug: Check what format we're sending
+            const first4Bytes = Array.from(this.museTalkAudioAccumulator.slice(0, 4));
+            const isOgg = first4Bytes[0] === 79 && first4Bytes[1] === 103 && first4Bytes[2] === 103 && first4Bytes[3] === 83; // OggS
+            console.info('🎭 Audio format check:', isOgg ? 'OGG detected' : 'Raw data', 'First 4 bytes:', first4Bytes);
+            
+            const base64Audio = btoa(String.fromCharCode.apply(null, this.museTalkAudioAccumulator));
+            console.info('🎭 Flushing accumulated audio to MuseTalk:', base64Audio.length, 'chars from', this.museTalkAudioAccumulator.length, 'bytes');
+            this.state.avatarManager.sendAudioToMuseTalk(base64Audio);
+            
+            // Reset accumulator
+            this.museTalkAudioAccumulator = new Uint8Array(0);
+        } else if (this.museTalkAudioAccumulator.length > 0) {
+            console.debug('🎭 Skipping small audio chunk to MuseTalk:', this.museTalkAudioAccumulator.length, 'bytes (too small)');
+            // Still reset to avoid accumulating forever
+            this.museTalkAudioAccumulator = new Uint8Array(0);
+        }
+        
+        // Clear timeout
+        if (this.museTalkFlushTimeout) {
+            clearTimeout(this.museTalkFlushTimeout);
+            this.museTalkFlushTimeout = null;
+        }
+    },
+
     // Initialize
     initialize() {
         console.log('📄 Renderer initializing...');
@@ -537,7 +635,20 @@ const NodieRenderer = {
         
         // Initialize connections
         this.connectToUnmute();
-        this.loadVideoAvatar();
+        // this.loadVideoAvatar(); // Disabled - using MuseTalk frames instead
+        
+        // Initialize avatar manager (for MuseTalk integration)
+        console.log('🔍 Checking AvatarManagerClass:', typeof AvatarManagerClass);
+        console.log('🔍 Canvas element exists:', !!document.getElementById('avatar-canvas'));
+        if (AvatarManagerClass) {
+            console.log('🔍 Creating new AvatarManagerClass...');
+            this.state.avatarManager = new AvatarManagerClass();
+            console.log('🔍 Calling initialize...');
+            this.state.avatarManager.initialize();
+            console.log('✅ Avatar manager initialized');
+        } else {
+            console.error('❌ AvatarManagerClass not found');
+        }
         
         // Start waveform (will be static until analyser is available)
         this.startWaveform();
@@ -569,6 +680,11 @@ const NodieRenderer = {
                 }
             }, 200); // 200ms delay - enough to prevent immediate self-interruption
         }
+        
+        // Trigger avatar animation if avatar manager is available
+        if (this.state.avatarManager && typeof this.state.avatarManager.setAnimationMode === 'function') {
+            this.state.avatarManager.setAnimationMode(true);
+        }
     },
 
     onAudioPlaybackStop() {
@@ -576,6 +692,86 @@ const NodieRenderer = {
         if (this.state.audioCapture) {
             console.debug('🎤 Ensuring microphone gain is restored after audio playback');
             this.state.audioCapture.setGain(1.0);
+        }
+        
+        // Return avatar to static mode if avatar manager is available
+        if (this.state.avatarManager && typeof this.state.avatarManager.setAnimationMode === 'function') {
+            this.state.avatarManager.setAnimationMode(false);
+        }
+    },
+    
+    // Handle decoded PCM audio from decoderWorker
+    onDecodedAudio(pcmFrame) {
+        if (!this.state.avatarManager) return;
+        
+        // pcmFrame is a Float32Array of PCM audio
+        // Accumulate PCM frames
+        this.pcmAudioAccumulator.push(pcmFrame);
+        
+        // Clear existing timeout
+        if (this.pcmFlushTimeout) {
+            clearTimeout(this.pcmFlushTimeout);
+        }
+        
+        // Calculate total samples
+        const totalSamples = this.pcmAudioAccumulator.reduce((sum, frame) => sum + frame.length, 0);
+        
+        // Send when we have enough audio (0.5 seconds at 48kHz = 24000 samples)
+        if (totalSamples > 24000) {
+            this.flushPCMAudio();
+        } else {
+            // Set timeout to flush after delay
+            this.pcmFlushTimeout = setTimeout(() => {
+                this.flushPCMAudio();
+            }, 500); // 500ms delay
+        }
+    },
+    
+    // Send accumulated PCM audio to MuseTalk
+    flushPCMAudio() {
+        if (this.pcmAudioAccumulator.length === 0) return;
+        
+        // Combine all PCM frames
+        const totalSamples = this.pcmAudioAccumulator.reduce((sum, frame) => sum + frame.length, 0);
+        const combinedPCM = new Float32Array(totalSamples);
+        let offset = 0;
+        
+        for (const frame of this.pcmAudioAccumulator) {
+            combinedPCM.set(frame, offset);
+            offset += frame.length;
+        }
+        
+        // Convert Float32Array to Int16Array for WAV format
+        const int16Audio = new Int16Array(combinedPCM.length);
+        for (let i = 0; i < combinedPCM.length; i++) {
+            // Clamp and convert to int16
+            const sample = Math.max(-1, Math.min(1, combinedPCM[i]));
+            int16Audio[i] = sample * 32767;
+        }
+        
+        // Convert to base64
+        const uint8Audio = new Uint8Array(int16Audio.buffer);
+        const base64Audio = btoa(String.fromCharCode.apply(null, uint8Audio));
+        
+        console.info('🎭 Sending PCM audio to MuseTalk:', base64Audio.length, 'chars from', totalSamples, 'samples');
+        
+        // Send as PCM data with metadata
+        if (this.state.avatarManager && this.state.avatarManager.musetalkWsClient) {
+            this.state.avatarManager.musetalkWsClient.sendAudio(base64Audio, {
+                format: 'pcm',
+                sampleRate: 48000, // Assuming 48kHz from audio context
+                channels: 1,
+                bitDepth: 16
+            });
+        }
+        
+        // Clear accumulator
+        this.pcmAudioAccumulator = [];
+        
+        // Clear timeout
+        if (this.pcmFlushTimeout) {
+            clearTimeout(this.pcmFlushTimeout);
+            this.pcmFlushTimeout = null;
         }
     }
 };

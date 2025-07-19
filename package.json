@@ -28,6 +28,7 @@
     "node-fetch": "^3.3.2",
     "opus-recorder": "^8.0.5",
     "playwright": "^1.54.1",
+    "puppeteer": "^24.14.0",
     "ws": "^8.14.2"
   }
 }

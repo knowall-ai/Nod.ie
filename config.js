@@ -30,25 +30,32 @@ function getConfig(key, defaultValue = null) {
 }
 
 module.exports = {
-    // Port configurations
-    UNMUTE_BACKEND_PORT: getConfig('UNMUTE_BACKEND_PORT', '8767'),
-    UNMUTE_MCP_BACKEND_PORT: getConfig('UNMUTE_MCP_BACKEND_PORT', '8766'),
-    MUSETALK_PORT: getConfig('MUSETALK_PORT', '8765'),
-    WEB_TEST_PORT: getConfig('WEB_TEST_PORT', '8095'),
+    // Host configurations
+    UNMUTE_BACKEND_HOST: getConfig('UNMUTE_BACKEND_HOST'),
+    UNMUTE_MCP_BACKEND_HOST: getConfig('UNMUTE_MCP_BACKEND_HOST'),
+    MUSETALK_HOST: getConfig('MUSETALK_HOST'),
     
-    // URLs
-    UNMUTE_BACKEND_URL: getConfig('UNMUTE_BACKEND_URL', `ws://localhost:${getConfig('UNMUTE_BACKEND_PORT', '8767')}`),
-    UNMUTE_MCP_BACKEND_URL: getConfig('UNMUTE_MCP_BACKEND_URL', `ws://localhost:${getConfig('UNMUTE_MCP_BACKEND_PORT', '8766')}`),
-    MUSETALK_URL: getConfig('MUSETALK_URL', `ws://localhost:${getConfig('MUSETALK_PORT', '8765')}`),
+    // Port configurations
+    UNMUTE_BACKEND_PORT: getConfig('UNMUTE_BACKEND_PORT'),
+    UNMUTE_MCP_BACKEND_PORT: getConfig('UNMUTE_MCP_BACKEND_PORT'),
+    MUSETALK_PORT: getConfig('MUSETALK_PORT'),
+    WEB_TEST_PORT: getConfig('WEB_TEST_PORT'),
+    
+    // URLs - require explicit configuration
+    UNMUTE_BACKEND_URL: getConfig('UNMUTE_BACKEND_URL'),
+    UNMUTE_MCP_BACKEND_URL: getConfig('UNMUTE_MCP_BACKEND_URL'),
+    MUSETALK_URL: getConfig('MUSETALK_URL'),
+    MUSETALK_WS: getConfig('MUSETALK_WS'),
     
     // HTTP URLs
-    UNMUTE_BACKEND_HTTP: `http://localhost:${getConfig('UNMUTE_BACKEND_PORT', '8767')}`,
-    UNMUTE_MCP_BACKEND_HTTP: `http://localhost:${getConfig('UNMUTE_MCP_BACKEND_PORT', '8766')}`,
-    MUSETALK_HTTP: `http://localhost:${getConfig('MUSETALK_PORT', '8765')}`,
+    UNMUTE_BACKEND_HTTP: getConfig('UNMUTE_BACKEND_HTTP'),
+    UNMUTE_MCP_BACKEND_HTTP: getConfig('UNMUTE_MCP_BACKEND_HTTP'),
+    MUSETALK_HTTP: getConfig('MUSETALK_HTTP'),
     
     // Other settings
-    VOICE_MODEL: getConfig('VOICE_MODEL', 'unmute-prod-website/ex04_narration_longform_00001.wav'),
-    ASSISTANT_NAME: getConfig('ASSISTANT_NAME', 'Nodie'),
+    VOICE_MODEL: getConfig('VOICE_MODEL'),
+    ASSISTANT_NAME: getConfig('ASSISTANT_NAME'),
+    AVATAR_VIDEO_PATH: getConfig('AVATAR_VIDEO_PATH'),
     
     // Helper function
     getConfig

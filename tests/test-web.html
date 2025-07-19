@@ -5,14 +5,21 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nod.ie Web Test</title>
     <link rel="stylesheet" href="../renderer.css">
+    <style>
+        .connected { color: #4caf50; }
+        .disconnected { color: #f44336; }
+    </style>
 </head>
 <body>
     <div id="app">
         <canvas id="waveform"></canvas>
         <div id="circle" class="listening">
             <div id="avatar-container">
-                <img id="avatar-image" src="../assets/avatars/nodie-default.png" alt="Nod.ie Avatar">
-                <video id="avatar-video" alt="Nod.ie Avatar Animated" autoplay loop muted></video>
+                <canvas id="avatar-canvas" width="250" height="250" style="border-radius: 50%;"></canvas>
+                <video id="avatar-video" alt="Nod.ie Avatar Animated" autoplay loop muted style="display: block;">
+                    <source src="../assets/avatars/nodie-video-01.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
             </div>
             <div id="status-text" class="loading-text" style="display: none;"></div>
         </div>
@@ -21,15 +28,14 @@
     <div id="notification" class="notification"></div>
     <div id="debug-info">
         <div>Status: <span id="status">Initializing...</span></div>
-        <div>WebSocket: <span id="ws-status">Disconnected</span></div>
+        <div>Unmute WS: <span id="unmute-ws-status">Disconnected</span></div>
+        <div>MuseTalk WS: <span id="musetalk-ws-status">Disconnected</span></div>
         <div>Avatar: <span id="avatar-status">Not loaded</span></div>
         <div>Console: <span id="console-errors">0 errors</span></div>
     </div>
 
-    <script>
-        // Load configuration from config system
-        // This will be populated by the config-web.js file
-    </script>
+    <!-- Load environment configuration -->
+    <script src="env-config.js"></script>
     <script src="../config-web.js"></script>
     <!-- Load opus-recorder for web audio capture -->
     <script src="../node_modules/opus-recorder/dist/recorder.min.js"></script>
@@ -37,6 +43,10 @@
     <script src="../modules/audio-capture-web.js"></script>
     <!-- Load audio playback module -->
     <script src="../modules/audio-playback-web.js"></script>
+    <!-- Load MuseTalk WebSocket client -->
+    <script src="../modules/musetalk-websocket-client.js"></script>
+    <!-- Load unified avatar manager -->
+    <script src="../modules/avatar-manager.js"></script>
     <!-- Load main renderer -->
     <script src="../renderer.js"></script>
 </body>

@@ -122,13 +122,30 @@ body[data-platform="web"] #circle.loading {
 }
 
 #avatar-image,
-#avatar-video {
+#avatar-video,
+#avatar-canvas {
     position: absolute;
     width: 250px;
     height: 250px;
     object-fit: cover;
     border-radius: 50%;
     display: none;
+}
+
+/* Ensure avatar canvas is on top */
+#avatar-canvas {
+    z-index: 10;
+}
+
+/* Show avatar elements when active */
+.avatar-active #avatar-canvas,
+.avatar-active #avatar-video {
+    display: block !important; /* Force display with !important */
+}
+
+/* Also show canvas when musetalk is connected */
+.musetalk-connected #avatar-canvas {
+    display: block !important;
 }
 
 /* Avatar is always visible */

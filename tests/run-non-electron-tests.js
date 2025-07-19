@@ -18,7 +18,8 @@ const nonElectronTests = [
     'test-final.js',
     'test-functionality.js',
     'check-avatar-status.js',
-    'check-musetalk-api.js'
+    'check-musetalk-api.js',
+    'test-musetalk-integration.js'
 ];
 
 let passed = 0;

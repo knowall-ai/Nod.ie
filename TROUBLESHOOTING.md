@@ -70,6 +70,92 @@ node debug-audio-detailed.js
 
 **Prevention**: Always validate audio data length before sending to WebSocket.
 
+### 🎭 MuseTalk Avatar Issues
+
+| Problem | Solution |
+|---------|----------|
+| MuseTalk WebSocket disconnects immediately | Check AVATAR_VIDEO_PATH environment variable is set |
+| "invalid literal for int() with base 10: 'cudacuda...'" | Function parameter error - fixed in get_image_prepare_material call |
+| MuseTalk shows "Disconnected" in web interface | Ensure container has AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4 |
+| No avatar video fallback | Add `<video>` tag with src="assets/avatars/nodie-video-01.mp4" |
+| Canvas shows no default avatar image | Check asset paths - use "../assets/" for tests, "./assets/" for main |
+| MuseTalk audio decoding fails - "[ogg @ 0x...] Codec not found" | Container's ffmpeg lacks proper Opus support - fixed with Python libraries (pydub, pyogg) |
+| "Audio decoding failed" in MuseTalk logs | OGG Opus format from browser not compatible with conda ffmpeg build |
+| MuseTalk generates frames but no lip-sync | Audio processing failing - check for "Successfully decoded Opus audio" in logs |
+| MuseTalk falls back to video cycling | Real audio not being processed - audio decoding step is failing |
+
+**Diagnosing MuseTalk Issues:**
+
+1. **Check MuseTalk service health:**
+   ```bash
+   curl http://localhost:8765/health
+   # Should return: {"status":"healthy","model_loaded":true,...}
+   ```
+
+2. **Check container environment:**
+   ```bash
+   docker exec musetalk env | grep AVATAR_VIDEO_PATH
+   # Should show: AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4
+   ```
+
+3. **Check WebSocket connection logs:**
+   ```bash
+   docker logs musetalk --tail 20
+   # Look for: "WebSocket client connected" without errors
+   ```
+
+4. **Check audio processing logs:**
+   ```bash
+   docker logs musetalk --tail 50 | grep -E "(Processing audio|Successfully decoded|Audio decoding failed)"
+   # Should show successful Opus decoding, not "Audio decoding failed"
+   ```
+
+5. **Verify real-time lip-sync:**
+   ```bash
+   # Open web test page: http://localhost:8095/tests/test-web.html
+   # Speak into microphone and check logs for:
+   docker logs musetalk --tail 10 | grep "Generated actual lip-synced frame"
+   # If missing, audio processing is failing
+   ```
+
+**Common MuseTalk Fixes:**
+
+1. **Set environment variable and restart:**
+   ```bash
+   cd musetalk-service
+   AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4 docker compose up -d
+   ```
+
+2. **Verify video files exist:**
+   ```bash
+   docker exec musetalk ls -la /app/avatars/
+   # Should list .mp4 files
+   ```
+
+3. **Check preprocessing errors:**
+   - Look for "Error preparing avatar" in logs
+   - Face detection may fail on some video frames
+   - Falls back to static video frames when MuseTalk fails
+
+4. **Fix Opus audio decoding (Current Issue):**
+   ```bash
+   # Update container with Python audio libraries
+   cd musetalk-service
+   docker compose down
+   docker compose up --build -d
+   
+   # Check if pydub and pyogg are installed
+   docker exec musetalk pip list | grep -E "(pydub|pyogg)"
+   ```
+
+5. **Test audio decoding:**
+   ```bash
+   # Speak into microphone on test page and check logs
+   docker logs musetalk --follow | grep -E "(decoded|audio)"
+   # Should see: "✅ Successfully decoded Opus audio"
+   # Not: "Audio decoding failed"
+   ```
+
 ### 🔄 Process Management
 
 | Problem | Solution |
@@ -249,6 +335,8 @@ console.log(audioPlayback?.audioContext?.state)
 | "Too many people are connected" | Connection limit reached | Restart Unmute services |
 | "Cannot read properties of undefined (reading 'getContext')" | Canvas element not found | Fixed element ID reference |
 | "Invalid instructions format" | Wrong message format | Use discriminated union objects |
+| "invalid literal for int() with base 10: 'cudacudacuda...'" | MuseTalk function call error | Fixed get_image_prepare_material parameters |
+| "AVATAR_VIDEO_PATH environment variable not set" | MuseTalk WebSocket closes immediately | Set AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4 |
 
 ## Prevention Tips
 

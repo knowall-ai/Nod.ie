@@ -2,10 +2,8 @@ services:
   musetalk:
     build: 
       context: .
-      dockerfile: Dockerfile
-      no_cache: true
-    container_name: musetalk
-    image: musetalk:latest
+      dockerfile: Dockerfile.musetalk
+    container_name: musetalk-clean
     ports:
       - "8765:8765"
     environment:
@@ -14,9 +12,8 @@ services:
       - FACE_SIZE=256
       - LOG_LEVEL=INFO
       - CUDA_VISIBLE_DEVICES=0
-      - AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4
     volumes:
-      - ../musetalk-repo/models:/app/models
+      - ./models:/app/models
       - ../assets/avatars:/app/avatars
     restart: unless-stopped
     networks:
@@ -33,7 +30,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
 networks:
   ai-stack:

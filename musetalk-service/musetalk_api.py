@@ -1,37 +1,37 @@
 """
-MuseTalk API Service with Real Model Integration
-Provides REST and WebSocket endpoints for real-time lip-sync animation
+MuseTalk API Service - Refactored Main Entry Point
+Uses modular architecture with separate audio and avatar processing modules
 """
 
 import asyncio
 import base64
 import json
 import logging
-import time
+import os
 import sys
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
 import numpy as np
 import cv2
-from PIL import Image
-import io
 import torch
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from transformers import WhisperModel, WhisperProcessor
 
-# Add MuseTalk to path
+# Add modules to path
 sys.path.append('/app')
+
+# Import our modular components
+from audio_processor_module import AudioProcessorModule
+from avatar_processor_module import AvatarProcessorModule
 
 # Import MuseTalk components
 try:
-    from musetalk.utils.utils import load_all_model, datagen
+    from musetalk.utils.utils import load_all_model
     from musetalk.utils.audio_processor import AudioProcessor
-    from musetalk.utils.preprocessing import get_landmark_and_bbox, read_imgs
-    from musetalk.utils.blending import get_image_prepare_material, get_image_blending
     from musetalk.utils.face_parsing import FaceParsing
     MUSETALK_AVAILABLE = True
 except ImportError as e:
@@ -57,13 +57,15 @@ model_state = {
     "processing": False
 }
 
-# Frame buffer for synchronization
-frame_buffer = {}
-frame_counter = 0
+# Initialize modules
+audio_module = None
+avatar_module = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize models on startup"""
+    global audio_module, avatar_module
+    
     try:
         if MUSETALK_AVAILABLE:
             logger.info("Initializing MuseTalk models...")
@@ -75,7 +77,7 @@ async def lifespan(app: FastAPI):
             # Load VAE, UNet, and Positional Encoding
             vae, unet, pe = load_all_model(
                 unet_model_path="/app/models/musetalkV15/unet.pth",
-                vae_type="sd-vae-ft-mse",
+                vae_type="/app/models/sd-vae",
                 unet_config="/app/models/musetalkV15/musetalk.json",
                 device=device
             )
@@ -85,18 +87,27 @@ async def lifespan(app: FastAPI):
             model_state["pe"] = pe
             
             # Load Whisper for audio processing
-            whisper = WhisperModel.from_pretrained("openai/whisper-tiny").to(device)
-            model_state["whisper"] = whisper
-            model_state["whisper_processor"] = WhisperProcessor.from_pretrained("openai/whisper-tiny")
+            try:
+                whisper_model_name = "openai/whisper-tiny"
+                logger.info(f"Loading Whisper model: {whisper_model_name}")
+                whisper = WhisperModel.from_pretrained(whisper_model_name).to(device)
+                model_state["whisper"] = whisper
+                model_state["whisper_processor"] = WhisperProcessor.from_pretrained(whisper_model_name)
+                logger.info("Whisper model loaded successfully")
+            except Exception as e:
+                logger.error(f"Failed to load Whisper model: {e}")
+                model_state["whisper"] = None
+                model_state["whisper_processor"] = None
             
             # Initialize audio processor
-            model_state["audio_processor"] = AudioProcessor(
-                16000,  # sample_rate
-                25      # fps
-            )
+            model_state["audio_processor"] = AudioProcessor(feature_extractor_path="openai/whisper-tiny")
             
             # Initialize face parsing
-            model_state["face_parsing"] = FaceParsing(device=device)
+            model_state["face_parsing"] = FaceParsing()
+            
+            # Initialize our modules
+            audio_module = AudioProcessorModule(model_state)
+            avatar_module = AvatarProcessorModule(model_state)
             
             model_state["initialized"] = True
             logger.info("MuseTalk models initialized successfully")
@@ -107,7 +118,6 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Cleanup on shutdown
     logger.info("Shutting down MuseTalk service")
 
 app = FastAPI(lifespan=lifespan)
@@ -135,16 +145,10 @@ async def health_check():
 @app.post("/initialize")
 async def initialize_model(request: Dict[str, Any]):
     """Initialize or reinitialize the model with specific parameters"""
-    try:
-        face_size = request.get("face_size", 256)
-        quality = request.get("quality", "auto")
-        
-        logger.info(f"Initializing model with face_size={face_size}, quality={quality}")
-        
-        return {"status": "initialized", "face_size": face_size}
-    except Exception as e:
-        logger.error(f"Initialization error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    face_size = request.get("face_size", 256)
+    quality = request.get("quality", "auto")
+    logger.info(f"Initializing model with face_size={face_size}, quality={quality}")
+    return {"status": "initialized", "face_size": face_size}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -153,83 +157,33 @@ async def websocket_endpoint(websocket: WebSocket):
     client_id = id(websocket)
     logger.info(f"WebSocket client {client_id} connected")
     
-    # Load avatar video and prepare for MuseTalk
-    video_path = Path("/app/avatars/nodie-video-03.mp4")
+    # Load avatar video
+    avatar_video = os.environ.get('AVATAR_VIDEO_PATH')
+    if not avatar_video:
+        logger.error("AVATAR_VIDEO_PATH environment variable not set")
+        await websocket.close(code=1008, reason="Avatar video path not configured")
+        return
+        
+    video_path = Path(avatar_video)
     logger.info(f"Loading avatar video: {video_path}")
+    
+    # Load video frames
+    try:
+        video_frames = avatar_module.load_avatar_video(video_path)
+    except FileNotFoundError:
+        logger.error(f"Avatar video not found: {video_path}")
+        await websocket.close(code=1008, reason="Avatar video not found")
+        return
     
     # Prepare avatar materials if MuseTalk is available
     avatar_info = {}
     vae_encode_latents = []
     
-    if MUSETALK_AVAILABLE and model_state["initialized"] and video_path.exists():
-        try:
-            # Read video frames
-            cap = cv2.VideoCapture(str(video_path))
-            frames = []
-            while True:
-                ret, frame = cap.read()
-                if not ret:
-                    break
-                frames.append(cv2.resize(frame, (256, 256)))
-                if len(frames) >= 150:  # Limit frames for memory
-                    break
-            cap.release()
-            logger.info(f"Loaded {len(frames)} frames")
-            
-            if frames:
-                # Get face landmarks and bbox for first frame
-                coord_list, frame_list = get_landmark_and_bbox(frames, 10)
-                
-                if coord_list and len(coord_list[0]) > 0:
-                    # Process first valid frame
-                    first_frame_idx = 0
-                    for i, coords in enumerate(coord_list):
-                        if coords:
-                            first_frame_idx = i
-                            break
-                    
-                    first_frame = frames[first_frame_idx]
-                    first_coords = coord_list[first_frame_idx]
-                    
-                    # Get avatar materials
-                    avatar_info = get_image_prepare_material(
-                        first_frame, 
-                        first_coords,
-                        model_state["face_parsing"],
-                        model_state["device"]
-                    )
-                    
-                    # Encode frames to latents
-                    logger.info("Encoding frames to latents...")
-                    for i, frame in enumerate(frames[:50]):  # Limit for memory
-                        if i % 10 == 0:
-                            logger.info(f"Encoding frame {i}...")
-                        latent = model_state["vae"].encode_latents(
-                            frame,
-                            avatar_info["mask_crop"],
-                            avatar_info["face_mask"]
-                        )
-                        vae_encode_latents.append(latent)
-                    
-                    logger.info(f"Encoded {len(vae_encode_latents)} latents")
-                else:
-                    logger.warning("No face detected in video")
-        except Exception as e:
-            logger.error(f"Error preparing avatar: {e}")
-            import traceback
-            traceback.print_exc()
+    if MUSETALK_AVAILABLE and model_state["initialized"]:
+        avatar_info, vae_encode_latents = avatar_module.prepare_avatar_materials(video_frames)
     
-    # Fallback frames if MuseTalk not available
     if not vae_encode_latents:
         logger.warning("Using fallback video frames (no lip-sync)")
-        cap = cv2.VideoCapture(str(video_path))
-        video_frames = []
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-            video_frames.append(cv2.resize(frame, (256, 256)))
-        cap.release()
     
     frame_count = 0
     
@@ -243,59 +197,41 @@ async def websocket_endpoint(websocket: WebSocket):
                 audio_data = base64.b64decode(data["audio"])
                 timestamp = data.get("timestamp", time.time())
                 
+                # Get audio metadata
+                audio_format = data.get("format", "ogg")
+                sample_rate = data.get("sampleRate", 24000)
+                channels = data.get("channels", 1)
+                bit_depth = data.get("bitDepth", 16)
+                
+                # Initialize frame variable
+                frame = None
+                
                 if MUSETALK_AVAILABLE and model_state["initialized"] and vae_encode_latents:
                     try:
-                        # Extract audio features with Whisper
-                        audio_array = np.frombuffer(audio_data, dtype=np.float32)
-                        
-                        # Get whisper features
-                        whisper_chunks = model_state["audio_processor"].get_whisper_chunk(
-                            audio_array,
-                            model_state["device"],
-                            model_state["dtype"],
-                            model_state["whisper"]
+                        # Process audio data
+                        audio_array = audio_module.process_audio_data(
+                            audio_data, audio_format, sample_rate, channels, bit_depth
                         )
                         
-                        # Generate lip-synced frame
-                        for whisper_batch, latent_batch in datagen(
-                            [whisper_chunks],
-                            vae_encode_latents,
-                            batch_size=1,
-                            delay_frame=0,
-                            device=model_state["device"]
-                        ):
-                            # Apply positional encoding
-                            audio_feature_batch = model_state["pe"](whisper_batch)
-                            
-                            # Generate with UNet
-                            timesteps = torch.zeros(1, device=model_state["device"], dtype=torch.long)
-                            pred_latents = model_state["unet"].model(
-                                latent_batch,
-                                timesteps,
-                                encoder_hidden_states=audio_feature_batch
-                            ).sample
-                            
-                            # Decode latents to image
-                            recon = model_state["vae"].decode_latents(pred_latents)
-                            
-                            # Blend with original frame
-                            base_frame = frames[frame_count % len(frames)]
-                            frame = get_image_blending(
-                                base_frame,
-                                recon[0],
-                                avatar_info
-                            )
-                            
-                            break  # Process only first batch
+                        # Get Whisper features
+                        whisper_chunks = audio_module.get_whisper_features(audio_array)
                         
-                        logger.debug(f"Generated lip-synced frame {frame_count}")
+                        # Generate lip-synced frame
+                        frame = avatar_module.generate_lip_synced_frame(
+                            whisper_chunks, vae_encode_latents, avatar_info, 
+                            video_frames, frame_count
+                        )
                         
                     except Exception as e:
                         logger.error(f"MuseTalk processing error: {e}")
-                        # Fallback to cycling frames
                         frame = video_frames[frame_count % len(video_frames)]
                 else:
                     # Fallback: cycle through video frames
+                    frame = video_frames[frame_count % len(video_frames)]
+                
+                # Ensure frame is valid
+                if frame is None:
+                    logger.warning("Frame is None, using fallback")
                     frame = video_frames[frame_count % len(video_frames)]
                 
                 # Encode and send frame
@@ -311,7 +247,6 @@ async def websocket_endpoint(websocket: WebSocket):
                 frame_count += 1
                 
             elif data["type"] == "config":
-                # Update configuration
                 logger.info(f"Config update: {data}")
                 
     except WebSocketDisconnect:
@@ -324,8 +259,7 @@ async def websocket_endpoint(websocket: WebSocket):
 async def get_stats():
     """Get processing statistics"""
     return {
-        "frames_processed": frame_counter,
-        "buffer_size": len(frame_buffer),
+        "frames_processed": frame_count if 'frame_count' in locals() else 0,
         "model_status": model_state,
         "musetalk_available": MUSETALK_AVAILABLE
     }

@@ -4,12 +4,12 @@
 
 console.log('🧪 Testing Nod.ie functionality...');
 
-// Test window visibility
+// Test window visibility - check if running in browser
 const windowInfo = {
     visible: true,
-    location: window.location.href,
-    title: document.title,
-    readyState: document.readyState
+    location: typeof window !== 'undefined' ? window.location.href : 'Node.js environment',
+    title: typeof document !== 'undefined' ? document.title : 'N/A',
+    readyState: typeof document !== 'undefined' ? document.readyState : 'N/A'
 };
 
 console.log('Window info:', windowInfo);

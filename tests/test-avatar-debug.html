@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Avatar Debug Test</title>
+    <link rel="stylesheet" href="../renderer.css">
+    <style>
+        body {
+            background: #1a1a1a;
+            color: white;
+            font-family: monospace;
+        }
+        #debug-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            max-width: 400px;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        #test-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .element-info {
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body data-platform="web">
+    <div id="app">
+        <canvas id="waveform"></canvas>
+        <div id="circle" class="listening">
+            <div id="avatar-container">
+                <img id="avatar-image" src="../assets/avatars/nodie-default.png" alt="Nod.ie Avatar">
+                <video id="avatar-video" alt="Nod.ie Avatar Animated" autoplay loop muted></video>
+            </div>
+            <div id="status-text" class="loading-text" style="display: none;"></div>
+        </div>
+    </div>
+    
+    <div id="debug-panel">
+        <h3>Avatar Element Debug</h3>
+        <div id="element-status"></div>
+        <div id="log-container" style="max-height: 300px; overflow-y: auto;"></div>
+    </div>
+    
+    <div id="test-controls">
+        <h3>Test Controls</h3>
+        <button onclick="testStaticImage()">Test Static Image</button>
+        <button onclick="testVideoDisplay()">Test Video Display</button>
+        <button onclick="testMuseTalkFrame()">Test MuseTalk Frame</button>
+        <button onclick="checkZIndex()">Check Z-Index</button>
+        <button onclick="toggleElements()">Toggle Elements</button>
+        <button onclick="clearLogs()">Clear Logs</button>
+    </div>
+
+    <script>
+        const logs = [];
+        
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const entry = `[${timestamp}] ${message}`;
+            logs.push(entry);
+            console.log(entry);
+            
+            const container = document.getElementById('log-container');
+            const logEl = document.createElement('div');
+            logEl.className = 'log-entry';
+            logEl.style.color = type === 'error' ? '#e74c3c' : type === 'success' ? '#27ae60' : '#3498db';
+            logEl.textContent = entry;
+            container.appendChild(logEl);
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function updateElementStatus() {
+            const image = document.getElementById('avatar-image');
+            const video = document.getElementById('avatar-video');
+            const container = document.getElementById('avatar-container');
+            const circle = document.getElementById('circle');
+            
+            const status = `
+                <div class="element-info">
+                    <strong>Image Element:</strong><br>
+                    Display: ${image ? getComputedStyle(image).display : 'N/A'}<br>
+                    Visibility: ${image ? getComputedStyle(image).visibility : 'N/A'}<br>
+                    Opacity: ${image ? getComputedStyle(image).opacity : 'N/A'}<br>
+                    Z-Index: ${image ? getComputedStyle(image).zIndex : 'N/A'}<br>
+                    Src: ${image ? image.src.split('/').pop() : 'N/A'}
+                </div>
+                <div class="element-info">
+                    <strong>Video Element:</strong><br>
+                    Display: ${video ? getComputedStyle(video).display : 'N/A'}<br>
+                    Visibility: ${video ? getComputedStyle(video).visibility : 'N/A'}<br>
+                    Opacity: ${video ? getComputedStyle(video).opacity : 'N/A'}<br>
+                    Z-Index: ${video ? getComputedStyle(video).zIndex : 'N/A'}<br>
+                    Src: ${video ? (video.src ? video.src.split('/').pop() : 'None') : 'N/A'}
+                </div>
+                <div class="element-info">
+                    <strong>Container:</strong><br>
+                    Display: ${container ? getComputedStyle(container).display : 'N/A'}<br>
+                    Z-Index: ${container ? getComputedStyle(container).zIndex : 'N/A'}<br>
+                    Opacity: ${container ? getComputedStyle(container).opacity : 'N/A'}
+                </div>
+                <div class="element-info">
+                    <strong>Circle Classes:</strong><br>
+                    ${circle ? circle.className : 'N/A'}
+                </div>
+            `;
+            
+            document.getElementById('element-status').innerHTML = status;
+        }
+        
+        function testStaticImage() {
+            log('Testing static image display');
+            const image = document.getElementById('avatar-image');
+            const video = document.getElementById('avatar-video');
+            
+            if (video) {
+                video.style.display = 'none';
+                log('Video hidden');
+            }
+            
+            if (image) {
+                image.style.display = 'block';
+                image.style.opacity = '1';
+                image.style.visibility = 'visible';
+                log('Image shown', 'success');
+            }
+            
+            updateElementStatus();
+        }
+        
+        function testVideoDisplay() {
+            log('Testing video display');
+            const image = document.getElementById('avatar-image');
+            const video = document.getElementById('avatar-video');
+            
+            if (image) {
+                image.style.display = 'none';
+                log('Image hidden');
+            }
+            
+            if (video) {
+                video.style.display = 'block';
+                video.style.opacity = '1';
+                video.style.visibility = 'visible';
+                video.src = '../assets/avatars/nodie-video-01.mp4';
+                video.play().catch(e => log('Video play failed: ' + e.message, 'error'));
+                log('Video shown and playing', 'success');
+            }
+            
+            updateElementStatus();
+        }
+        
+        function testMuseTalkFrame() {
+            log('Testing MuseTalk frame display');
+            const image = document.getElementById('avatar-image');
+            const video = document.getElementById('avatar-video');
+            
+            // Hide video
+            if (video) {
+                video.style.display = 'none';
+                log('Video hidden');
+            }
+            
+            // Create a test frame
+            if (image) {
+                image.style.display = 'block';
+                image.style.opacity = '1';
+                image.style.visibility = 'visible';
+                image.style.position = 'absolute';
+                image.style.zIndex = '10';
+                
+                // Create a test image with a red circle to make it obvious
+                const canvas = document.createElement('canvas');
+                canvas.width = 250;
+                canvas.height = 250;
+                const ctx = canvas.getContext('2d');
+                
+                // Fill with white
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, 250, 250);
+                
+                // Draw red circle
+                ctx.fillStyle = 'red';
+                ctx.beginPath();
+                ctx.arc(125, 125, 100, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Draw text
+                ctx.fillStyle = 'white';
+                ctx.font = '20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText('TEST FRAME', 125, 125);
+                
+                // Convert to data URL
+                const dataUrl = canvas.toDataURL('image/png');
+                image.src = dataUrl;
+                
+                log('Test frame created and displayed', 'success');
+            }
+            
+            updateElementStatus();
+        }
+        
+        function checkZIndex() {
+            log('Checking z-index hierarchy');
+            
+            const elements = [
+                { name: 'Waveform', el: document.getElementById('waveform') },
+                { name: 'Circle', el: document.getElementById('circle') },
+                { name: 'Avatar Container', el: document.getElementById('avatar-container') },
+                { name: 'Avatar Image', el: document.getElementById('avatar-image') },
+                { name: 'Avatar Video', el: document.getElementById('avatar-video') }
+            ];
+            
+            elements.forEach(({ name, el }) => {
+                if (el) {
+                    const computed = getComputedStyle(el);
+                    const rect = el.getBoundingClientRect();
+                    log(`${name}: z-index=${computed.zIndex}, position=${computed.position}, visible=${rect.width > 0 && rect.height > 0}`);
+                }
+            });
+            
+            updateElementStatus();
+        }
+        
+        function toggleElements() {
+            log('Toggling element visibility');
+            const image = document.getElementById('avatar-image');
+            const video = document.getElementById('avatar-video');
+            
+            if (image) {
+                const isVisible = getComputedStyle(image).display !== 'none';
+                image.style.display = isVisible ? 'none' : 'block';
+                log(`Image ${isVisible ? 'hidden' : 'shown'}`);
+            }
+            
+            if (video) {
+                const isVisible = getComputedStyle(video).display !== 'none';
+                video.style.display = isVisible ? 'none' : 'block';
+                log(`Video ${isVisible ? 'hidden' : 'shown'}`);
+            }
+            
+            updateElementStatus();
+        }
+        
+        function clearLogs() {
+            document.getElementById('log-container').innerHTML = '';
+            logs.length = 0;
+            log('Logs cleared');
+        }
+        
+        // Initial status update
+        window.addEventListener('DOMContentLoaded', () => {
+            log('Page loaded, checking initial state');
+            updateElementStatus();
+            
+            // Monitor for changes
+            setInterval(updateElementStatus, 1000);
+        });
+    </script>
+</body>
+</html>

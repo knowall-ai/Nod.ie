@@ -210,6 +210,15 @@ Always test:
 4. **Don't modify layout in state changes** - Causes alignment bugs
 5. **Don't rewrite working features** - Make incremental improvements instead
 6. **Don't implement new features without agreement** - Discuss major changes first
+7. **Don't use fallbacks in configuration** - NEVER use patterns like:
+   - `window.CONFIG?.MUSETALK_WS || 'ws://localhost:8765/ws'` ❌
+   - `os.environ.get('AVATAR_VIDEO_PATH', '/app/avatars/nodie-video-03.mp4')` ❌
+   - `getConfig('MUSETALK_PORT', '8765')` ❌
+   
+   Instead, always require configuration from .env file:
+   - `window.CONFIG?.MUSETALK_WS` ✅
+   - `os.environ.get('AVATAR_VIDEO_PATH')` ✅ (with error handling if missing)
+   - `getConfig('MUSETALK_PORT')` ✅
 
 ## Debugging Tips
 
