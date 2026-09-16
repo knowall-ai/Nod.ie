@@ -127,7 +127,12 @@ class SecurityMonitor {
         for (const file of [...files, path.join(item.cwd, '.env')]) {
             try { entries.push([file, hash(await fs.readFile(file))]); } catch (error) { if (error.code === 'ENOENT' && file.endsWith('/.env')) entries.push([file, null]); else throw error; }
         }
-        return { files, fingerprint: hash(entries) };
+        // Compose resolves env_file, includes and interpolation. Hash the resolved
+        // result in memory only: it can contain credentials and must never be logged.
+        const resolved = await this.run(['--context', item.context, 'compose', '--project-directory', item.cwd, '-p', item.project, ...files.flatMap(file => ['-f', file]), 'config', '--format', 'json'], { cwd: item.cwd });
+        const service = JSON.parse(resolved).services?.[item.service];
+        if (!service) throw new Error('Compose service is no longer defined');
+        return { files, fingerprint: hash([entries, resolved]) };
     }
     async prepare(id) {
         if (this.busy) throw new Error('An update is already in progress');

@@ -6,7 +6,7 @@ Recognised images include Core Lightning, BTCPay Server, LND, Bitcoin Core, Olla
 
 === Approval and execution
 
-Only a refresh of an already-configured image tag in a local Compose project can be applied automatically. A single-use plan binds the container, context, target manifest digest and Compose configuration fingerprints. It expires after ten minutes. Native desktop confirmation requires explicit acknowledgement of recovery readiness and the restart.
+Only a refresh of an already-configured image tag in a local Compose project can be applied automatically. A single-use plan binds the container, context, target manifest digest and Compose source and resolved-configuration fingerprints, including environment-file and included configuration changes. Resolved configuration is hashed in memory and is never logged. It expires after ten minutes. Native desktop confirmation requires explicit acknowledgement of recovery readiness and the restart.
 
 Version changes, unrecognised images, remote Docker contexts, unavailable source files and managed BTCPay stacks use the official upgrade guide. The assistant must not improvise shell commands from release text. There is no ambient-voice approval or unattended updating.
 

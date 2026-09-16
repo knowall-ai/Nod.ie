@@ -10,7 +10,7 @@ async function fixture(t) {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nodie-monitor-test-'));
     t.after(() => fs.rm(dir, { recursive: true, force: true }));
     const file = path.join(dir, 'compose.yml'); await fs.writeFile(file, 'services:\n  ollama:\n    image: ollama/ollama:latest\n');
-    let now = Date.now(); let notify = 0;
+    let now = Date.now(); let notify = 0; let resolvedEnv = 'original';
     const item = { id: 'c'.repeat(64), name: '/ollama', image: 'ollama/ollama:latest', imageId: old, project: 'test', service: 'ollama', files: file, cwd: dir, state: 'running' };
     const commands = []; let updated = false;
     const run = async args => {
@@ -22,11 +22,12 @@ async function fixture(t) {
         if (a[0] === 'image') return a.includes('{{.Id}}') ? digest : JSON.stringify({ digests: ['ollama/ollama@' + (updated ? digest : old)], arch: 'amd64', os: 'linux' });
         if (a[0] === 'buildx') return JSON.stringify({ digest });
         if (a[0] === 'pull') return '';
+        if (a[0] === 'compose' && a.includes('config')) return JSON.stringify({ services: { ollama: { image: item.image, environment: { setting: resolvedEnv } } } });
         if (a[0] === 'compose') { updated = true; return ''; }
         throw new Error('Unexpected command');
     };
     const monitor = new SecurityMonitor({ stateDir: dir, run, fetchJSON: async () => ({ tag_name: 'v0.34.1' }), notify: () => notify++, now: () => now });
-    return { monitor, commands, file, item, getNotify: () => notify, age: () => now += 7 * 60 * 60 * 1000 };
+    return { changeResolvedEnv: () => { resolvedEnv = 'changed'; }, monitor, commands, file, item, getNotify: () => notify, age: () => now += 7 * 60 * 60 * 1000 };
 }
 test('scan is read-only, compares running digests and deduplicates notifications', async t => {
     const f = await fixture(t); const state = await f.monitor.scan(); await f.monitor.scan();
@@ -50,4 +51,11 @@ test('changed Compose files and stale scans cannot be applied', async t => {
 test('failed release checks remain unknown', async t => {
     const f = await fixture(t); f.monitor.fetchJSON = async () => { throw new Error('offline'); };
     const result = await f.monitor.scan(); assert.equal(result.containers[0].status, 'unknown');
+});
+
+test('changes to resolved env_file or included Compose content invalidate approval', async t => {
+    const f = await fixture(t); await f.monitor.scan(); const plan = await f.monitor.prepare(f.item.id);
+    assert.equal(plan.executable, true); f.changeResolvedEnv();
+    await assert.rejects(f.monitor.apply(plan.id), /configuration changed/);
+    assert.ok(!f.commands.some(args => args.includes('pull')));
 });
