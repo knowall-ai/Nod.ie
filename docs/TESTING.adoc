@@ -1,0 +1,7 @@
+== Testing
+
+`npm test` uses Node's built-in runner and portable fixtures under `tests/unit`. It covers public configuration filtering, server path traversal and symlink escape, cross-origin voice requests, asynchronous microphone shutdown, WebSocket reconnection and prompt restoration, and update-plan mutation/expiry/digest checks. It does not require Docker, live wallets or a microphone.
+
+Browser acceptance uses Playwright with synthetic audio and checks the complete turn without accessing the user's microphone. Live acceptance verifies transcription, an Ollama reply, WAV output and read-only memory availability. Automated tests do not prove that a user's speaker or microphone is selected correctly.
+
+Dependency checks use `npm audit`. Updates to the pinned runtime and test tools require a fresh audit and regression run. Historical live diagnostic scripts are not the CI test suite.

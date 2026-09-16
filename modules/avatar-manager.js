@@ -2,68 +2,24 @@
  * Unified Avatar Manager - Handles avatar display and animation for both Electron and Web
  */
 
-// Platform detection
-const isElectronEnv = typeof require !== 'undefined' && typeof process !== 'undefined' && process.versions && process.versions.electron;
-
-// Platform-specific imports
-let Store, MuseTalkStaticVideo, avatarConfig;
-
-if (isElectronEnv) {
-    Store = require('electron-store');
-    MuseTalkStaticVideo = require('./musetalk-static-video');
-    avatarConfig = require('../config');
-} else {
-    // Web environment - use window.CONFIG (no fallbacks)
-    avatarConfig = {
-        MUSETALK_HTTP: window.CONFIG?.MUSETALK_HTTP,
-        MUSETALK_WS: window.CONFIG?.MUSETALK_WS
-    };
-}
-
-// Get MuseTalkWebSocketClient based on environment
-function getMuseTalkClient() {
-    if (isElectronEnv) {
-        const MuseTalkWebSocketClient = require('./musetalk-websocket-client');
-        return MuseTalkWebSocketClient;
-    } else {
-        return window.MuseTalkWebSocketClient;
-    }
-}
-
 class AvatarManager {
-    constructor() {
+    constructor(config = window.CONFIG || {}) {
         // Delay store access to avoid early IPC issues
         this.store = null;
-        this.enabled = true; // Default to true
+        this.enabled = config.AVATAR_ENABLED !== false;
         this.animated = false;
         this.frameQueue = [];
         this.maxQueueSize = 5;
-        this.staticVideo = isElectronEnv ? new MuseTalkStaticVideo() : null;
-        this.musetalkApiUrl = avatarConfig.MUSETALK_HTTP;
-        this.musetalkWsUrl = avatarConfig.MUSETALK_WS;
+        this.staticVideo = null;
+        this.musetalkApiUrl = config.MUSETALK_HTTP;
+        this.musetalkWsUrl = config.MUSETALK_WS;
         this.musetalkConnected = false;
         this.musetalkWsClient = null;
-        
+
         console.log('🎭 AvatarManager constructor completed');
     }
 
     initialize() {
-        console.log(`🎭 Initializing Avatar Manager (${isElectronEnv ? 'Electron' : 'Web'})`);
-        
-        // Initialize store (Electron only)
-        if (isElectronEnv) {
-            try {
-                this.store = new Store();
-                this.enabled = this.store.get('avatarEnabled', true);
-            } catch (error) {
-                console.warn('Could not access store, using defaults:', error);
-                this.enabled = true;
-            }
-        } else {
-            // Web - always enabled
-            this.enabled = true;
-        }
-        
         // Initialize canvas with default image after DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
@@ -73,27 +29,27 @@ class AvatarManager {
             // DOM ready, initialize immediately
             setTimeout(() => this.initializeCanvas(), 100);
         }
-        
+
         // Apply initial avatar state
         if (this.enabled) {
             this.showAvatar();
         }
-        
+
         // Initialize static video player (Electron only)
         if (this.staticVideo) {
             this.staticVideo.initialize();
         }
-        
+
         // Test MuseTalk connectivity and establish WebSocket
         this.testMuseTalkConnection().then(() => {
-            if (this.musetalkConnected) {
+            if (this.musetalkConnected && !this.disposed) {
                 this.connectMuseTalkWebSocket();
             }
         });
-        
+
         // Set up frame update handler
         window.updateAvatarFrame = this.updateFrame.bind(this);
-        
+
         // Set up audio playback hooks
         window.onAudioPlaybackStart = () => {
             if (this.enabled) {
@@ -104,7 +60,7 @@ class AvatarManager {
                 }
             }
         };
-        
+
         window.onAudioPlaybackStop = () => {
             if (this.enabled) {
                 if (this.staticVideo) {
@@ -115,7 +71,7 @@ class AvatarManager {
             }
         };
     }
-    
+
     initializeCanvas() {
         console.log('🎭 initializeCanvas called');
         const canvasEl = document.getElementById('avatar-canvas');
@@ -125,7 +81,7 @@ class AvatarManager {
             return;
         }
         console.log('🎭 Canvas found, initializing with default image', canvasEl);
-        
+
         // Debug canvas visibility
         const computedStyle = window.getComputedStyle(canvasEl);
         console.log('🎭 Canvas initial visibility:', {
@@ -135,23 +91,23 @@ class AvatarManager {
             width: computedStyle.width,
             height: computedStyle.height
         });
-        
+
         const ctx = canvasEl.getContext('2d');
         const defaultImg = new Image();
-        
+
         defaultImg.onload = () => {
             console.log('🎭 Loading default avatar image to canvas');
             ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
             ctx.drawImage(defaultImg, 0, 0, canvasEl.width, canvasEl.height);
         };
-        
+
         defaultImg.onerror = (e) => {
             console.error('🎭 Failed to load default avatar image:', e);
             console.error('🎭 Attempted path:', defaultImg.src);
         };
-        
+
         // Platform-specific asset path
-        if (isElectronEnv) {
+        if (window.nodie) {
             defaultImg.src = './assets/avatars/nodie-default.png';
         } else {
             // Web - handle tests directory
@@ -164,7 +120,7 @@ class AvatarManager {
         const circle = document.getElementById('circle');
         circle.classList.add('avatar-active', 'avatar-static');
         document.body.classList.add('avatar-enabled');
-        
+
         // Force canvas to be visible for debugging
         const canvasEl = document.getElementById('avatar-canvas');
         if (canvasEl) {
@@ -187,7 +143,7 @@ class AvatarManager {
         if (this.store) {
             this.store.set('avatarEnabled', enabled);
         }
-        
+
         if (enabled) {
             this.showAvatar();
         } else {
@@ -197,7 +153,7 @@ class AvatarManager {
 
     setAnimationMode(animated, available = true) {
         const circle = document.getElementById('circle');
-        
+
         if (animated && available && this.enabled) {
             circle.classList.add('avatar-animated');
             circle.classList.remove('avatar-static');
@@ -211,31 +167,31 @@ class AvatarManager {
 
     updateFrame(frame) {
         if (!this.enabled || !frame || !frame.data) return;
-        
+
         // Add frame to queue
         this.frameQueue.push(frame);
-        
+
         // Limit queue size
         while (this.frameQueue.length > this.maxQueueSize) {
             this.frameQueue.shift();
         }
-        
+
         // Process frame
         this.displayFrame(frame);
     }
 
     displayFrame(frame) {
         // Re-enabled with video support
-        
+
         const videoEl = document.getElementById('avatar-video');
         const canvasEl = document.getElementById('avatar-canvas');
         const circle = document.getElementById('circle');
-        
+
         try {
             // Handle different frame types
             if (frame.type === 'video_url') {
                 console.log('🎭 Received video URL from MuseTalk:', frame.url);
-                
+
                 // Update animation state
                 if (!this.animated) {
                     this.setAnimationMode(true);
@@ -243,25 +199,25 @@ class AvatarManager {
                     canvasEl.style.display = 'none';
                     videoEl.style.display = 'block';
                 }
-                
+
                 // Set the video source to the MuseTalk generated video
                 videoEl.src = frame.url;
                 videoEl.play().catch(e => {
                     console.warn('Video autoplay failed:', e);
                 });
-                
+
                 return;
             }
-            
+
             console.debug('🎭 Displaying frame on canvas, data length:', frame.data ? frame.data.length : 0);
-            
+
             // Update animation state if needed
             if (!this.animated) {
                 this.setAnimationMode(true);
                 // Hide video, show canvas
                 videoEl.style.display = 'none';
                 canvasEl.style.display = 'block';
-                
+
                 // Ensure avatar container has the right classes
                 const circle = document.getElementById('circle');
                 if (!circle.classList.contains('avatar-active')) {
@@ -269,20 +225,45 @@ class AvatarManager {
                     circle.classList.add('avatar-active');
                 }
             }
-            
-            // Draw frame on canvas for smooth updates
+
+            // Optimized frame rendering - use createImageBitmap for better performance
             const ctx = canvasEl.getContext('2d');
-            const img = new Image();
-            
-            img.onload = () => {
-                // Clear and draw new frame
-                ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-                ctx.drawImage(img, 0, 0, canvasEl.width, canvasEl.height);
-            };
-            
-            // Set source to trigger load
-            img.src = `data:image/jpeg;base64,${frame.data}`;
-            
+
+            try {
+                // Convert base64 to blob for faster processing
+                const binaryString = atob(frame.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const blob = new Blob([bytes], { type: 'image/jpeg' });
+
+                // Use createImageBitmap for hardware-accelerated rendering
+                createImageBitmap(blob).then(imageBitmap => {
+                    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+                    ctx.drawImage(imageBitmap, 0, 0, canvasEl.width, canvasEl.height);
+                    imageBitmap.close(); // Free memory
+                }).catch(error => {
+                    console.warn('createImageBitmap failed, falling back to Image:', error);
+                    // Fallback to original method
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+                        ctx.drawImage(img, 0, 0, canvasEl.width, canvasEl.height);
+                    };
+                    img.src = `data:image/jpeg;base64,${frame.data}`;
+                });
+            } catch (error) {
+                console.warn('Optimized rendering failed, using fallback:', error);
+                // Fallback to original method
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+                    ctx.drawImage(img, 0, 0, canvasEl.width, canvasEl.height);
+                };
+                img.src = `data:image/jpeg;base64,${frame.data}`;
+            }
+
         } catch (error) {
             console.error('Error displaying avatar frame:', error);
             // Fall back to static on error
@@ -292,9 +273,9 @@ class AvatarManager {
 
     updateStatus(audioPlayback) {
         if (!audioPlayback) return;
-        
+
         const status = audioPlayback.getAvatarStatus();
-        
+
         if (status.available && !status.fallbackToStatic) {
             this.setAnimationMode(true, true);
         } else {
@@ -319,14 +300,15 @@ class AvatarManager {
     }
 
     async testMuseTalkConnection() {
+        if (!this.musetalkApiUrl || !this.enabled) return false;
         try {
             console.log('🔗 Testing MuseTalk API connection to:', this.musetalkApiUrl);
-            
+
             const response = await fetch(`${this.musetalkApiUrl}/health`, {
                 method: 'GET',
-                timeout: 5000
+                signal: AbortSignal.timeout(5000)
             });
-            
+
             if (response.ok) {
                 const data = await response.json();
                 this.musetalkConnected = true;
@@ -348,7 +330,7 @@ class AvatarManager {
         if (!this.musetalkConnected) {
             return { connected: false, message: 'Not connected' };
         }
-        
+
         try {
             const response = await fetch(`${this.musetalkApiUrl}/status`);
             const data = await response.json();
@@ -372,8 +354,8 @@ class AvatarManager {
 
         try {
             this.updateMuseTalkStatus('Connecting...');
-            this.musetalkWsClient = new MuseTalkWebSocketClient(this.musetalkWsUrl);
-            
+            this.musetalkWsClient = new window.MuseTalkWebSocketClient(this.musetalkWsUrl);
+
             // Set up frame callback
             this.musetalkWsClient.setFrameCallback((frame) => {
                 this.updateFrame(frame);
@@ -382,7 +364,7 @@ class AvatarManager {
             await this.musetalkWsClient.connect();
             console.log('✅ MuseTalk WebSocket connected for lip-sync');
             this.updateMuseTalkStatus('Connected');
-            
+
             // Add musetalk-connected class to enable canvas visibility
             const circle = document.getElementById('circle');
             if (circle) {
@@ -413,22 +395,28 @@ class AvatarManager {
         }
     }
 
+    cleanup() {
+        this.disposed = true;
+        this.musetalkWsClient?.disconnect();
+        this.clearFrameQueue();
+    }
+
     setIdle() {
         // Return avatar to idle state (show default video instead of MuseTalk frames)
         console.debug('🎭 Setting avatar to idle state');
-        
+
         const videoEl = document.getElementById('avatar-video');
         const canvasEl = document.getElementById('avatar-canvas');
-        
+
         if (videoEl && canvasEl) {
             // Switch back to static video
             this.animated = false;
             canvasEl.style.display = 'none';
             videoEl.style.display = 'block';
-            
+
             // Reset to default video source
             if (videoEl.src !== 'assets/avatars/nodie-video-01.mp4') {
-                videoEl.src = 'assets/avatars/nodie-video-01.mp4';
+                videoEl.src = (window.location.pathname.includes('/tests/') ? '../' : './') + 'assets/avatars/nodie-video-01.mp4';
             }
         }
     }

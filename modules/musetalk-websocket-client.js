@@ -10,6 +10,7 @@ class MuseTalkWebSocketClient {
         }
         this.url = url;
         this.ws = null;
+        this.closed = false;
         this.connected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
@@ -18,12 +19,14 @@ class MuseTalkWebSocketClient {
     }
 
     async connect() {
+        if (this.closed) return;
         return new Promise((resolve, reject) => {
             try {
                 console.log('🔗 Connecting to MuseTalk WebSocket:', this.url);
                 this.ws = new WebSocket(this.url);
 
                 this.ws.onopen = () => {
+                    clearTimeout(this.connectTimer);
                     console.log('✅ MuseTalk WebSocket connected');
                     this.connected = true;
                     this.reconnectAttempts = 0;
@@ -45,13 +48,15 @@ class MuseTalkWebSocketClient {
                 };
 
                 this.ws.onclose = () => {
+                    clearTimeout(this.connectTimer);
+                    reject(new Error("MuseTalk disconnected"));
                     console.log('🔌 MuseTalk WebSocket disconnected');
                     this.connected = false;
                     this.attemptReconnect();
                 };
 
                 // Timeout connection attempt (increased for model loading)
-                setTimeout(() => {
+                this.connectTimer = setTimeout(() => {
                     if (!this.connected) {
                         reject(new Error('MuseTalk connection timeout'));
                     }
@@ -120,6 +125,7 @@ class MuseTalkWebSocketClient {
     }
 
     attemptReconnect() {
+        if (this.closed) return;
         if (this.reconnectAttempts >= this.maxReconnectAttempts) {
             console.error('Max reconnection attempts reached for MuseTalk');
             return;
@@ -128,7 +134,7 @@ class MuseTalkWebSocketClient {
         this.reconnectAttempts++;
         console.log(`Attempting to reconnect to MuseTalk (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
 
-        setTimeout(() => {
+        this.reconnectTimer = setTimeout(() => {
             this.connect().catch(error => {
                 console.error('MuseTalk reconnection failed:', error);
             });
@@ -136,6 +142,9 @@ class MuseTalkWebSocketClient {
     }
 
     disconnect() {
+        this.closed = true;
+        clearTimeout(this.connectTimer);
+        clearTimeout(this.reconnectTimer);
         if (this.ws) {
             this.ws.close();
             this.ws = null;

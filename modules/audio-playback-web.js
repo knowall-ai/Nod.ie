@@ -14,7 +14,13 @@ class AudioPlaybackWeb {
         this.hasNotifiedPlaybackStart = false;
     }
 
-    async initialize() {
+    initialize() {
+        if (this.isInitialized) return Promise.resolve();
+        if (!this.initializing) this.initializing = this.initializeOnce().finally(() => { this.initializing = null; });
+        return this.initializing;
+    }
+
+    async initializeOnce() {
         try {
             console.log('🔊 Initializing audio playback (web)...');
             
@@ -57,7 +63,7 @@ class AudioPlaybackWeb {
                     // Also send PCM audio to MuseTalk
                     if (window.NodieRenderer && window.NodieRenderer.onDecodedAudio) {
                         // frame is Float32Array of PCM audio at outputBufferSampleRate
-                        window.NodieRenderer.onDecodedAudio(frame);
+                        window.NodieRenderer.onDecodedAudio(frame, this.audioContext.sampleRate);
                     }
                 }
             };
@@ -76,15 +82,9 @@ class AudioPlaybackWeb {
             
         } catch (error) {
             console.error('❌ Failed to initialize audio playback:', error);
-            // Fallback: try simpler approach
-            await this.initializeFallback();
+            await this.stop();
+            throw error;
         }
-    }
-
-    async initializeFallback() {
-        console.log('🔊 Using fallback audio playback...');
-        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        this.isInitialized = true;
     }
 
     async processAudioDelta(audioData) {
@@ -114,8 +114,7 @@ class AudioPlaybackWeb {
                 pages: audioDataCopy
             });
         } else {
-            console.warn('Decoder not available, queueing audio');
-            this.audioQueue.push(audioData);
+            throw new Error('Audio decoder is unavailable');
         }
     }
 
@@ -159,3 +158,4 @@ class AudioPlaybackWeb {
 if (typeof window !== 'undefined') {
     window.AudioPlaybackWeb = AudioPlaybackWeb;
 }
+if (typeof module !== "undefined" && module.exports) module.exports = AudioPlaybackWeb;

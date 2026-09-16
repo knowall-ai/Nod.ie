@@ -265,3 +265,12 @@ body[data-platform="web"] #debug-info {
 .loading-text {
     animation: fadeIn 0.5s ease;
 }
+/* Native window-manager dragging avoids pointer-coordinate feedback on X11. */
+#drag-handle { display: none; }
+body[data-platform="electron"] #drag-handle {
+    display: block; position: absolute; top: 0; left: 110px; width: 80px;
+    height: 24px; text-align: center; color: white; background: #183323;
+    border-radius: 12px; z-index: 100; -webkit-app-region: drag;
+    user-select: none; line-height: 24px;
+}
+#circle { -webkit-app-region: no-drag; }

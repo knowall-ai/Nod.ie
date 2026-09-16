@@ -1,0 +1,60 @@
+extends: default
+page:
+  size: A4
+  margin: [20mm, 18mm, 20mm, 18mm]
+base:
+  font-family: KnowAllSans
+  font-size: 10
+  font-color: '17251C'
+heading:
+  font-family: KnowAllSans
+  font-color: '166534'
+link:
+  font-color: '166534'
+title-page:
+  background-color: '020604'
+  logo:
+    image: image:../brand/knowall-logo-white.png[pdfwidth=45mm]
+    top: 12%
+  title:
+    top: 36%
+    font-family: KnowAllSans
+    font-size: 36
+    font-color: '22C55E'
+  subtitle:
+    font-color: 'FFFFFF'
+  authors:
+    font-color: 'FFFFFF'
+  revision:
+    font-color: 'FFFFFF'
+header:
+  height: 12mm
+  recto:
+    right:
+      content: 'Nod.ie | KnowAll AI'
+  verso:
+    left:
+      content: 'Nod.ie | KnowAll AI'
+footer:
+  height: 12mm
+  recto:
+    right:
+      content: '{page-number}'
+  verso:
+    left:
+      content: '{page-number}'
+code:
+  font-size: 8
+  background-color: 'F1F5F2'
+table:
+  head:
+    background-color: 'DCFCE7'
+
+font:
+  catalog:
+    merge: true
+    KnowAllSans:
+      normal: DejaVuSans.ttf
+      bold: DejaVuSans-Bold.ttf
+      italic: DejaVuSans.ttf
+      bold_italic: DejaVuSans-Bold.ttf

@@ -1,0 +1,14 @@
+== Data model
+
+[cols="1,2,2",options="header"]
+|===
+|Record |Contents |Storage
+|Settings |Backend URL, model, voice, hotkey, avatar visibility, window position |Electron user-data store
+|Conversation |Last six user/assistant turn pairs |Process memory only
+|Memory |Entities and relationships recalled through Reverie |Existing Neo4j database; no Nod.ie writes
+|Scan |Container IDs, configured references, running image IDs/digests, assessment, timestamps |Private user-data `security/status.json`
+|Update plan |Container identity, Compose file fingerprints, target digest, ten-minute expiry |Process memory; single-use
+|Audit |Update target, timestamp, result and failure stage |Private user-data `security/audit.jsonl`
+|===
+
+No raw container environment, wallet secret, microphone recording or transcript is written to the security audit. Update overrides are retained privately so operators can reproduce the approved deployment.

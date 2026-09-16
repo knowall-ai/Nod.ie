@@ -2,6 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https:; object-src 'none'; base-uri 'none'">
     <title>Nod.ie Settings</title>
     <style>
         body {
@@ -217,10 +218,10 @@
         
         <div class="setting-row">
             <div class="setting-label">
-                <h3>Unmute Frontend URL</h3>
+                <h3>Unmute Backend URL</h3>
                 <p>WebSocket URL for Unmute</p>
             </div>
-            <input type="url" id="unmuteFrontendUrl" placeholder="ws://localhost:3000">
+            <input type="url" id="unmuteBackendUrl" placeholder="ws://localhost:3000">
         </div>
         
         <div class="setting-row">
@@ -228,14 +229,7 @@
                 <h3>Voice Model</h3>
                 <p>Voice to use for speech synthesis</p>
             </div>
-            <select id="voiceModel">
-                <option value="nova">Nova</option>
-                <option value="echo">Echo</option>
-                <option value="fable">Fable</option>
-                <option value="onyx">Onyx</option>
-                <option value="alloy">Alloy</option>
-                <option value="shimmer">Shimmer</option>
-            </select>
+            <input type="text" id="voiceModel" placeholder="Configured Unmute voice path">
         </div>
     </div>
     
@@ -251,73 +245,21 @@
         </div>
     </div>
     
+    <div class="section">
+        <h2>Security and container updates</h2>
+        <p>Read-only checks run at startup and every six hours. Applying an update requires a separate confirmation. No models are loaded by scans.</p>
+        <button id="scan">Check now</button>
+        <p id="scan-status" role="status"></p>
+        <div id="updates"></div>
+        <pre id="update-plan" style="white-space: pre-wrap"></pre>
+        <button id="apply" hidden>Review and apply</button>
+    </div>
+    <p id="settings-error" role="alert"></p>
     <div class="button-row">
-        <button class="btn-secondary" onclick="cancelSettings()">Cancel</button>
-        <button class="btn-primary" onclick="saveSettings()">Save</button>
+        <button class="btn-secondary" id="cancel">Cancel</button>
+        <button class="btn-primary" id="save">Save</button>
     </div>
     
-    <script>
-        const { ipcRenderer } = require('electron');
-        const Store = require('electron-store');
-        const store = new Store();
-        
-        // Load current settings
-        function loadSettings() {
-            document.getElementById('avatarEnabled').checked = store.get('avatarEnabled', true);
-            document.getElementById('avatarQuality').value = store.get('avatarQuality', 'auto');
-            document.getElementById('assistantName').value = store.get('assistantName', 'Nod.ie');
-            document.getElementById('unmuteFrontendUrl').value = store.get('unmuteFrontendUrl', 'ws://localhost:3000');
-            document.getElementById('voiceModel').value = store.get('voiceModel', 'nova');
-            document.getElementById('globalHotkey').value = store.get('globalHotkey', 'CommandOrControl+Shift+Space');
-            
-            // Check avatar status
-            checkAvatarStatus();
-        }
-        
-        async function checkAvatarStatus() {
-            try {
-                const response = await fetch('http://localhost:8767/health');
-                const health = await response.json();
-                
-                const statusEl = document.getElementById('avatarStatus');
-                if (health.status === 'healthy') {
-                    statusEl.textContent = 'Available';
-                    statusEl.className = 'avatar-status status-available';
-                } else {
-                    statusEl.textContent = 'Static Mode';
-                    statusEl.className = 'avatar-status status-static';
-                }
-            } catch (error) {
-                const statusEl = document.getElementById('avatarStatus');
-                statusEl.textContent = 'Unavailable';
-                statusEl.className = 'avatar-status status-unavailable';
-            }
-        }
-        
-        function saveSettings() {
-            // Save all settings
-            store.set('avatarEnabled', document.getElementById('avatarEnabled').checked);
-            store.set('avatarQuality', document.getElementById('avatarQuality').value);
-            store.set('assistantName', document.getElementById('assistantName').value);
-            store.set('unmuteFrontendUrl', document.getElementById('unmuteFrontendUrl').value);
-            store.set('voiceModel', document.getElementById('voiceModel').value);
-            store.set('globalHotkey', document.getElementById('globalHotkey').value);
-            
-            // Notify main process to update settings
-            ipcRenderer.send('settings-updated', {
-                avatarEnabled: document.getElementById('avatarEnabled').checked
-            });
-            
-            // Close window
-            window.close();
-        }
-        
-        function cancelSettings() {
-            window.close();
-        }
-        
-        // Load settings on startup
-        loadSettings();
-    </script>
+    <script src="settings.js"></script>
 </body>
 </html>

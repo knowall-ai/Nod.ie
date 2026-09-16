@@ -1,0 +1,15 @@
+== Troubleshooting
+
+[cols="2,3",options="header"]
+|===
+|Problem |Action
+|Localhost refuses the connection |Start `npm run web` and keep it running, or start the user service. Verify the configured port.
+|Electron SUID sandbox error |Use the app-specific AppArmor setup script. Do not add `--no-sandbox`.
+|Voice endpoints healthy but no conversation |Run a complete recorded turn; health probes alone do not establish model readiness.
+|Microphone unavailable |Grant browser permission and select a working input device. Local mode releases it after each recording.
+|No sound |Check the browser audio permission, selected output device and system volume.
+|Memory unavailable |Check the configured MCP entry and Neo4j access. Do not paste credentials into an issue.
+|Unmute STT/TTS restart repeatedly |Check startup tooling compatibility. The old Hugging Face CLI entry point is retired. Avoid shell tracing that logs tokens.
+|Update status unknown |Check Docker permissions, registry connectivity and GitHub rate limits. Unknown is not patched.
+|Update plan changed or expired |Scan and review a new plan. Do not reuse an old approval.
+|===

@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss: http: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nod.ie Web Test</title>
     <link rel="stylesheet" href="../renderer.css">
@@ -34,20 +35,17 @@
         <div>Console: <span id="console-errors">0 errors</span></div>
     </div>
 
-    <!-- Load environment configuration -->
-    <script src="env-config.js"></script>
+    <script src="../env-config.js"></script>
+    <script src="../lib/config-schema.js"></script>
     <script src="../config-web.js"></script>
-    <!-- Load opus-recorder for web audio capture -->
+    <script src="../browser-bridge.js"></script>
     <script src="../node_modules/opus-recorder/dist/recorder.min.js"></script>
-    <!-- Load audio capture module -->
     <script src="../modules/audio-capture-web.js"></script>
-    <!-- Load audio playback module -->
     <script src="../modules/audio-playback-web.js"></script>
-    <!-- Load MuseTalk WebSocket client -->
     <script src="../modules/musetalk-websocket-client.js"></script>
-    <!-- Load unified avatar manager -->
     <script src="../modules/avatar-manager.js"></script>
-    <!-- Load main renderer -->
+    <script src="../modules/websocket-handler.js"></script>
+    <script src="../modules/local-voice-session.js"></script>
     <script src="../renderer.js"></script>
 </body>
 </html>

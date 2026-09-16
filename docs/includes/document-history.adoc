@@ -1,0 +1,7 @@
+// Generated from Git by scripts/document-history.py
+[cols="1,1,4",options="header"]
+|===
+|Commit |Date |Change
+|16791d4 |2025-07-19 |Fix avatar canvas visibility and implement PCM audio flow to MuseTalk
+|Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
+|===
