@@ -7,10 +7,14 @@ const env = require('./config');
 const { normalize, validate, aliases } = require('./lib/config-schema');
 const { LocalVoice } = require('./lib/local-voice');
 const { SecurityMonitor } = require('./security/monitor');
+const { Logger } = require('./lib/logger');
+const { Diagnostics } = require('./lib/diagnostics');
 if (!app.requestSingleInstanceLock()) { app.quit(); } else { start(); }
 function start() {
     const store = new Store();
-    const voice = new LocalVoice();
+    const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
+    const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
+    const voice = new LocalVoice({ logger, diagnostics: () => diagnostics.status() });
     let mainWindow, settingsWindow, tray, monitor;
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
     const isLocalFrame = (event, file) => event.senderFrame === event.sender.mainFrame && event.senderFrame.url === pathToFileURL(path.join(__dirname, file)).href;
@@ -43,6 +47,7 @@ function start() {
         globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
     }
     handle('get-config', config);
+    handle('diagnostics-status', () => diagnostics.status());
     handle('voice-health', () => voice.health());
     handle('voice-turn', audio => voice.converse(audio));
     handle('voice-cancel', () => voice.cancel());
@@ -90,9 +95,11 @@ function start() {
         if (fs.existsSync(path.join(__dirname, 'icon.png'))) { tray = new Tray(path.join(__dirname, 'icon.png')); tray.setToolTip('Nod.ie'); tray.setContextMenu(menu); tray.on('click', () => mainWindow.show()); }
         shortcuts();
         monitor = new SecurityMonitor({ stateDir: path.join(app.getPath('userData'), 'security'), onChange: status => { if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.webContents.send('security-status-changed', status); }, notify: count => { if (Notification.isSupported()) { const notice = new Notification({ title: 'Nod.ie: updates recommended', body: `${count} container update recommendation(s). Open Settings to review before applying.` }); notice.on('click', showSettings); notice.show(); } } });
-        monitor.start();
-    }).catch(error => { console.error(error); app.quit(); });
-    app.on('before-quit', () => { app.isQuitting = true; monitor?.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
+        diagnostics.start();
+        monitor.start().catch(() => logger.write('error', 'updates.monitor-failed'));
+        logger.write('info', 'desktop.started');
+    }).catch(error => { logger.write('error', 'desktop.start-failed', { code: error.code || 'unknown' }); app.quit(); });
+    app.on('before-quit', () => { app.isQuitting = true; monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
     app.on('will-quit', () => globalShortcut.unregisterAll());
     app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus(); });
 }

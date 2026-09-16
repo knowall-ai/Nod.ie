@@ -19,13 +19,13 @@ test('local turn supplies clock context, bounds model work and validates WAV out
     assert.deepEqual(chat.options, { num_predict: 90, num_ctx: 8192 });
     assert.equal(voice.busy, false);
     voice.fetch = async url => url.includes('transcriptions') ? Response.json({ text: 'Hi' }) : url.includes('/api/chat') ? Response.json({ message: { content: 'Hello' } }) : new Response('invalid audio');
-    await assert.rejects(voice.converse(new Uint8Array(200)), /WAV/);
+    await assert.rejects(voice.converse(new Uint8Array(200)), /Speech synthesis failed/);
     assert.equal(voice.history.length, 2);
 });
 test('cancelling an in-flight turn aborts the service request and releases the busy guard', async () => {
     const voice = new LocalVoice({ config, fetchImpl: (_url, options) => new Promise((_resolve, reject) => options.signal.addEventListener('abort', () => reject(options.signal.reason), { once: true })) });
     const pending = voice.converse(new Uint8Array(200));
     await assert.rejects(voice.converse(new Uint8Array(200)), /already in progress/);
-    voice.cancel(); await assert.rejects(pending, { name: 'AbortError' });
+    voice.cancel(); await assert.rejects(pending, { code: 'cancelled' });
     assert.equal(voice.busy, false);
 });

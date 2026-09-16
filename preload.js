@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('nodie', {
     onConfigChanged: (fn) => subscribe('config-changed', fn),
     onQuit: (fn) => subscribe('app-will-quit', fn),
     moveWindow: (delta) => ipcRenderer.send('move-window', delta),
+    getDiagnostics: () => ipcRenderer.invoke('diagnostics-status'),
     getSecurityStatus: () => ipcRenderer.invoke('security-status'),
     scanSecurity: () => ipcRenderer.invoke('security-scan'),
     reviewUpdate: (id) => ipcRenderer.invoke('security-review', id),

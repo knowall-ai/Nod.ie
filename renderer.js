@@ -262,7 +262,7 @@ const NodieRenderer = {
     async handleRealtimeMessage(data) {
                 // Log error details
                 if (data.type === 'error') {
-                    console.error('❌ Unmute error:', data.error || data);
+                    console.error('Unmute reported a service error');
                 }
 
                 // Handle speech stopped - cancel any ongoing response generation

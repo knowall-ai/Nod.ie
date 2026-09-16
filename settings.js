@@ -9,6 +9,7 @@ async function load() {
     el('avatarQuality').disabled = true;
     el('avatarStatus').textContent = config.MUSETALK_WS ? 'Configured' : 'Not configured';
     render(await api.getSecurityStatus());
+    await loadDiagnostics();
 }
 function render(status) {
     el('scan-status').textContent = `Status: ${status.state}. Last scan: ${status.checkedAt || 'not yet checked'}. ${status.error || ''}`;
@@ -28,6 +29,11 @@ function render(status) {
         el('updates').append(row);
     }
 }
+async function loadDiagnostics() {
+    const status = await api.getDiagnostics();
+    el('diagnostics-status').textContent = JSON.stringify(status, null, 2);
+}
+el('diagnostics-refresh').onclick = () => loadDiagnostics().catch(error);
 el('scan').onclick = () => api.scanSecurity().then(render).catch(error);
 el('apply').onclick = async () => {
     if (!currentPlan) return;

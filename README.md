@@ -28,6 +28,10 @@ npm run security:scan
 
 Nod.ie does not expose Docker administration through the browser or execute payments, shell commands, or memory writes through conversation. See [responsible disclosure](SECURITY.md) and [update monitoring](docs/SECURITY_UPDATES.adoc).
 
+## Diagnostics
+
+Health/activity monitoring samples container state and host resource pressure every minute. Settings shows alerts and bounded application logs; local voice can explain a read-only diagnostic snapshot. See [monitoring scope and logging](docs/DIAGNOSTICS.adoc). These signals are not proof of an intrusion.
+
 ## Documentation and contributions
 
 Canonical documentation is in [`docs/*.adoc`](docs/TECHNICAL_SOLUTION_DOCUMENT.adoc). Install the gems in `docs/Gemfile`, then run `npm run docs` to build the branded technical solution PDF. Generated PDFs are not committed.

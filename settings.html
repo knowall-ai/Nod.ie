@@ -211,7 +211,7 @@
         <div class="setting-row">
             <div class="setting-label">
                 <h3>Assistant Name</h3>
-                <p>Name used in N8N webhooks</p>
+                <p>Name of your assistant</p>
             </div>
             <input type="text" id="assistantName" placeholder="Nod.ie">
         </div>
@@ -253,6 +253,12 @@
         <div id="updates"></div>
         <pre id="update-plan" style="white-space: pre-wrap"></pre>
         <button id="apply" hidden>Review and apply</button>
+    </div>
+    <div class="section">
+        <h2>Health and unusual activity</h2>
+        <p>Checks run every minute. Signals flag changes to investigate, not proof of an intrusion. Nod.ie can read this summary during a local voice conversation.</p>
+        <button id="diagnostics-refresh">Refresh summary</button>
+        <pre id="diagnostics-status" style="white-space: pre-wrap"></pre>
     </div>
     <p id="settings-error" role="alert"></p>
     <div class="button-row">

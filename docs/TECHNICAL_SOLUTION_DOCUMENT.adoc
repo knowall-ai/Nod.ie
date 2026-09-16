@@ -22,6 +22,8 @@ include::INSTALLATION.adoc[]
 include::SECURITY_UPDATES.adoc[]
 include::MEMORY.adoc[]
 include::TESTING.adoc[]
+
+include::DIAGNOSTICS.adoc[]
 include::CONFIDENTIALITY.adoc[]
 include::BRAND_GUIDELINES.adoc[]
 include::TROUBLESHOOTING.adoc[]
