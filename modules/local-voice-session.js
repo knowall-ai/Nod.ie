@@ -34,7 +34,7 @@ class LocalVoiceSession {
             this.recorder = new MediaRecorder(stream, { mimeType });
             this.recorder.ondataavailable = event => { bytes += event.data.size; if (bytes > 5 * 1024 * 1024) { this.cancel(); this.status('Recording too long. Click to try again.'); } else if (event.data.size) chunks.push(event.data); };
             this.recorder.onerror = () => { this.cancel(); this.status('Recording failed. Click to try again.'); };
-            this.recorder.onstop = () => { this.releaseMicrophone(); if (generation === this.generation) this.send(chunks, generation); };
+            this.recorder.onstop = () => { if (generation !== this.generation) return; this.releaseMicrophone(); this.send(chunks, generation); };
             this.recorder.start(250);
             this.state = 'recording'; this.renderer.state.isMuted = false; this.status('Listening — click to send');
             this.limitTimer = setTimeout(() => this.finish(), 30000);
