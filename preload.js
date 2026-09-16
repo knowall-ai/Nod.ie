@@ -6,6 +6,7 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
+    clearHistory: () => ipcRenderer.invoke('clear-history'),
     voiceHealth: () => ipcRenderer.invoke('voice-health'),
     voiceTurn: (audio) => ipcRenderer.invoke('voice-turn', audio),
     voiceCancel: () => ipcRenderer.invoke('voice-cancel'),
@@ -15,7 +16,8 @@ contextBridge.exposeInMainWorld('nodie', {
     onToggleMute: (fn) => subscribe('toggle-mute', fn),
     onConfigChanged: (fn) => subscribe('config-changed', fn),
     onQuit: (fn) => subscribe('app-will-quit', fn),
-    moveWindow: (delta) => ipcRenderer.send('move-window', delta),
+    beginDrag: () => ipcRenderer.send('begin-drag'),
+    endDrag: () => ipcRenderer.send('end-drag'),
     getDiagnostics: () => ipcRenderer.invoke('diagnostics-status'),
     getSecurityStatus: () => ipcRenderer.invoke('security-status'),
     scanSecurity: () => ipcRenderer.invoke('security-scan'),

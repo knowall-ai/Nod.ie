@@ -10,6 +10,7 @@ if (!window.nodie && window.ENV_CONFIG?.VOICE_MODE === 'local') {
         platform: 'web',
         getConfig: async () => window.ENV_CONFIG,
         getSystemPrompt: async () => (await fetch('/system-prompt')).text(),
+        clearHistory: () => post('/voice/clear-history'),
         voiceHealth: () => post('/voice/health'),
         voiceTurn: async audio => { const result = await post('/voice/turn', audio); result.audio = Uint8Array.from(atob(result.audio), c => c.charCodeAt(0)); return result; },
         voiceCancel: () => post('/voice/cancel'),

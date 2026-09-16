@@ -28,6 +28,7 @@ Security fixes target the current maintained source and next release. Older snap
 
 ## Operational boundaries
 
+- Local conversation history is a bounded plaintext file with owner-only permissions; users can clear it from Settings or the browser. Diagnostic logs exclude conversation content.
 - Keep secrets in ignored local configuration; never in renderer code or logs.
 - The local web server is loopback-only and offers no Docker administration endpoint.
 - Container scans are read-only; application requires a reviewed, expiring plan and explicit desktop approval.

@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|3398c65 |2026-09-17 |Add private structured logs and read-only activity diagnostics
 |88ee6bf |2026-09-17 |Merge master while retaining the hardened desktop and voice implementation
 |42d1147 |2026-09-17 |Test local voice cancellation and prevent stale recorder cleanup
 |d15092a |2026-09-17 |Improve desktop voice, security monitoring and branded documentation

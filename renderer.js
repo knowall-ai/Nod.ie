@@ -498,6 +498,20 @@ const NodieRenderer = {
         this.setStatus('loading');
         this.showLoadingText('Loading Nod.ie...');
 
+        const clearHistory = document.getElementById('web-clear-history');
+        if (!isElectron && window.nodie?.clearHistory && clearHistory) {
+            clearHistory.hidden = false;
+            clearHistory.addEventListener('click', async () => { try { this.localVoice?.cancel(); await window.nodie.clearHistory(); this.showNotification('Saved conversation history cleared.', 'info'); } catch { this.showNotification('Could not clear saved history. Please retry.', 'error'); } });
+        }
+        const handle = document.getElementById('drag-handle');
+        if (isElectron && handle) {
+            handle.addEventListener('pointerdown', event => {
+                if (event.button !== 0) return;
+                event.preventDefault(); handle.setPointerCapture(event.pointerId); window.nodie.beginDrag();
+            });
+            for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) handle.addEventListener(name, () => window.nodie.endDrag());
+            window.addEventListener('blur', () => window.nodie.endDrag());
+        }
         // Set up click handler
         const circle = document.getElementById('circle');
         if (circle) {

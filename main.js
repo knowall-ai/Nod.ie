@@ -14,8 +14,10 @@ function start() {
     const store = new Store();
     const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
-    const voice = new LocalVoice({ logger, diagnostics: () => diagnostics.status() });
-    let mainWindow, settingsWindow, tray, monitor;
+    const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
+    const voice = new LocalVoice({ logger, historyStore, diagnostics: () => diagnostics.status() });
+    let mainWindow, settingsWindow, tray, monitor, dragTimer, dragDeadline;
+    const stopDrag = () => { clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; };
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
     const isLocalFrame = (event, file) => event.senderFrame === event.sender.mainFrame && event.senderFrame.url === pathToFileURL(path.join(__dirname, file)).href;
     const trusted = event => [mainWindow, settingsWindow].some(win => win && !win.isDestroyed() && event.sender === win.webContents) && (isLocalFrame(event, 'index.html') || isLocalFrame(event, 'settings.html'));
@@ -50,6 +52,7 @@ function start() {
     handle('diagnostics-status', () => diagnostics.status());
     handle('voice-health', () => voice.health());
     handle('voice-turn', audio => voice.converse(audio));
+    handle('clear-history', () => voice.clearHistory(), true);
     handle('voice-cancel', () => voice.cancel());
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
@@ -61,11 +64,21 @@ function start() {
         mainWindow.webContents.send('config-changed', next);
         return next;
     }, true);
-    ipcMain.on('move-window', (event, delta) => {
-        if (!trusted(event) || event.sender !== mainWindow.webContents) return;
-        if (!delta || !Number.isFinite(delta.deltaX) || !Number.isFinite(delta.deltaY) || Math.abs(delta.deltaX) > 1000 || Math.abs(delta.deltaY) > 1000) return;
-        const [x, y] = mainWindow.getPosition(); mainWindow.setPosition(Math.round(x + delta.deltaX), Math.round(y + delta.deltaY));
+    ipcMain.on('begin-drag', event => {
+        if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
+        const { screen } = require('electron');
+        const origin = screen.getCursorScreenPoint();
+        const [x, y] = mainWindow.getPosition();
+        // Cursor and window positions are both desktop-independent pixels. Renderer
+        // screenX/screenY mix coordinate spaces on scaled X11 desktops.
+        dragTimer = setInterval(() => {
+            if (mainWindow.isDestroyed()) return stopDrag();
+            const point = screen.getCursorScreenPoint();
+            mainWindow.setPosition(Math.round(x + point.x - origin.x), Math.round(y + point.y - origin.y));
+        }, 16);
+        dragDeadline = setTimeout(stopDrag, 30000);
     });
+    ipcMain.on('end-drag', event => { if (trusted(event) && event.sender === mainWindow.webContents) stopDrag(); });
     handle('security-status', () => monitor.status());
     handle('security-scan', () => monitor.scan(), true);
     handle('security-dismiss', id => monitor.dismiss(id), true);
@@ -99,7 +112,7 @@ function start() {
         monitor.start().catch(() => logger.write('error', 'updates.monitor-failed'));
         logger.write('info', 'desktop.started');
     }).catch(error => { logger.write('error', 'desktop.start-failed', { code: error.code || 'unknown' }); app.quit(); });
-    app.on('before-quit', () => { app.isQuitting = true; monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
+    app.on('before-quit', () => { app.isQuitting = true; stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
     app.on('will-quit', () => globalShortcut.unregisterAll());
     app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus(); });
 }

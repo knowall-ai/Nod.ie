@@ -42,6 +42,7 @@ el('apply').onclick = async () => {
     catch (err) { error(err); }
     finally { el('apply').hidden = true; el('apply').disabled = false; currentPlan = null; }
 };
+el('clear-history').onclick = () => api.clearHistory().then(() => { el('history-status').textContent = 'Saved conversation history cleared.'; }).catch(error);
 el('cancel').onclick = () => window.close();
 el('save').onclick = async () => {
     try { await api.saveSettings({ AVATAR_ENABLED: el('avatarEnabled').checked, ASSISTANT_NAME: el('assistantName').value, UNMUTE_BACKEND_URL: el('unmuteBackendUrl').value, VOICE_MODEL: el('voiceModel').value, GLOBAL_HOTKEY: el('globalHotkey').value }); window.close(); }
