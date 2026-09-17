@@ -29,10 +29,12 @@ shape.XShapeQueryExtension.argtypes = [C.c_void_p, C.POINTER(C.c_int), C.POINTER
 def rectangles(data, width, height):
     vw, vh = data['width'], data['height']
     regions = data['regions']
-    if not all(isinstance(v, (int, float)) and math.isfinite(v) and 0 < v <= 4096 for v in (vw, vh)) or not 1 <= len(regions) <= 8:
+    if not all(isinstance(v, (int, float)) and math.isfinite(v) and 0 < v <= 4096 for v in (vw, vh)) or not 0 <= len(regions) <= 8:
         raise ValueError('Invalid input regions')
     if not 1 <= width <= 8192 or not 1 <= height <= 8192:
         raise ValueError('Invalid window dimensions')
+    if not regions:
+        return []
     rows = {}
     for r in regions:
         if not all(isinstance(r[k], (int, float)) and math.isfinite(r[k]) and abs(r[k]) <= 4096 for k in ('x', 'y', 'width', 'height')) or r['width'] <= 0 or r['height'] <= 0:

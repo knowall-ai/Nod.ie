@@ -27,7 +27,17 @@ test('polling restores pointer input on Linux and never releases an active drag'
     win.emit('closed'); assert.equal(clears, 1);
 });
 test('invalid renderer geometry cannot make the window permanently unreachable', () => {
-    assert.throws(() => validateRegions({ ...geometry, regions: [] }));
+    assert.equal(hitsOverlay({x:150,y:150}, {x:0,y:0,width:300,height:300}, validateRegions({ ...geometry, regions: [] })), false);
+    for (const patch of [{x:-1}, {x:1.5}, {extra:true}]) assert.throws(() => validateRegions({...geometry, regions:[{...geometry.regions[0],...patch}]}));
+    assert.throws(() => validateRegions({...geometry,extra:true}));
     assert.throws(() => validateRegions({ ...geometry, width: Infinity }));
     assert.throws(() => validateRegions({ ...geometry, regions: [{ x: 0, y: 0, width: -1, height: 2 }] }));
+});
+
+test('native helper shutdown waits for close and kills a stuck child within the deadline', async () => {
+    const {closeHelper}=require('../../lib/window-hit-test');
+    const child=new EventEmitter(); let ended=false,killed=false;
+    child.stdin={end(){ended=true}};child.kill=signal=>{assert.equal(signal,'SIGKILL');killed=true;child.emit('close')};
+    await closeHelper(child,10);assert.equal(ended,true);assert.equal(killed,true);
+    const normal=new EventEmitter();normal.stdin={end(){setImmediate(()=>normal.emit('close'))}};normal.kill=()=>assert.fail('should close without killing');await closeHelper(normal,100);
 });

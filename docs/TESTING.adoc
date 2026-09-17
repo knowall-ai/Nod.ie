@@ -24,3 +24,5 @@ node_modules/.bin/electron tests/desktop-input-region.cjs
 ----
 
 This creates an invisible isolated Electron window, waits for its first paint, and queries its native XShape regions. It verifies corner pass-through, avatar/button input, unchanged visual bounds, recovery after movement and repeated external input-mask resets, and restoration when the helper stops. It does not move the pointer, click, open a microphone or access the camera. The development machine's native 900-pixel window at 300% scale passed this check; the running overlay's native region was also inspected. Unit tests additionally cover viewport mapping, geometry validation and drag retention for the polling fallback.
+
+The X11 overlay test checks every eligible exclusive ancestor frame as well as the client window. It verifies corner pass-through, avatar/control capture, empty masks, movement, repeated external resets and cleanup. Native helper shutdown is bounded by a 500 ms kill backstop and a 750 ms absolute wait.

@@ -143,7 +143,19 @@ function start() {
         monitor.start().catch(() => logger.write('error', 'updates.monitor-failed'));
         logger.write('info', 'desktop.started');
     }).catch(error => { logger.write('error', 'desktop.start-failed', { code: error.code || 'unknown' }); app.quit(); });
-    app.on('before-quit', () => { app.isQuitting = true; pointerTracker?.stop(); stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
+    let quitCleanup = false;
+    app.on('before-quit', event => {
+        if (quitCleanup) return;
+        event.preventDefault();
+        if (app.isQuitting) return;
+        app.isQuitting = true;
+        stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {});
+        mainWindow?.webContents.send('app-will-quit');
+        (async () => {
+            try { await pointerTracker?.stop(); }
+            finally { quitCleanup = true; app.quit(); }
+        })().catch(() => {});
+    });
     app.on('will-quit', () => globalShortcut.unregisterAll());
     app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus(); });
 }

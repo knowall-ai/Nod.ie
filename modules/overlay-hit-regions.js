@@ -6,9 +6,10 @@
         queued = false;
         const regions = [...document.querySelectorAll('#circle, .orbit-control')].filter(el => !el.hidden && getComputedStyle(el).display !== 'none').map(el => {
             const rect = el.getBoundingClientRect();
-            return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+            const pixel = v => Math.max(0, Math.min(4096, Math.round(v)));
+            return { x: pixel(rect.x), y: pixel(rect.y), width: pixel(rect.width), height: pixel(rect.height) };
         }).filter(r => r.width > 0 && r.height > 0);
-        if (regions.length) window.nodie.setHitRegions({ width: window.innerWidth, height: window.innerHeight, regions });
+        window.nodie.setHitRegions({ width: Math.max(1, Math.min(4096, Math.round(window.innerWidth))), height: Math.max(1, Math.min(4096, Math.round(window.innerHeight))), regions: regions.slice(0, 8) });
         if ([...document.querySelectorAll('#circle, .orbit-control')].some(el => el.getAnimations().some(animation => animation.playState === 'running'))) changed();
     };
     const changed = () => { if (!queued) { queued = true; requestAnimationFrame(publish); } };
