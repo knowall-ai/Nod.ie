@@ -125,7 +125,8 @@ function start() {
         mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true, ...(process.platform === 'linux' ? { type: 'dock' } : {}) }, 'index.html');
         // A Linux dock overlay avoids KWin's normal-window panel avoidance and resize drift.
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
-        pointerTracker = require('./lib/window-hit-test').trackPointer(mainWindow, require('electron').screen, () => Boolean(dragTimer));
+        const input = require('./lib/window-hit-test');
+        pointerTracker = process.platform === 'linux' && process.env.DISPLAY ? input.nativeInputRegion(mainWindow, logger) : input.trackPointer(mainWindow, require('electron').screen, () => Boolean(dragTimer));
         const position = store.get('position');
         const { screen } = require('electron');
         const area = screen.getPrimaryDisplay().workArea;
