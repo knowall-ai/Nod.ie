@@ -79,3 +79,11 @@ Recognition and persistent conversation-history integration remain separate work
 The TTS startup stages only the nine demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
 
 Decoded audio carries a response generation. Interruptions invalidate queued output, and the decoder clears partial PCM buffers at generation changes while retaining its continuous Opus state. Late frames cannot restart animation, microphone ducking or playback in a later response.
+
+=== Avoiding cold model reloads
+
+For the local Ollama deployment, prepare the adapter with `python3 unmute-service/prepare-backend.py /path/to/unmute`, then apply `unmute-service/compose.warmup.yml` after the existing voice and optional memory overrides. Set `NODIE_WARMUP_DIR` to the absolute path of its `unmute-service` directory. This opt-in override keeps other Ollama users and their server defaults unchanged.
+
+The adapter preloads the configured model when a voice client is created and awaits the shared load before a turn. Speech interruptions cannot cancel that load and trigger repeated model startups. A native, empty `/api/generate` request requests 30 minutes of residency; it sends no conversation text and generates no spoken reply. A post-turn refresh restores that period because OpenAI-compatible requests use the server's default residency. There is no periodic generation job. The model can expire after inactivity and Ollama may still evict it under memory pressure. Disabling `NODIE_OLLAMA_WARMUP` restores the prior behavior.
+
+Warm-up has a 90-second HTTP timeout and failures permit the normal completion path to attempt recovery. Logs contain only fixed success/failure events and elapsed milliseconds. A failed warm-up is retried on a subsequent call; a recently successful pre-turn warm-up is cached for 60 seconds. Retaining Qwen uses GPU memory but does not continuously generate tokens. Tests exercise interruption shielding, shared loading, cache/refresh behavior and retry after failure.
