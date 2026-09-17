@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|8b0686e |2026-09-17 |feat: restore neural lip sync for streamed Unmute replies
 |6e96e52 |2026-09-17 |fix: reconnect read-only Reverie recall to Unmute and protect memory logs
 |b126884 |2026-09-17 |fix: unblock speech with empty tools and remove duplicate mic notices
 |cd57d78 |2026-09-17 |fix: restore Unmute streaming voice trial and interruption handling
@@ -9,6 +10,5 @@
 |6a414f3 |2026-09-17 |Let the model infer direct address and device-control intent
 |4a19edc |2026-09-17 |Require direct name address for spoken device controls
 |29cb4bb |2026-09-17 |Preserve voice controls after node lookups and reduce Qwen cold starts
-|49d61bf |2026-09-17 |Improve local voice responsiveness and select Qwen for vision preparation
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

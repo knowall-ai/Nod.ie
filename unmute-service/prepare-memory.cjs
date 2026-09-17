@@ -16,4 +16,4 @@ const output = path.join(__dirname, 'generated/mcp.json');
 fs.mkdirSync(path.dirname(output), { recursive: true, mode: 0o700 });
 fs.writeFileSync(output, JSON.stringify({ mcpServers: { reverie: { command: 'node', args: ['/app/nodie/reverie-readonly.cjs'], env } } }), { mode: 0o600 });
 fs.chmodSync(output, 0o600);
-console.log('Private read-only Reverie configuration prepared.');
+console.log('Private Reverie configuration prepared.');
