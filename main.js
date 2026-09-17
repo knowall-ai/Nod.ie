@@ -50,6 +50,7 @@ function start() {
         globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
     }
     handle('get-config', config);
+    handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
     handle('voice-health', () => voice.health());
     handle('voice-turn', audio => voice.converse(audio));

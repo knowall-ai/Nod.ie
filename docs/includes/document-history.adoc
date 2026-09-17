@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|f2aee77 |2026-09-17 |Group avatar controls along the bottom-left arc
 |72d4224 |2026-09-17 |Fix panel overlay drift and add self-context with read-only node tools
 |194f720 |2026-09-17 |Document model-owned wording for spoken notifications
 |573e4e0 |2026-09-17 |Add Lucide device controls and bound desktop dragging
@@ -9,6 +10,5 @@
 |1c5cc6c |2026-09-17 |Bind update approvals to resolved Compose configuration
 |56f7bbb |2026-09-17 |Preserve bounded conversation history and correct HiDPI window dragging
 |3398c65 |2026-09-17 |Add private structured logs and read-only activity diagnostics
-|88ee6bf |2026-09-17 |Merge master while retaining the hardened desktop and voice implementation
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

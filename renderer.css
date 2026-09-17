@@ -265,16 +265,6 @@ body[data-platform="web"] #debug-info {
     animation: fadeIn 0.5s ease;
 }
 /* Dragging uses Electron desktop coordinates to handle scaled X11 displays. */
-#drag-handle { display: none; }
-body[data-platform="electron"] #drag-handle {
-    display: block; position: absolute; top: 0; left: 110px; width: 80px;
-    height: 24px; text-align: center; color: #291507; background: #f5a623;
-    border-radius: 12px; z-index: 100; -webkit-app-region: no-drag; cursor: grab;
-    user-select: none; line-height: 24px;
-}
-body[data-platform="electron"] #drag-handle:hover { background: #ee8b22; }
-body[data-platform="electron"] #drag-handle:focus-visible { outline: 2px solid #ffd45c; outline-offset: 2px; }
-body[data-platform="electron"] #drag-handle:active { cursor: grabbing; }
 #circle { -webkit-app-region: no-drag; }
 
 #web-clear-history { position: fixed; bottom: 16px; right: 16px; padding: 8px 12px; }
@@ -299,9 +289,11 @@ body[data-platform="electron"] #circle { touch-action: none; user-select: none; 
 .orbit-control:focus-visible { outline: 2px solid #fff1b8; outline-offset: 2px; }
 .orbit-control[aria-disabled="true"] { background: #95816c; border-color: #c5a37a; cursor: not-allowed; }
 .orbit-control:disabled { opacity: .65; cursor: wait; }
-#control-mic { left: 6px; top: 188px; }
-#control-camera { left: 33px; top: 227px; }
-#control-speaker { left: 72px; top: 254px; }
+#control-mic { left: 17px; top: 183px; }
+#control-camera { left: 42px; top: 218px; }
+#control-speaker { left: 77px; top: 243px; }
+#control-settings { left: 119px; top: 254px; }
+.orbit-control[hidden] { display: none; }
 
 /* Keep interaction hints below the face so they do not cover the moving lips. */
 #status-text {

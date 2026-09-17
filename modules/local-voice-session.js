@@ -19,7 +19,7 @@ class LocalVoiceSession {
         if (this.state === 'recording') { this.finish(); return; }
         if (this.state === 'processing' || this.state === 'speaking') { this.cancel(); this.status(''); return; }
         const generation = ++this.generation;
-        this.state = 'starting'; this.status('Opening microphone…');
+        this.state = 'starting'; this.status('');
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, channelCount: 1 }, video: false });
             if (generation !== this.generation) { stream.getTracks().forEach(t => t.stop()); return; }
@@ -36,7 +36,7 @@ class LocalVoiceSession {
             this.recorder.onerror = () => { this.cancel(); this.status('Recording failed'); };
             this.recorder.onstop = () => { if (generation !== this.generation) return; this.releaseMicrophone(); this.send(chunks, generation); };
             this.recorder.start(250);
-            this.state = 'recording'; this.renderer.state.isMuted = false; this.status('Listening');
+            this.state = 'recording'; this.renderer.state.isMuted = false; this.status('');
             this.limitTimer = setTimeout(() => this.finish(), 30000);
         } catch (error) { this.cancel(); this.status(error.message); }
     }
@@ -48,7 +48,7 @@ class LocalVoiceSession {
         this.renderer.state.analyser = null; this.renderer.state.isMuted = true;
     }
     async send(chunks, generation) {
-        this.state = 'processing'; this.status('Thinking…');
+        this.state = 'processing'; this.status('');
         try {
             const audio = new Uint8Array(await new Blob(chunks).arrayBuffer());
             if (generation !== this.generation) return;
@@ -62,7 +62,7 @@ class LocalVoiceSession {
         this.state = 'speaking';
         const manager = this.renderer.state.avatarManager;
         const video = useVideo && result.video && manager?.isEnabled() ? document.getElementById('avatar-video') : null;
-        this.status(result.lipSync === 'unavailable' ? 'Speaking (lip sync unavailable)' : result.memory === 'unavailable' ? 'Speaking (memory unavailable)' : 'Speaking');
+        this.status(result.lipSync === 'unavailable' ? 'Lip sync unavailable' : result.memory === 'unavailable' ? 'Memory unavailable' : '');
         this.audioUrl = URL.createObjectURL(new Blob([video ? result.video : result.audio], { type: video ? 'video/mp4' : 'audio/wav' }));
         const player = video || new Audio();
         this.player = player;

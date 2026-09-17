@@ -6,6 +6,11 @@ class AvatarControls {
         this.mic = document.getElementById('control-mic');
         this.speaker = document.getElementById('control-speaker');
         this.camera = document.getElementById('control-camera');
+        this.settings = document.getElementById('control-settings');
+        if (this.settings && typeof window.nodie?.openSettings === 'function') {
+            this.settings.hidden = false;
+            this.settings.addEventListener('click', () => window.nodie.openSettings().catch(() => renderer.showNotification('Could not open Settings.', 'error')));
+        }
         try { renderer.state.speakerMuted = localStorage.getItem(AvatarControls.speakerStorageKey) === 'true'; } catch { renderer.state.speakerMuted = false; }
         this.mic?.addEventListener('click', () => {
             if (renderer.state.isLoading) return;

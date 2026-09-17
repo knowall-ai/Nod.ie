@@ -205,6 +205,14 @@ const NodieRenderer = {
                     }
                     ctx.closePath();
                     ctx.stroke();
+                    // Fill back to the portrait edge: sound grows out of the circumference.
+                    ctx.moveTo(centerX + radius, centerY);
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(247, 147, 26, 0.65)';
+                    ctx.fill('evenodd');
+                    ctx.beginPath();
+                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                    ctx.stroke();
                 } else {
                     // No activity - draw perfect smooth circle
                     ctx.beginPath();
@@ -508,8 +516,6 @@ const NodieRenderer = {
             clearHistory.hidden = false;
             clearHistory.addEventListener('click', async () => { try { this.localVoice?.cancel(); await window.nodie.clearHistory(); this.showNotification('Saved conversation history cleared.', 'info'); } catch { this.showNotification('Could not clear saved history. Please retry.', 'error'); } });
         }
-        const handle = document.getElementById('drag-handle');
-        if (isElectron && handle) window.bindDesktopDrag(handle, window.nodie);
         this.controls = new window.AvatarControls(this);
         // Set up click handler
         const circle = document.getElementById('circle');

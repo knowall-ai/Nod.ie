@@ -21,3 +21,14 @@ test('node failure is unavailable, never a fabricated zero or leaked raw error',
     assert.deepEqual(result.bitcoin, { state: 'unavailable' }); assert.deepEqual(result.lightning, { state: 'unavailable' });
     assert.ok(!JSON.stringify(result).includes('secret'));
 });
+test('malformed node metrics cannot masquerade as checked zero balances', async () => {
+    for (const invalid of ['', ' ', true, null, '0x10', '1.5', -1, 2_100_000_000_000_001, Number.MAX_SAFE_INTEGER + 1]) {
+        const result = await nodeSnapshot({ run: async (_file, args) => ({ stdout: JSON.stringify(args.at(-1) === 'getnetworkinfo' ? { subversion: '31.1' } : args.at(-1) === 'getinfo' ? { version: '0.21.3', num_pending_channels: invalid } : { channels: [] }) }) });
+        assert.equal(result.lightning.state, 'unavailable', String(invalid));
+    }
+});
+test('node metric follow-ups require fresh data, ordinary conversation does not', () => {
+    const { requiresNodeSnapshot } = require('../../lib/node-snapshot');
+    assert.equal(requiresNodeSnapshot('How many are active?', [{ role: 'user', content: 'How many channels?' }]), true);
+    assert.equal(requiresNodeSnapshot('Hello'), false);
+});

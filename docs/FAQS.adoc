@@ -14,7 +14,7 @@ No. There is no ElevenLabs integration in this implementation. Local mode uses e
 
 === Does Nod.ie float over the desktop or run on the lock screen?
 
-The Electron interface is a transparent, frameless, always-on-top desktop window. Click and drag Nod.ie herself to move her, or use the optional orange/amber handle above her. A short click starts or stops the selected voice interaction; dragging does not trigger it. The browser is an alternative interface. KDE's protected lock screen does not display ordinary desktop windows above it. Lock-screen voice interaction is not implemented; it would need a separate, restricted KDE integration. Do not rely on screen locking alone to cancel an in-progress voice turn in this release; stop the turn before locking.
+The Electron interface is a transparent, frameless, always-on-top desktop window. Click and drag Nod.ie herself to move her; there is no separate grab handle. A short click starts or stops the selected voice interaction; dragging does not trigger it. The browser is an alternative interface. KDE's protected lock screen does not display ordinary desktop windows above it. Lock-screen voice interaction is not implemented; it would need a separate, restricted KDE integration. Do not rely on screen locking alone to cancel an in-progress voice turn in this release; stop the turn before locking.
 
 === Does she have neural lip sync?
 
