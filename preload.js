@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('nodie', {
     voiceCancel: () => ipcRenderer.invoke('voice-cancel'),
     getConfig: () => ipcRenderer.invoke('get-config'),
     getSystemPrompt: () => ipcRenderer.invoke('get-system-prompt'),
+    openSettings: () => ipcRenderer.invoke('open-settings'),
     saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
     onToggleMute: (fn) => subscribe('toggle-mute', fn),
     onConfigChanged: (fn) => subscribe('config-changed', fn),

@@ -4,11 +4,12 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const Store = require('electron-store');
 const env = require('./config');
-const { normalize, validate, aliases } = require('./lib/config-schema');
+const { normalize, validate, validateSettingsPatch, aliases } = require('./lib/config-schema');
 const { LocalVoice } = require('./lib/local-voice');
 const { SecurityMonitor } = require('./security/monitor');
 const { Logger } = require('./lib/logger');
 const { Diagnostics } = require('./lib/diagnostics');
+const { dragPosition } = require('./lib/window-drag');
 if (!app.requestSingleInstanceLock()) { app.quit(); } else { start(); }
 function start() {
     const store = new Store();
@@ -49,6 +50,7 @@ function start() {
         globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
     }
     handle('get-config', config);
+    handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
     handle('voice-health', () => voice.health());
     handle('voice-turn', audio => voice.converse(audio));
@@ -56,19 +58,29 @@ function start() {
     handle('voice-cancel', () => voice.cancel());
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
-        if (!settings || typeof settings !== 'object' || Object.keys(settings).some(key => !['ASSISTANT_NAME', 'UNMUTE_BACKEND_URL', 'VOICE_MODEL', 'LLM_MODEL', 'GLOBAL_HOTKEY', 'AVATAR_ENABLED'].includes(key))) throw new Error('Unsupported settings');
-        if ('AVATAR_ENABLED' in settings && typeof settings.AVATAR_ENABLED !== 'boolean') throw new Error('Invalid avatar setting');
-        const next = validate({ ...config(), ...settings });
-        for (const key of Object.keys(settings)) store.set(aliases[key], next[key]);
-        shortcuts();
-        mainWindow.webContents.send('config-changed', next);
-        return next;
+        let stage = 'validation';
+        try {
+            validateSettingsPatch(settings);
+            const next = validate({ ...config(), ...settings });
+            stage = 'storage';
+            store.set(Object.fromEntries(Object.keys(settings).map(key => [aliases[key], next[key]])));
+            stage = 'apply';
+            shortcuts();
+            mainWindow.webContents.send('config-changed', next);
+            logger.write('info', 'settings.saved', { count: Object.keys(settings).length });
+            return next;
+        } catch (error) {
+            logger.write('error', 'settings.failed', { stage, code: stage === 'validation' ? 'invalid-settings' : 'save-failed' });
+            throw error;
+        }
     }, true);
     ipcMain.on('begin-drag', event => {
         if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
         const { screen } = require('electron');
         const origin = screen.getCursorScreenPoint();
-        const [x, y] = mainWindow.getPosition();
+        const start = mainWindow.getPosition();
+        const size = mainWindow.getSize();
+        let last = start;
         // Cursor and window positions are both desktop-independent pixels. Renderer
         // screenX/screenY mix coordinate spaces on scaled X11 desktops.
         dragMoved = false;
@@ -77,7 +89,11 @@ function start() {
             const point = screen.getCursorScreenPoint();
             if (!dragMoved && Math.hypot(point.x - origin.x, point.y - origin.y) < 5) return;
             dragMoved = true;
-            mainWindow.setPosition(Math.round(x + point.x - origin.x), Math.round(y + point.y - origin.y));
+            const next = dragPosition(origin, point, start, size, screen.getDisplayNearestPoint(point).bounds);
+            // Repeated identical moves can fight the window manager's edge constraints.
+            if (next[0] === last[0] && next[1] === last[1]) return;
+            last = next;
+            mainWindow.setPosition(...next);
         };
         dragTimer = setInterval(updateDrag, 16);
         dragDeadline = setTimeout(stopDrag, 30000);
@@ -99,11 +115,13 @@ function start() {
             callback(contents === mainWindow?.webContents && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href && permission === 'media' && !details.mediaTypes?.includes('video'));
         });
         session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === mainWindow?.webContents && permission === 'media' && details.mediaType !== 'video');
-        mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true }, 'index.html');
+        mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true, ...(process.platform === 'linux' ? { type: 'dock' } : {}) }, 'index.html');
+        // A Linux dock overlay avoids KWin's normal-window panel avoidance and resize drift.
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
         const position = store.get('position');
         const { screen } = require('electron');
         const area = screen.getPrimaryDisplay().workArea;
-        if (position && Number.isFinite(position.x) && Number.isFinite(position.y) && screen.getAllDisplays().some(d => position.x >= d.workArea.x && position.y >= d.workArea.y && position.x + 300 <= d.workArea.x + d.workArea.width && position.y + 300 <= d.workArea.y + d.workArea.height)) mainWindow.setPosition(position.x, position.y);
+        if (position && Number.isFinite(position.x) && Number.isFinite(position.y) && screen.getAllDisplays().some(d => { const p = dragPosition({ x: 0, y: 0 }, { x: 0, y: 0 }, [position.x, position.y], [300, 300], d.bounds); return p[0] === position.x && p[1] === position.y; })) mainWindow.setPosition(position.x, position.y);
         else mainWindow.setPosition(area.x + area.width - 350, area.y + area.height - 350);
         mainWindow.on('moved', () => { const [x, y] = mainWindow.getPosition(); store.set('position', { x, y }); });
         mainWindow.on('close', event => { if (!app.isQuitting) { event.preventDefault(); mainWindow.hide(); } });

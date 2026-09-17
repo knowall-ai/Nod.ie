@@ -13,3 +13,9 @@ Thank you for contributing. Nod.ie is MIT-licensed; contributions are made under
 Never commit `.env`, MCP credentials, wallet data, recordings, private graph exports, generated PDFs or logs. Do not add arbitrary shell execution, automatic updates or ambient-voice approval for privileged operations.
 
 See [installation](docs/INSTALLATION.adoc), [solution design](docs/SOLUTION_DESIGN.adoc) and [testing](docs/TESTING.adoc).
+
+## Nod.ie chooses her own words
+
+Keep conversational wording model-generated. Code determines reliable facts, event types, timing, permissions and delivery channels; Nod.ie chooses how to express those facts in her own voice. Do not implement fixed spoken scripts, stock greetings or prewritten announcement variants. Prompts may constrain length, tone and factual content without prescribing the exact utterance.
+
+For example, an unfamiliar-face event should provide the observation, recognition uncertainty and notification intent—not a sentence for her to recite. Model output never authorises actions or turns uncertain recognition into a confirmed identity. If language generation is unavailable, use a factual on-screen status rather than substituting a canned spoken line. Stable button labels, accessibility text and technical error messages are appropriate exceptions.

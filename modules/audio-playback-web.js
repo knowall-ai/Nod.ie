@@ -4,6 +4,8 @@
 
 class AudioPlaybackWeb {
     constructor() {
+        this.muted = false;
+        this.outputGain = null;
         this.audioContext = null;
         this.audioWorklet = null;
         this.decoderWorker = null;
@@ -37,7 +39,10 @@ class AudioPlaybackWeb {
             
             // Create output worklet
             this.outputWorklet = new AudioWorkletNode(this.audioContext, 'audio-output-processor');
-            this.outputWorklet.connect(this.audioContext.destination);
+            this.outputGain = this.audioContext.createGain();
+            this.outputGain.gain.value = this.muted ? 0 : 1;
+            this.outputWorklet.connect(this.outputGain);
+            this.outputGain.connect(this.audioContext.destination);
             
             // Initialize decoder worker - use relative path
             const workerPath = window.location.pathname.includes('/tests/') 
@@ -120,6 +125,11 @@ class AudioPlaybackWeb {
 
     
 
+    setMuted(muted) {
+        this.muted = Boolean(muted);
+        if (this.outputGain) this.outputGain.gain.value = this.muted ? 0 : 1;
+    }
+
     async stop() {
         console.log('🛑 Stopping audio playback...');
         
@@ -137,6 +147,7 @@ class AudioPlaybackWeb {
             this.outputWorklet = null;
         }
         
+        this.outputGain?.disconnect(); this.outputGain = null;
         if (this.decoderWorker) {
             this.decoderWorker.terminate();
             this.decoderWorker = null;

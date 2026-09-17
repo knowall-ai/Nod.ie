@@ -8,6 +8,8 @@
 |Voice endpoints healthy but no conversation |Run a complete recorded turn; health probes alone do not establish model readiness.
 |Microphone unavailable |Grant browser permission and select a working input device. Local mode releases it after each recording.
 |Lip sync unavailable |Check `LOCAL_LIP_SYNC_URL` and the neural service `/health` endpoint. Run the model setup script with `--verify`. Check GPU headroom and container health. Speech remains available if rendering fails.
+|Avatar stops near the bottom edge |The whole transparent window stays inside the usable desktop area, including the panel boundary. At 300% scaling, a 300-DIP window occupies 900 physical pixels. Movement stops at that boundary.
+|Controls missing |Reload the browser or restart the desktop after updating. Microphone and speaker are functional; the camera button stays off until vision is connected.
 |Dragging starts a conversation |Reload the desktop after updating. A movement of at least five desktop-independent pixels is treated as a drag; a short click remains a voice control.
 |No sound |Check the browser audio permission, selected output device and system volume.
 |Memory unavailable |Check the configured MCP entry and Neo4j access. Do not paste credentials into an issue.
@@ -15,3 +17,7 @@
 |Update status unknown |Check Docker permissions, registry connectivity and GitHub rate limits. Unknown is not patched.
 |Update plan changed or expired |Scan and review a new plan. Do not reuse an old approval.
 |===
+
+=== Settings changes and silent recordings
+
+Desktop settings attempts log `settings.saved` or `settings.failed` with a validation/storage/apply stage and no setting values. Failed saves keep the panel open and scroll to the error. A successful transcription with no recognised words reports `no-speech`, not an unavailable speech service; try a clear recording before investigating service health.
