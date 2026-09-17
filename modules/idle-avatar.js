@@ -3,9 +3,12 @@ class IdleAvatar {
     constructor({enabled=true, avatarEnabled=true}={}) {
         this.video=document.getElementById('avatar-idle');
         this.cover=document.getElementById('avatar-handoff');
+        this.lastTilt=-Infinity;
+        this.clip={name:'nodie-idle',duration:6,blinks:[2.25,4.7]};
         this.enabled=enabled;this.avatarEnabled=avatarEnabled;this.speaking=false;this.generation=0;
         this.motion=window.matchMedia('(prefers-reduced-motion: reduce)');
         this.onMotion=()=>this.refresh();this.motion.addEventListener('change',this.onMotion);
+        this.video?.addEventListener('ended',()=>this.scheduleNext());
         this.video?.addEventListener('error',()=>{this.available=false;this.hideIdle();});
         this.available=true;this.refresh();
     }
@@ -19,15 +22,31 @@ class IdleAvatar {
             this.video.style.opacity='1';
         }).catch(()=>this.hideIdle());
     }
-    hideIdle() {if(this.video){this.video.style.opacity='0';this.video.pause();}}
+    hideIdle() {clearTimeout(this.motionTimer);if(this.video){this.video.style.opacity='0';this.video.pause();}}
     setEnabled(enabled, avatarEnabled=this.avatarEnabled) {this.enabled=enabled;this.avatarEnabled=avatarEnabled;++this.generation;this.refresh();}
+    /** Leave quiet gaps and vary gestures, with blinks more frequent than head turns. */
+    scheduleNext() {
+        this.hideIdle();
+        if(this.speaking || this.disposed || !this.enabled || !this.avatarEnabled || this.motion.matches || !this.available)return;
+        const generation=this.generation;
+        this.motionTimer=setTimeout(()=>{
+            if(generation!==this.generation || this.speaking || this.disposed)return;
+            const blink={name:'nodie-idle-blink',duration:6,blinks:[2.25,4.7]};
+            const choices=[blink,blink,blink,blink,blink,{name:'nodie-look-left',duration:3,blinks:[2.25]},{name:'nodie-look-right',duration:3,blinks:[1.7]}];
+            if(Date.now()-this.lastTilt>=60000)choices.push({name:'nodie-head-tilt',duration:3,blinks:[]});
+            const options=choices.filter(clip=>clip.name!==this.clip.name || clip.name===blink.name);
+            this.clip=options[Math.floor(Math.random()*options.length)];
+            if(this.clip.name==='nodie-head-tilt')this.lastTilt=Date.now();
+            this.video.src=`assets/avatars/${this.clip.name}.mp4`;this.video.load();this.refresh();
+        },1800+Math.random()*2400);
+    }
     /** Finish an in-progress blink, then dissolve to the unchanged neutral portrait. */
     prepareSpeech() {
         if(this.speaking) return this.settled || Promise.resolve();
-        this.speaking=true;const generation=++this.generation;clearTimeout(this.idleTimer);
-        const t=this.video?.currentTime%6;
+        clearTimeout(this.motionTimer);this.speaking=true;const generation=++this.generation;clearTimeout(this.idleTimer);
+        const t=this.video?.currentTime%this.clip.duration;
         let blinkRemaining=0;
-        for(const center of [2.25,4.7]) if(t>=center-.18 && t<center+.18) blinkRemaining=Math.max(blinkRemaining,(center+.18-t)*1000);
+        for(const center of this.clip.blinks) if(t>=center-.18 && t<center+.18) blinkRemaining=Math.max(blinkRemaining,(center+.18-t)*1000);
         this.settled=new Promise(resolve=>{
             setTimeout(()=>{
                 if(generation!==this.generation || this.disposed){resolve();return;}
@@ -63,7 +82,7 @@ class IdleAvatar {
     }
     fadeCover(){if(this.cover){this.cover.style.transition='opacity 120ms linear';this.cover.style.opacity='0';}}
     /** Stop idle media and invalidate delayed transitions on application shutdown. */
-    dispose(){this.disposed=true;++this.generation;clearTimeout(this.idleTimer);this.hideIdle();this.motion.removeEventListener('change',this.onMotion);}
+    dispose(){this.disposed=true;++this.generation;clearTimeout(this.idleTimer);clearTimeout(this.motionTimer);this.hideIdle();this.motion.removeEventListener('change',this.onMotion);}
 }
 if(typeof window!=='undefined')window.IdleAvatar=IdleAvatar;
 if(typeof module!=='undefined')module.exports={IdleAvatar};

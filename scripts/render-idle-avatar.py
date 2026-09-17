@@ -22,10 +22,12 @@ with torch.inference_mode():
  baseline=w.parse_output(w.warp_decode(features,kp,kp)['out'])[0].astype(np.float32)
  closed=w.retarget_eye(kp,torch.tensor([[.3,.3,0.]],device=w.device))
  opened=w.retarget_eye(kp,torch.tensor([[.3,.3,.3]],device=w.device))
- mask=np.zeros((size,size),np.float32);cv2.ellipse(mask,(size//2,int(size*.48)),(int(size*.39),int(size*.45)),0,0,360,1,-1);mask=cv2.GaussianBlur(mask,(41,41),0)[...,None]
+ mask=np.zeros((size,size),np.float32);cv2.ellipse(mask,(size//2,int(size*.48)),(int(size*.48),int(size*.48)),0,0,360,1,-1);mask=cv2.GaussianBlur(mask,(41,41),0)[...,None]
  output=Path('/output');output.mkdir(exist_ok=True)
- preview='--preview' in sys.argv
- times=[0.,3.,6.] if preview else sorted(set([round(i*.3,2) for i in range(21)]+[round(c+d,2) for c in [2.25,4.7] for d in [-.18,-.09,0,.09,.18]]))
+ preview='--preview' in sys.argv or '--motion-preview' in sys.argv
+ tilt='--tilt' in sys.argv
+ times=([0.,1.8,4.2] if '--motion-preview' in sys.argv else [0.,3.,6.]) if preview else sorted(set([round(i*.3,2) for i in range(21)]+[round(c+d,2) for c in [2.25,4.7] for d in [-.18,-.09,0,.09,.18]]))
+ if tilt: times=[0.,.5,1.,1.5,2.,2.5,3.]
  count=len(times)
  keys=[]
  started=time.monotonic()
@@ -34,23 +36,42 @@ with torch.inference_mode():
   blink=max(0,1-abs(t-2.25)/.18)+max(0,1-abs(t-4.7)/.18)
   if '--preview' in sys.argv: blink=i/(count-1)
   amplitude=math.sin(math.pi*t/6)**2
-  rotation=get_rotation_matrix(info['pitch'],info['yaw']+amplitude*.35*math.sin(t),info['roll']+amplitude*.2*math.sin(t*.8))
+  # Small but visible pose changes; the wider feathered mask includes the hair.
+  rotation=get_rotation_matrix(info['pitch']+amplitude*1.2*math.sin(t*.7),info['yaw']+amplitude*4.0*math.sin(t),info['roll']+amplitude*1.8*math.sin(t*.8))
+  if tilt:
+   blink=0
+   rotation=get_rotation_matrix(info['pitch'],info['yaw'],info['roll']+2.2*math.sin(math.pi*t/3)**2)
   target=info['scale'][...,None]*(info['kp']@rotation+info['exp']);target[:,:,:2]+=info['t'][:,None,:2]
   target+= (closed-opened)*min(1,blink)
   target=w.stitching(kp,target)
   rendered=w.parse_output(w.warp_decode(features,kp,target)['out'])[0].astype(np.float32)
   delta=cv2.resize(rendered-baseline,(size,size))[:,:,::-1]
   frame=source.copy();frame[y:y+size,x:x+size]=np.clip(source[y:y+size,x:x+size].astype(np.float32)+delta*mask,0,255).astype(np.uint8)
-  if not '--preview' in sys.argv and (i==0 or i==count-1): frame=source.copy()
+  if not preview and (i==0 or i==count-1): frame=source.copy()
   keys.append(frame)
   if preview and not cv2.imwrite(str(output/f'frame-{i:04d}.png'),frame): raise RuntimeError('Could not write preview frame')
   if i%5==0: print('Rendered keyframe',i+1,'of',count,flush=True)
  print(json.dumps({'frames':count,'seconds':round(time.monotonic()-started,2),'gpu':use_gpu,'peak_mib':round(torch.cuda.max_memory_allocated()/1048576) if use_gpu else 0}),flush=True)
 
  if not preview:
-  for i in range(150):
-   t=i*6/149
+  frame_count=75 if tilt else 150
+  duration=3 if tilt else 6
+  for i in range(frame_count):
+   t=i*duration/(frame_count-1)
    right=min(np.searchsorted(times,t,side='right'),count-1);left=max(0,right-1)
    ratio=(t-times[left])/(times[right]-times[left]) if right!=left else 0
    frame=cv2.addWeighted(keys[left],1-ratio,keys[right],ratio,0)
    if not cv2.imwrite(str(output/f'frame-{i:04d}.png'),frame): raise RuntimeError('Could not write frame')
+
+  # Reuse the neural trajectory for shorter directional gestures. Feather each
+  # gesture to the unchanged portrait so every clip starts and ends at neutral.
+  for name,start,end in ([] if tilt else [('look-left',0,3),('look-right',3,6)]):
+   folder=output/name;folder.mkdir(exist_ok=True)
+   for i in range(75):
+    local=i*3/74;t=start+local
+    right=min(np.searchsorted(times,t,side='right'),count-1);left=max(0,right-1)
+    ratio=(t-times[left])/(times[right]-times[left]) if right!=left else 0
+    frame=cv2.addWeighted(keys[left],1-ratio,keys[right],ratio,0)
+    edge=min(1,local/.5,(3-local)/.5);weight=edge*edge*(3-2*edge)
+    frame=cv2.addWeighted(source,1-weight,frame,weight,0)
+    if not cv2.imwrite(str(folder/f'frame-{i:04d}.png'),frame): raise RuntimeError('Could not write gesture frame')
