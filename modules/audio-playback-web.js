@@ -5,6 +5,8 @@
 class AudioPlaybackWeb {
     constructor() {
         this.muted = false;
+        this.interrupted = false;
+        this.generation = 0;
         this.outputGain = null;
         this.audioContext = null;
         this.audioWorklet = null;
@@ -54,9 +56,9 @@ class AudioPlaybackWeb {
             
             // Handle decoded audio from worker (like official frontend)
             this.decoderWorker.onmessage = (event) => {
-                if (!event.data) return;
+                if (!event.data || this.interrupted || event.data.generation !== this.generation) return;
                 
-                const frame = event.data[0];
+                const frame = event.data.frames?.[0];
                 if (frame) {
                     console.debug('🔊 Sending decoded audio to worklet');
                     this.outputWorklet.port.postMessage({
@@ -93,6 +95,7 @@ class AudioPlaybackWeb {
     }
 
     async processAudioDelta(audioData) {
+        const generation = this.generation;
         if (!this.isInitialized) {
             await this.initialize();
         }
@@ -104,7 +107,7 @@ class AudioPlaybackWeb {
         }
 
         // Notify that audio playback is starting (only once per response)
-        if (!this.hasNotifiedPlaybackStart && window.NodieRenderer && window.NodieRenderer.onAudioPlaybackStart) {
+        if (!this.interrupted && generation === this.generation && !this.hasNotifiedPlaybackStart && window.NodieRenderer && window.NodieRenderer.onAudioPlaybackStart) {
             window.NodieRenderer.onAudioPlaybackStart();
             this.hasNotifiedPlaybackStart = true;
         }
@@ -115,7 +118,8 @@ class AudioPlaybackWeb {
             // Create a copy to avoid buffer transfer issues
             const audioDataCopy = new Uint8Array(audioData);
             this.decoderWorker.postMessage({
-                command: 'decode', 
+                command: 'decode',
+                generation,
                 pages: audioDataCopy
             });
         } else {
@@ -124,6 +128,20 @@ class AudioPlaybackWeb {
     }
 
     
+
+    interrupt() {
+        // Keep the Opus decoder alive: subsequent pages belong to the same stream.
+        this.interrupted = true;
+        ++this.generation;
+        this.outputWorklet?.port.postMessage({ type: 'reset' });
+    }
+
+    beginResponse() {
+        ++this.generation;
+        if (this.interrupted) this.outputWorklet?.port.postMessage({ type: 'reset' });
+        this.interrupted = false;
+        this.hasNotifiedPlaybackStart = false;
+    }
 
     setMuted(muted) {
         this.muted = Boolean(muted);
