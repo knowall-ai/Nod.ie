@@ -1,0 +1,8 @@
+# Apply after the voice and optional memory Compose overrides.
+services:
+  unmute-backend:
+    environment:
+      NODIE_OLLAMA_WARMUP: '1'
+    volumes:
+      - ${NODIE_WARMUP_DIR:?}/ollama_warmup.py:/app/unmute/ollama_warmup.py:ro
+      - ${NODIE_WARMUP_DIR:?}/generated/llm_utils.py:/app/unmute/llm/llm_utils.py:ro
