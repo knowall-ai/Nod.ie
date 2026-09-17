@@ -7,3 +7,6 @@ PDF typography uses bundled DejaVu Sans faces (licence included in `docs/themes`
 The implementation follows the documentation, generate-docs and brand-guidelines skills in the T-Minus-15 plugin referenced by KnowAll AI's company plugin. The technical-document build uses the skill's canonical output filename; it is not a separately issued client proposal.
 
 The desktop Settings panel uses warm ivory `#FFF8EC`, cream cards `#FFFDF7`, dark brown text `#291507`, and amber `#F5A623` primary controls. A dark-brown Nod.ie header, yellow focus rings, rounded cards and a sticky action footer connect it visually to the avatar. Error and success states retain distinct semantic colours. The documentation PDF remains KnowAll AI branded.
+
+
+The system-tray portrait has a transparent circular mask and a two-pixel amber `#F5A623` border at its 32-pixel base size. Matching 2x and 3x PNG representations keep it crisp on scaled desktops. Rebuild these assets from the unchanged source portrait with `node scripts/generate-tray-icon.cjs` after installing the development dependencies and Playwright Chromium.
