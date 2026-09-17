@@ -26,6 +26,13 @@ app.whenReady().then(async () => {
  const shaped=read(); assert.deepEqual(shaped[0],initial[0]);
  for(const [x,y] of [[0,0],[299,0],[0,299],[299,299],[26,26]]) assert.equal(contains(shaped[2],x*width/300,y*height/300),false);
  for(const r of regions) assert.equal(contains(shaped[2],(r.x+r.width/2)*width/300,(r.y+r.height/2)*height/300),true);
+ win.setPosition(800, 300);
+ // Moving the native window can reset the client/frame input masks. The helper
+ // must restore them without relying on another renderer geometry message.
+ await new Promise(resolve => setTimeout(resolve, 150));
+ const moved = read();
+ assert.equal(contains(moved[2], 0, 0), false);
+ assert.equal(contains(moved[2], width / 2, height / 2), true);
  await send(null); assert.deepEqual(read()[2],initial[2]);
  await send({width:300,height:300,regions});
  child.stdin.end(); await new Promise(r=>child.once('exit',r)); assert.deepEqual(read()[2],initial[2]);

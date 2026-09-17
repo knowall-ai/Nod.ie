@@ -3,6 +3,8 @@
 import ctypes as C
 import json
 import math
+import os
+import select
 import sys
 
 class Rectangle(C.Structure):
@@ -18,6 +20,10 @@ x.XSync.argtypes = [C.c_void_p, C.c_int]
 x.XCloseDisplay.argtypes = [C.c_void_p]
 shape.XShapeCombineRectangles.argtypes = [C.c_void_p, C.c_ulong, C.c_int, C.c_int, C.c_int, C.POINTER(Rectangle), C.c_int, C.c_int, C.c_int]
 shape.XShapeCombineMask.argtypes = [C.c_void_p, C.c_ulong, C.c_int, C.c_int, C.c_int, C.c_ulong, C.c_int]
+x.XFree.argtypes = [C.c_void_p]
+x.XQueryTree.argtypes = [C.c_void_p, C.c_ulong, C.POINTER(C.c_ulong), C.POINTER(C.c_ulong), C.POINTER(C.POINTER(C.c_ulong)), C.POINTER(C.c_uint)]
+shape.XShapeGetRectangles.argtypes = [C.c_void_p, C.c_ulong, C.c_int, C.POINTER(C.c_int), C.POINTER(C.c_int)]
+shape.XShapeGetRectangles.restype = C.POINTER(Rectangle)
 shape.XShapeQueryExtension.argtypes = [C.c_void_p, C.POINTER(C.c_int), C.POINTER(C.c_int)]
 
 def rectangles(data, width, height):
@@ -65,25 +71,94 @@ def main():
     if not shape.XShapeQueryExtension(display, C.byref(event), C.byref(error)):
         x.XCloseDisplay(display)
         raise RuntimeError('XShape unavailable')
+    def geometry(target):
+        root, px, py = C.c_ulong(), C.c_int(), C.c_int()
+        width, height, border, depth = C.c_uint(), C.c_uint(), C.c_uint(), C.c_uint()
+        if not x.XGetGeometry(display, target, C.byref(root), C.byref(px), C.byref(py), C.byref(width), C.byref(height), C.byref(border), C.byref(depth)):
+            raise RuntimeError('Window unavailable')
+        return px.value, py.value, width.value, height.value
+
+    def tree(target):
+        root, parent = C.c_ulong(), C.c_ulong()
+        children, count = C.POINTER(C.c_ulong)(), C.c_uint()
+        if not x.XQueryTree(display, target, C.byref(root), C.byref(parent), C.byref(children), C.byref(count)):
+            raise RuntimeError('Window unavailable')
+        values = [children[i] for i in range(count.value)]
+        x.XFree(children)
+        return root.value, parent.value, values
+
+    def frames():
+        # KWin adds two frameless wrapper windows. Never shape the root or a
+        # shared/differently sized ancestor, only this client's exclusive frame.
+        result, current = [window], window
+        size = geometry(window)[2:]
+        for _ in range(4):
+            root, parent, _children = tree(current)
+            if parent == root or not parent:
+                break
+            if tree(parent)[2] != [current] or geometry(parent)[2:] != size or geometry(current)[:2] != (0, 0):
+                break
+            result.append(parent)
+            current = parent
+        return result
+
+    def signature(target):
+        count, ordering = C.c_int(), C.c_int()
+        values = shape.XShapeGetRectangles(display, target, 2, C.byref(count), C.byref(ordering))
+        result = tuple((values[i].x, values[i].y, values[i].width, values[i].height) for i in range(count.value))
+        x.XFree(values)
+        return result
+
+    applied = {}
+    shaped = set()
+    data, pending = None, b''
+    cached = None
+    buffer = None
+    count = 0
     try:
-        for line in iter(lambda: sys.stdin.readline(8193), ''):
-            if len(line) > 8192:
-                raise ValueError('Input region message too large')
-            data = json.loads(line)
-            if data is None:
-                shape.XShapeCombineMask(display, window, 2, 0, 0, 0, 0)
-            else:
-                root, px, py = C.c_ulong(), C.c_int(), C.c_int()
-                width, height, border, depth = C.c_uint(), C.c_uint(), C.c_uint(), C.c_uint()
-                if not x.XGetGeometry(display, window, C.byref(root), C.byref(px), C.byref(py), C.byref(width), C.byref(height), C.byref(border), C.byref(depth)):
+        while True:
+            readable, _, _ = select.select([sys.stdin], [], [], 0.05)
+            changed = False
+            if readable:
+                chunk = os.read(sys.stdin.fileno(), 8193)
+                if not chunk:
                     break
-                values = rectangles(data, width.value, height.value)
-                buffer = (Rectangle * len(values))(*values)
-                shape.XShapeCombineRectangles(display, window, 2, 0, 0, buffer, len(values), 0, 3)
+                pending += chunk
+                while b'\n' in pending:
+                    line, pending = pending.split(b'\n', 1)
+                    if len(line) > 8192:
+                        raise ValueError('Input region message too large')
+                    data = json.loads(line)
+                    changed = True
+                    applied.clear()
+                if len(pending) > 8192:
+                    raise ValueError('Input region message too large')
+            if data is None:
+                for target in frames() if shaped else []:
+                    if target in shaped:
+                        shape.XShapeCombineMask(display, target, 2, 0, 0, 0, 0)
+                shaped.clear()
+            else:
+                width, height = geometry(window)[2:]
+                if cached != (id(data), width, height):
+                    values = rectangles(data, width, height)
+                    count = len(values)
+                    buffer = (Rectangle * count)(*values)
+                    cached = (id(data), width, height)
+                for target in frames():
+                    current = signature(target)
+                    if applied.get(target) != (width, height, current):
+                        shape.XShapeCombineRectangles(display, target, 2, 0, 0, buffer, count, 0, 3)
+                        x.XSync(display, 0)
+                        applied[target] = (width, height, signature(target))
+                        shaped.add(target)
             x.XSync(display, 0)
-            print('ready', flush=True)
+            if changed:
+                print('ready', flush=True)
     finally:
-        shape.XShapeCombineMask(display, window, 2, 0, 0, 0, 0)
+        for target in frames():
+            if target in shaped:
+                shape.XShapeCombineMask(display, target, 2, 0, 0, 0, 0)
         x.XSync(display, 0)
         x.XCloseDisplay(display)
 
