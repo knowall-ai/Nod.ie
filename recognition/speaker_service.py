@@ -3,7 +3,10 @@ import hashlib
 import json
 import os
 import subprocess
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import time
+import threading
+from deadline_worker import DeadlineEngine, BusyError
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 import numpy as np
@@ -64,6 +67,7 @@ class SpeakerEngine:
 
 class Handler(BaseHTTPRequestHandler):
     engine = None
+    requests = threading.BoundedSemaphore(2)
     def setup(self):
         super().setup()
         self.connection.settimeout(10)
@@ -89,20 +93,44 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         if not self.local_request() or self.path != '/diarize':
             return self.reply(403, {'error': 'Forbidden'})
+        if not self.requests.acquire(blocking=False):
+            return self.reply(503, {'error': 'Speaker analysis busy'})
+        deadline = time.monotonic() + 1.6
         try:
             size = int(self.headers.get('Content-Length', '0'))
             if not 100 <= size <= 5 * 1024 * 1024:
                 return self.reply(413, {'error': 'Invalid audio size'})
-            body = self.rfile.read(size)
+            chunks = []
+            received = 0
+            while received < size:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise TimeoutError('Request deadline exceeded')
+                self.connection.settimeout(remaining)
+                chunk = self.rfile.read1(min(65536, size - received))
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                received += len(chunk)
+            body = b''.join(chunks)
             if len(body) != size:
                 return self.reply(400, {'error': 'Incomplete recording'})
-            self.reply(200, self.engine.analyse(body))
+            self.reply(200, self.engine.analyse(body, deadline))
+        except TimeoutError:
+            self.reply(504, {'error': 'Speaker analysis timed out'})
+        except BusyError:
+            self.reply(503, {'error': 'Speaker analysis busy'})
         except (ValueError, subprocess.SubprocessError):
             self.reply(422, {'error': 'Speaker analysis could not use this recording'})
         except Exception:
             self.reply(503, {'error': 'Speaker analysis unavailable'})
+        finally:
+            self.requests.release()
 
 if __name__ == '__main__':
-    Handler.engine = SpeakerEngine()
+    Handler.engine = DeadlineEngine(SpeakerEngine)
     print('Nod.ie CPU speaker service ready on 127.0.0.1:8106', flush=True)
-    HTTPServer(('127.0.0.1', 8106), Handler).serve_forever()
+    try:
+        ThreadingHTTPServer(('127.0.0.1', 8106), Handler).serve_forever()
+    finally:
+        Handler.engine.close()
