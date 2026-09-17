@@ -21,7 +21,7 @@ MuseTalk 1.5 is optional in local mode. When LOCAL_LIP_SYNC_URL is configured an
 
 === Circumference controls and desktop movement
 
-Locally bundled Lucide SVGs provide microphone, camera and speaker controls around the avatar. Icons retain their upstream licence and pinned provenance under `assets/icons/lucide`. Speaker mute applies to both local media playback and realtime Web Audio gain, with an interface-local browser-storage preference. Camera capture remains unavailable. Brief state indicators sit below the face so they do not obscure lip movement. Idle shows no status bubble, and controls do not display "click to" instructions.
+Locally bundled Lucide SVGs provide microphone, camera and speaker controls in a compact arc around the avatar’s bottom-left quadrant. Icons retain their upstream licence and pinned provenance under `assets/icons/lucide`. Speaker mute applies to both local media playback and realtime Web Audio gain, with an interface-local browser-storage preference. Camera capture remains unavailable. Brief state indicators sit below the face so they do not obscure lip movement. Idle shows no status bubble, and controls do not display "click to" instructions.
 
 Dragging uses native desktop-independent coordinates and the full display bounds, including the system panel. Partial off-screen placement is allowed while keeping a recoverable 100-DIP portion visible. Linux uses a dock-type overlay to avoid KWin moving and progressively resizing a normal window away from the panel. Saved positions use the same bounds. On the inspected 300% scaled desktop, the 300-DIP window occupies 900 physical pixels.
 

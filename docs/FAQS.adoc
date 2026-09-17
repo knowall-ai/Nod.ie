@@ -22,7 +22,7 @@ Yes, when the optional local MuseTalk service is configured. It generates her mo
 
 === What do the buttons around Nod.ie do?
 
-The lower-left Lucide microphone button starts recording; clicking again sends the recording. Clicking it while she is replying interrupts that reply and starts a new recording. The lower-right speaker button mutes or unmutes actual audio output, including neural speech video; the choice survives a reload on that interface. These controls are separate from the avatar drag surface.
+The three Lucide controls form a compact arc around the bottom-left edge: microphone, camera, then speaker. The microphone button starts recording; clicking again sends the recording. Clicking it while she is replying interrupts that reply and starts a new recording. The speaker button mutes or unmutes actual audio output, including neural speech video; the choice survives a reload on that interface. These controls are separate from the avatar drag surface.
 
 The bottom camera button is visibly off and unavailable because camera capture and vision are not yet connected. Clicking it explains this without requesting camera permission. Llama 3.1 8B is text-only. Family face recognition and speaker identification require separate integration and opt-in enrolment; neither is active in this release.
 
