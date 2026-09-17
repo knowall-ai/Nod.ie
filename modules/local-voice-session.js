@@ -7,17 +7,17 @@ class LocalVoiceSession {
         this.renderer.state.isMuted = true;
         this.renderer.state.isConnected = health.ready;
         this.renderer.updateWSStatus(health.ready ? 'Local voice ready' : 'Unavailable');
-        this.status(health.ready ? 'Click to speak' : `Unavailable: ${health.unavailable.join(', ')}`);
+        this.status(health.ready ? '' : `Unavailable: ${health.unavailable.join(', ')}`);
     }
     status(text) {
         this.renderer.setStatus(this.state === 'processing' ? 'thinking' : 'idle');
         const status = document.getElementById('status-text');
-        if (status) { status.textContent = text; status.style.display = 'block'; }
+        if (status) { status.textContent = text; status.style.display = text ? 'block' : 'none'; }
     }
     async toggle() {
         if (this.state === 'starting') { this.cancel(); return; }
         if (this.state === 'recording') { this.finish(); return; }
-        if (this.state === 'processing' || this.state === 'speaking') { this.cancel(); this.status('Cancelled. Click to speak'); return; }
+        if (this.state === 'processing' || this.state === 'speaking') { this.cancel(); this.status(''); return; }
         const generation = ++this.generation;
         this.state = 'starting'; this.status('Opening microphone…');
         try {
@@ -32,11 +32,11 @@ class LocalVoiceSession {
             if (!mimeType) throw new Error('No supported recording format');
             const chunks = []; let bytes = 0;
             this.recorder = new MediaRecorder(stream, { mimeType });
-            this.recorder.ondataavailable = event => { bytes += event.data.size; if (bytes > 5 * 1024 * 1024) { this.cancel(); this.status('Recording too long. Click to try again.'); } else if (event.data.size) chunks.push(event.data); };
-            this.recorder.onerror = () => { this.cancel(); this.status('Recording failed. Click to try again.'); };
+            this.recorder.ondataavailable = event => { bytes += event.data.size; if (bytes > 5 * 1024 * 1024) { this.cancel(); this.status('Recording limit reached'); } else if (event.data.size) chunks.push(event.data); };
+            this.recorder.onerror = () => { this.cancel(); this.status('Recording failed'); };
             this.recorder.onstop = () => { if (generation !== this.generation) return; this.releaseMicrophone(); this.send(chunks, generation); };
             this.recorder.start(250);
-            this.state = 'recording'; this.renderer.state.isMuted = false; this.status('Listening — click to send');
+            this.state = 'recording'; this.renderer.state.isMuted = false; this.status('Listening');
             this.limitTimer = setTimeout(() => this.finish(), 30000);
         } catch (error) { this.cancel(); this.status(error.message); }
     }
@@ -48,7 +48,7 @@ class LocalVoiceSession {
         this.renderer.state.analyser = null; this.renderer.state.isMuted = true;
     }
     async send(chunks, generation) {
-        this.state = 'processing'; this.status('Thinking… click to cancel');
+        this.state = 'processing'; this.status('Thinking…');
         try {
             const audio = new Uint8Array(await new Blob(chunks).arrayBuffer());
             if (generation !== this.generation) return;
@@ -62,7 +62,7 @@ class LocalVoiceSession {
         this.state = 'speaking';
         const manager = this.renderer.state.avatarManager;
         const video = useVideo && result.video && manager?.isEnabled() ? document.getElementById('avatar-video') : null;
-        this.status(result.lipSync === 'unavailable' ? 'Speaking (lip sync unavailable)' : result.memory === 'unavailable' ? 'Speaking (memory unavailable)' : 'Speaking — click to stop');
+        this.status(result.lipSync === 'unavailable' ? 'Speaking (lip sync unavailable)' : result.memory === 'unavailable' ? 'Speaking (memory unavailable)' : 'Speaking');
         this.audioUrl = URL.createObjectURL(new Blob([video ? result.video : result.audio], { type: video ? 'video/mp4' : 'audio/wav' }));
         const player = video || new Audio();
         this.player = player;
@@ -70,16 +70,16 @@ class LocalVoiceSession {
         manager?.setSpeechVideo(Boolean(video));
         player.onended = () => {
             if (this.player !== player) return;
-            this.releasePlayback(); this.state = 'idle'; this.status('Click to speak');
+            this.releasePlayback(); this.state = 'idle'; this.status('');
         };
         const failed = () => {
             if (this.player !== player || generation !== this.generation) return;
             this.releasePlayback();
             if (video) {
                 this.playReply({ ...result, lipSync: 'unavailable' }, generation, false).catch(() => {
-                    if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.status('Playback failed. Click to try again.'); }
+                    if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.status('Playback failed'); }
                 });
-            } else { this.state = 'idle'; this.status('Playback failed. Click to try again.'); }
+            } else { this.state = 'idle'; this.status('Playback failed'); }
         };
         player.onerror = failed;
         try { await player.play(); } catch { failed(); }

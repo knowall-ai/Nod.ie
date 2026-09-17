@@ -21,12 +21,22 @@ MuseTalk 1.5 is optional in local mode. When LOCAL_LIP_SYNC_URL is configured an
 
 === Circumference controls and desktop movement
 
-Locally bundled Lucide SVGs provide microphone, camera and speaker controls around the avatar. Icons retain their upstream licence and pinned provenance under `assets/icons/lucide`. Speaker mute applies to both local media playback and realtime Web Audio gain, with an interface-local browser-storage preference. Camera capture remains unavailable. Status hints sit below the face so they do not obscure lip movement.
+Locally bundled Lucide SVGs provide microphone, camera and speaker controls around the avatar. Icons retain their upstream licence and pinned provenance under `assets/icons/lucide`. Speaker mute applies to both local media playback and realtime Web Audio gain, with an interface-local browser-storage preference. Camera capture remains unavailable. Brief state indicators sit below the face so they do not obscure lip movement. Idle shows no status bubble, and controls do not display "click to" instructions.
 
-Dragging uses native desktop-independent coordinates, clamps the entire window to the destination display's usable area, and avoids repeated requests for an unchanged position. On the inspected 300% scaled desktop, the 300-DIP window occupies 900 physical pixels. The window stops at the usable screen edge instead of requesting off-screen positions.
+Dragging uses native desktop-independent coordinates and the full display bounds, including the system panel. Partial off-screen placement is allowed while keeping a recoverable 100-DIP portion visible. Linux uses a dock-type overlay to avoid KWin moving and progressively resizing a normal window away from the panel. Saved positions use the same bounds. On the inspected 300% scaled desktop, the 300-DIP window occupies 900 physical pixels.
 
 === Conversational wording principle
 
 Nod.ie chooses her own spoken wording. Application code supplies verified facts and structured events, controls timing and permissions, and selects the delivery channel. The language model composes the utterance within factual, length and tone constraints. Do not use fixed spoken scripts or a rotating list of prewritten announcements. If generation fails, show a factual status instead of silently substituting canned speech. Stable control labels, accessibility text and technical errors remain deterministic.
 
 The requested future unfamiliar-person notification is spoken, but its wording must be generated from an event describing an unmatched face and the recognition uncertainty. Recognition must never establish permission to perform privileged actions. Camera capture, family enrolment and speaker identification are not implemented by the current controls change.
+
+=== Assistant implementation context
+
+Each local voice turn includes a brief implementation description with allowlisted configured model and voice names, avatar and MuseTalk behavior, bounded history, Reverie/Neo4j recall, and actual capability limits. Configuration is not evidence of successful playback or service health. No endpoints, credential paths or secrets are included. Ambiguous transcriptions should prompt clarification in Nod.ie’s own words, not an invented correction. Live Bitcoin and Lightning answers require a verified read-only snapshot.
+
+=== Read-only node questions
+
+The model can select the `get_node_status` tool for live node questions and follow-ups. One tool round per turn runs bounded five-second queries to the local `bitcoind` and `lnd` Docker containers. Fixed argument lists call Bitcoin `getnetworkinfo` and LND `getinfo`/`listchannels`; LND explicitly uses its `readonly.macaroon`, never the admin credential. The tool takes no arguments; unsupported names, arguments and extra tool rounds are rejected. No model-generated command is executed. Missing containers, CLI access or credentials produce an unavailable state. Other node deployments require an adapter.
+
+The per-turn snapshot includes time, versions, open/active/pending counts, aggregate balances and reserves, and at most 20 anonymised channel summaries. It excludes peer keys, channel identifiers, addresses, credentials and raw errors. Inactive balances are distinguished from active totals; local/remote balances are not guaranteed routable liquidity. Queries are best-effort, not atomic, and are not background polling.

@@ -80,7 +80,7 @@ function start() {
             const point = screen.getCursorScreenPoint();
             if (!dragMoved && Math.hypot(point.x - origin.x, point.y - origin.y) < 5) return;
             dragMoved = true;
-            const next = dragPosition(origin, point, start, size, screen.getDisplayNearestPoint(point).workArea);
+            const next = dragPosition(origin, point, start, size, screen.getDisplayNearestPoint(point).bounds);
             // Repeated identical moves can fight the window manager's edge constraints.
             if (next[0] === last[0] && next[1] === last[1]) return;
             last = next;
@@ -106,11 +106,13 @@ function start() {
             callback(contents === mainWindow?.webContents && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href && permission === 'media' && !details.mediaTypes?.includes('video'));
         });
         session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === mainWindow?.webContents && permission === 'media' && details.mediaType !== 'video');
-        mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true }, 'index.html');
+        mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true, ...(process.platform === 'linux' ? { type: 'dock' } : {}) }, 'index.html');
+        // A Linux dock overlay avoids KWin's normal-window panel avoidance and resize drift.
+        mainWindow.setAlwaysOnTop(true, 'screen-saver');
         const position = store.get('position');
         const { screen } = require('electron');
         const area = screen.getPrimaryDisplay().workArea;
-        if (position && Number.isFinite(position.x) && Number.isFinite(position.y) && screen.getAllDisplays().some(d => position.x >= d.workArea.x && position.y >= d.workArea.y && position.x + 300 <= d.workArea.x + d.workArea.width && position.y + 300 <= d.workArea.y + d.workArea.height)) mainWindow.setPosition(position.x, position.y);
+        if (position && Number.isFinite(position.x) && Number.isFinite(position.y) && screen.getAllDisplays().some(d => { const p = dragPosition({ x: 0, y: 0 }, { x: 0, y: 0 }, [position.x, position.y], [300, 300], d.bounds); return p[0] === position.x && p[1] === position.y; })) mainWindow.setPosition(position.x, position.y);
         else mainWindow.setPosition(area.x + area.width - 350, area.y + area.height - 350);
         mainWindow.on('moved', () => { const [x, y] = mainWindow.getPosition(); store.set('position', { x, y }); });
         mainWindow.on('close', event => { if (!app.isQuitting) { event.preventDefault(); mainWindow.hide(); } });

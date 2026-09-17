@@ -25,3 +25,13 @@ Yes, when the optional local MuseTalk service is configured. It generates her mo
 The lower-left Lucide microphone button starts recording; clicking again sends the recording. Clicking it while she is replying interrupts that reply and starts a new recording. The lower-right speaker button mutes or unmutes actual audio output, including neural speech video; the choice survives a reload on that interface. These controls are separate from the avatar drag surface.
 
 The bottom camera button is visibly off and unavailable because camera capture and vision are not yet connected. Clicking it explains this without requesting camera permission. Llama 3.1 8B is text-only. Family face recognition and speaker identification require separate integration and opt-in enrolment; neither is active in this release.
+
+The avatar is quiet while idle. Routine status indicators use brief state names such as "Listening", "Thinking" and "Speaking", without persistent "click to" instructions.
+
+=== Can Nod.ie look up our Bitcoin version, channel count and liquidity herself?
+
+Yes, in local voice mode she can choose the read-only `get_node_status` tool, including for follow-up questions. It queries the local `bitcoind` and `lnd` containers using fixed CLI commands and the LND read-only macaroon. She receives fresh versions, channel counts, balances and reserves and chooses her own wording. Missing access is reported as unavailable; she cannot make payments or run arbitrary shell commands. Balances are not a guarantee that a payment can be routed.
+
+=== Can I put her over the system clock?
+
+Yes. The desktop overlay can cross the panel boundary and partially leave the screen, with a recoverable portion kept visible. Linux uses a dock-type window to prevent the panel avoidance that previously caused upward drift.

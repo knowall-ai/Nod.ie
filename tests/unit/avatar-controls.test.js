@@ -6,9 +6,10 @@ function setup() {
         const element = { dataset: {}, attrs: {}, handlers: {}, image: {}, addEventListener(type, fn) { this.handlers[type] = fn; }, setAttribute(k, v) { this.attrs[k] = v; }, querySelector() { return this.image; } };
         return ['control-' + name, element];
     }));
-    const saved = new Map([['nodie.speaker-muted', 'true']]);
+    const saved = new Map();
     const window = { location: { pathname: '/' } };
     vm.runInNewContext(fs.readFileSync('modules/avatar-controls.js', 'utf8'), { window, document: { getElementById: id => elements[id] }, localStorage: { getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value) } });
+    saved.set(window.AvatarControls.speakerStorageKey, 'true');
     return { elements, saved, Controls: window.AvatarControls };
 }
 test('speaker preference affects current local and realtime playback and stays independent of microphone', () => {
@@ -17,7 +18,7 @@ test('speaker preference affects current local and realtime playback and stays i
     new Controls(renderer);
     assert.equal(renderer.state.speakerMuted, true);
     elements['control-speaker'].handlers.click();
-    assert.equal(renderer.localVoice.player.muted, false); assert.equal(gainMuted, false); assert.equal(saved.get('nodie.speaker-muted'), 'false'); assert.equal(toggles, 0);
+    assert.equal(renderer.localVoice.player.muted, false); assert.equal(gainMuted, false); assert.equal(saved.get(Controls.speakerStorageKey), 'false'); assert.equal(toggles, 0);
     elements['control-speaker'].handlers.click(); assert.equal(renderer.localVoice.player.muted, true); assert.equal(gainMuted, true);
 });
 test('microphone interrupts a reply before recording and camera only explains its unavailable state', () => {
