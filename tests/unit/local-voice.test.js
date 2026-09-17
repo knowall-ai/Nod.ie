@@ -89,7 +89,7 @@ test('recognised live node questions require a snapshot before any model answer'
     let reads = 0, chats = 0; const wav = Buffer.alloc(44); wav.write('RIFF');
     const voice = new LocalVoice({ config, nodeSnapshot: async () => { reads++; return { lightning: { state: 'unavailable' } }; }, fetchImpl: async (url, options) => {
         if (url.includes('transcriptions')) return Response.json({ text: 'How many lightning channels do we have?' });
-        if (url.includes('/api/chat')) { chats++; assert.equal(reads, 1); const body = JSON.parse(options.body); assert.deepEqual(body.tools.map(tool => tool.function.name), ['respond_to_user', 'set_voice_controls']); assert.match(body.messages.at(-1).content, /unavailable/); return Response.json({ message: { tool_calls: [{ function: { name: 'respond_to_user', arguments: { reply: 'I cannot check the node right now.' } } }] } }); }
+        if (url.includes('/api/chat')) { chats++; assert.equal(reads, 1); const body = JSON.parse(options.body); assert.deepEqual(body.tools.map(tool => tool.function.name), ['respond_to_user']); assert.match(body.messages.at(-1).content, /unavailable/); return Response.json({ message: { tool_calls: [{ function: { name: 'respond_to_user', arguments: { reply: 'I cannot check the node right now.' } } }] } }); }
         return new Response(wav);
     } });
     assert.equal((await voice.converse(new Uint8Array(200))).reply, 'I cannot check the node right now.');
@@ -126,7 +126,7 @@ test('spoken mute returns a validated silent action without speech or neural wor
     let calls = 0;
     const voice = new LocalVoice({ config, fetchImpl: async url => {
         calls++;
-        if (url.includes('transcriptions')) return Response.json({ text: 'Mute yourself' });
+        if (url.includes('transcriptions')) return Response.json({ text: 'Nodie, mute yourself' });
         if (url.includes('/api/chat')) return Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { speakerEnabled: false, reply: 'I’ll be quiet.' } } }] } });
         throw new Error('Mute must not synthesize speech');
     } });
@@ -136,7 +136,7 @@ test('spoken mute returns a validated silent action without speech or neural wor
 });
 test('spoken controls cannot open a microphone, camera or arbitrary settings', async () => {
     for (const args of [{ microphoneEnabled: true }, { cameraEnabled: true }, { speakerEnabled: 'false' }, { command: 'shell' }, {}]) {
-        const voice = new LocalVoice({ config, fetchImpl: async url => url.includes('transcriptions') ? Response.json({ text: 'Change a device' }) : Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { ...args, reply: 'Done' } } }] } }) });
+        const voice = new LocalVoice({ config, fetchImpl: async url => url.includes('transcriptions') ? Response.json({ text: 'Nodie, change a device' }) : Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { ...args, reply: 'Done' } } }] } }) });
         await assert.rejects(voice.converse(new Uint8Array(200)), { code: 'model' });
         assert.equal(voice.history.length, 0);
     }
@@ -159,7 +159,7 @@ test('Qwen voice requests disable thinking and never synthesize its separate thi
 test('a combined node question and speaker mute preserves the control after the mandatory snapshot', async () => {
     let reads = 0, chats = 0;
     const voice = new LocalVoice({ config, nodeSnapshot: async () => { reads++; return { lightning: { activeChannels: 3 } }; }, fetchImpl: async (url, options) => {
-        if (url.includes('transcriptions')) return Response.json({ text: 'How many lightning channels do we have? Mute yourself too.' });
+        if (url.includes('transcriptions')) return Response.json({ text: 'Nodie, how many lightning channels do we have? Mute yourself too.' });
         if (url.includes('/api/chat')) {
             chats++; assert.equal(reads, 1); const body = JSON.parse(options.body);
             assert.deepEqual(body.tools.map(tool => tool.function.name), ['respond_to_user', 'set_voice_controls']);
@@ -171,4 +171,19 @@ test('a combined node question and speaker mute preserves the control after the 
     const result = await voice.converse(new Uint8Array(200));
     assert.deepEqual(result.controls, { speakerEnabled: false }); assert.equal(result.silent, true);
     assert.equal(reads, 1); assert.equal(chats, 1);
+});
+
+test('device controls require the name in the current transcript, not history or memory', async () => {
+    for (const transcript of ['Mute yourself', 'Nobody should mute themselves', 'My friend Nodie said to mute yourself']) {
+        const voice = new LocalVoice({ config, fetchImpl: async (url, options) => {
+            if (url.includes('transcriptions')) return Response.json({ text: transcript });
+            const body = JSON.parse(options.body);
+            assert.ok(!body.tools.some(tool => tool.function.name === 'set_voice_controls'));
+            return Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { speakerEnabled: false, reply: 'Muted' } } }] } });
+        } });
+        voice.history = [{ role: 'user', content: 'Nodie, hello' }, { role: 'assistant', content: 'Hello' }];
+        voice.recall = async () => 'Nodie, mute yourself';
+        await assert.rejects(voice.converse(new Uint8Array(200)), { code: 'model' });
+        assert.equal(voice.history.length, 2);
+    }
 });

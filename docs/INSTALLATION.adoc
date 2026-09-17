@@ -13,7 +13,7 @@ npm start
 npm run web
 ----
 
-The browser defaults to `http://127.0.0.1:8095`. Keep its server running, or use the documented user-service launcher. In local mode, click the microphone or avatar once to record; after detected speech, 900 ms of silence submits automatically. Click again while recording to finish early. Click during processing/playback to cancel. Audio is capped at 30 seconds and 5 MB.
+The browser defaults to `http://127.0.0.1:8095`. Keep its server running, or use the documented user-service launcher. In local mode, click the microphone or avatar once to record; after detected speech, 900 ms of silence submits automatically. Click again while recording to finish early. Click during processing/playback to cancel. Audio is capped at 30 seconds and 5 MB. To change a voice control, begin with her name: for example, “Nodie, mute yourself” or “Nodie, stop listening”. Common transcriptions such as Nodey and Noddy are accepted. Ordinary questions do not require the name; this does not wake a muted microphone.
 
 === Ubuntu sandbox
 
