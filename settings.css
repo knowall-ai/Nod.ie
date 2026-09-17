@@ -1,0 +1,81 @@
+:root {
+    color-scheme: light;
+    --ink: #291507;
+    --muted: #725944;
+    --amber: #f5a623;
+    --yellow: #ffd45c;
+    --paper: #fff8ec;
+    --card: #fffdf7;
+    --line: #ead7b9;
+}
+* { box-sizing: border-box; }
+body {
+    margin: 0; padding: 24px 24px 0;
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--paper); color: var(--ink);
+}
+.settings-header {
+    padding: 24px 28px; margin-bottom: 24px; border-radius: 20px;
+    background: var(--ink); color: var(--paper); border-top: 4px solid var(--amber);
+}
+.brand-name { display: inline-flex; align-items: center; gap: 7px; color: var(--amber); font-weight: 750; font-size: 19px; letter-spacing: -.5px; }
+.brand-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--yellow); }
+h1 { font-size: 30px; line-height: 1.2; margin: 10px 0 6px; letter-spacing: -.8px; }
+.settings-header p { margin: 0; color: #e1c39b; }
+.section {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 22px; margin-bottom: 16px; box-shadow: 0 3px 12px #29150706;
+}
+h2 { font-size: 17px; margin: 0 0 18px; letter-spacing: -.25px; }
+h3 { margin: 0 0 5px; font-size: 14px; font-weight: 650; }
+p { color: var(--muted); }
+.setting-row { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.setting-row:last-child { margin: 0; padding: 0; border: 0; }
+.setting-label { flex: 1; min-width: 0; }
+.setting-label p { margin: 0; font-size: 12px; }
+input, select, button { font: inherit; }
+input[type='text'], input[type='url'], select {
+    width: 240px; max-width: 100%; padding: 10px 12px; border: 1px solid #bda17b;
+    border-radius: 9px; background: #fff; color: var(--ink);
+}
+input::placeholder { color: #836950; opacity: 1; }
+select { cursor: pointer; }
+input[type='checkbox'] {
+    flex: 0 0 44px; appearance: none; width: 44px; height: 24px; margin: 0;
+    border: 1px solid #a58c70; border-radius: 24px; background: #dbcab2; cursor: pointer; position: relative;
+}
+input[type='checkbox']::before { content: ''; position: absolute; width: 18px; height: 18px; top: 2px; left: 2px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #29150733; }
+input[type='checkbox']:checked { background: var(--amber); border-color: #bb7610; }
+input[type='checkbox']:checked::before { transform: translateX(20px); background: var(--ink); }
+button {
+    border: 1px solid #c3a47b; border-radius: 9px; padding: 9px 15px;
+    background: #f5e6ce; color: var(--ink); cursor: pointer; font-weight: 600;
+}
+button:hover { background: #f5d99f; }
+.btn-primary, #apply { background: var(--amber); border-color: #b97710; color: var(--ink); }
+.btn-primary:hover, #apply:hover { background: var(--yellow); }
+.btn-secondary { background: var(--card); }
+:where(button, input, select):focus-visible { outline: 3px solid #bd7100; outline-offset: 3px; }
+:where(button, input, select):disabled { opacity: .55; cursor: not-allowed; }
+.button-row {
+    position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: flex-end;
+    gap: 10px; padding: 16px 0; margin-top: 20px; border-top: 1px solid var(--line); background: var(--paper);
+}
+.button-row button { min-width: 90px; }
+.avatar-status { padding: 5px 10px; border-radius: 20px; font-size: 12px; background: #f9e6bd; color: #67410b; }
+.status-available { background: #e5efd8; color: #35521e; }
+.status-unavailable { background: #fbe0d7; color: #872e20; }
+.status-static { background: #f9e6bd; color: #67410b; }
+#updates > div { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 16px; }
+#updates button { margin: 4px 8px 0 0; }
+#updates p, pre { overflow-wrap: anywhere; }
+pre { max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 12px; background: #f6ecd9; padding: 14px; border-radius: 10px; }
+pre:empty { display: none; }
+#settings-error { color: #9f291b; font-weight: 600; }
+#settings-error:empty { display: none; }
+@media (max-width: 580px) {
+    body { padding: 16px 16px 0; }
+    .section { padding: 18px; }
+    .setting-row { flex-wrap: wrap; gap: 12px; }
+    input[type='text'], input[type='url'], select { width: 100%; }
+}

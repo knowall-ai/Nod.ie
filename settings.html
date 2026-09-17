@@ -4,180 +4,21 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https:; object-src 'none'; base-uri 'none'">
     <title>Nod.ie Settings</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background: #f5f5f5;
-            color: #333;
-        }
-        
-        h1 {
-            font-size: 24px;
-            margin-bottom: 20px;
-            color: #667eea;
-        }
-        
-        .section {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        .section h2 {
-            font-size: 18px;
-            margin-top: 0;
-            margin-bottom: 15px;
-            color: #444;
-        }
-        
-        .setting-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-            padding-bottom: 15px;
-            border-bottom: 1px solid #eee;
-        }
-        
-        .setting-row:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-        
-        .setting-label {
-            flex: 1;
-        }
-        
-        .setting-label h3 {
-            margin: 0 0 5px 0;
-            font-size: 14px;
-            font-weight: 600;
-        }
-        
-        .setting-label p {
-            margin: 0;
-            font-size: 12px;
-            color: #666;
-        }
-        
-        input[type="checkbox"] {
-            width: 40px;
-            height: 20px;
-            -webkit-appearance: none;
-            appearance: none;
-            background: #ccc;
-            border-radius: 20px;
-            outline: none;
-            cursor: pointer;
-            transition: background 0.3s;
-            position: relative;
-        }
-        
-        input[type="checkbox"]:checked {
-            background: #667eea;
-        }
-        
-        input[type="checkbox"]::before {
-            content: '';
-            position: absolute;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: white;
-            top: 2px;
-            left: 2px;
-            transition: transform 0.3s;
-        }
-        
-        input[type="checkbox"]:checked::before {
-            transform: translateX(20px);
-        }
-        
-        input[type="text"], input[type="url"], select {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            min-width: 200px;
-            background: white;
-        }
-        
-        select {
-            cursor: pointer;
-        }
-        
-        .button-row {
-            display: flex;
-            justify-content: flex-end;
-            gap: 10px;
-            margin-top: 20px;
-        }
-        
-        button {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #5a67d8;
-        }
-        
-        .btn-secondary {
-            background: #e2e8f0;
-            color: #4a5568;
-        }
-        
-        .btn-secondary:hover {
-            background: #cbd5e0;
-        }
-        
-        .avatar-status {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
-            margin-left: 10px;
-        }
-        
-        .status-available {
-            background: #c6f6d5;
-            color: #276749;
-        }
-        
-        .status-unavailable {
-            background: #fed7d7;
-            color: #742a2a;
-        }
-        
-        .status-static {
-            background: #fefcbf;
-            color: #744210;
-        }
-    </style>
+    <link rel="stylesheet" href="settings.css">
 </head>
 <body>
-    <h1>Nod.ie Settings</h1>
+    <header class="settings-header">
+        <span class="brand-name">Nod.ie<span class="brand-dot" aria-hidden="true"></span></span>
+        <h1>Settings</h1>
+        <p>Your voice companion, your preferences.</p>
+    </header>
     
     <div class="section">
         <h2>Avatar Settings</h2>
         
         <div class="setting-row">
             <div class="setting-label">
-                <h3>Show Avatar</h3>
+                <h3><label for="avatarEnabled">Show Avatar</label></h3>
                 <p>Display animated avatar with lip-sync when speaking</p>
             </div>
             <input type="checkbox" id="avatarEnabled">
@@ -185,7 +26,7 @@
         
         <div class="setting-row">
             <div class="setting-label">
-                <h3>Avatar Quality</h3>
+                <h3><label for="avatarQuality">Avatar Quality</label></h3>
                 <p>Higher quality requires more resources</p>
             </div>
             <select id="avatarQuality">
@@ -210,7 +51,7 @@
         
         <div class="setting-row">
             <div class="setting-label">
-                <h3>Assistant Name</h3>
+                <h3><label for="assistantName">Assistant Name</label></h3>
                 <p>Name of your assistant</p>
             </div>
             <input type="text" id="assistantName" placeholder="Nod.ie">
@@ -218,7 +59,7 @@
         
         <div class="setting-row">
             <div class="setting-label">
-                <h3>Unmute Backend URL</h3>
+                <h3><label for="unmuteBackendUrl">Unmute Backend URL</label></h3>
                 <p>WebSocket URL for Unmute</p>
             </div>
             <input type="url" id="unmuteBackendUrl" placeholder="ws://localhost:3000">
@@ -226,7 +67,7 @@
         
         <div class="setting-row">
             <div class="setting-label">
-                <h3>Voice Model</h3>
+                <h3><label for="voiceModel">Voice Model</label></h3>
                 <p>Voice to use for speech synthesis</p>
             </div>
             <input type="text" id="voiceModel" placeholder="Configured Unmute voice path">
@@ -238,7 +79,7 @@
         
         <div class="setting-row">
             <div class="setting-label">
-                <h3>Global Hotkey</h3>
+                <h3><label for="globalHotkey">Global Hotkey</label></h3>
                 <p>Keyboard shortcut to toggle Nod.ie</p>
             </div>
             <input type="text" id="globalHotkey" placeholder="CommandOrControl+Shift+Space">
