@@ -14,7 +14,7 @@ text_bos_token = 1
 [modules.tts_py.py]
 log_folder = "/tmp/unmute_logs"
 # Load the demo voice set rather than every donated voice.
-voice_folder = "hf-snapshot://kyutai/tts-voices/unmute-prod-website/*.safetensors"
+voice_folder = "/tmp/nodie-voices"
 default_voice = "unmute-prod-website/default_voice.wav"
 cfg_coef = 2.0
 cfg_is_no_text = true

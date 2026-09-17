@@ -334,7 +334,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
 
                     // Return avatar to idle after a short delay to allow final audio to play
                     setTimeout(() => {
-                        if (this.state.avatarManager) {
+                        if (this.state.avatarManager && !this.isAssistantSpeaking) {
                             this.state.avatarManager.setSpeechVideo(false);
                         }
                     }, 500);
