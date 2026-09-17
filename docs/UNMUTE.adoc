@@ -1,0 +1,81 @@
+= Unmute streaming voice
+
+Unmute streams speech recognition, Qwen text generation and speech synthesis while keeping input audio flowing during replies.
+The desktop handles `input_audio_buffer.speech_started` and `unmute.interrupted_by_vad` by clearing buffered output and avatar audio.
+It retains the Opus decoder because subsequent audio pages belong to the same stream.
+Stopping speech does not disable the microphone; its button remains the listening control.
+
+== Existing installation repair
+
+The `unmute-service` override targets the existing KnowAll Unmute installation and ai-stack Compose services.
+It does not install a complete upstream stack.
+The installed Rust speech server is pinned to 0.6.3; this repair is not a claim that all upstream dependencies are current.
+The startup wrapper avoids shell tracing and the retired `huggingface-cli login` command.
+It uses inherited `HF_TOKEN` or `HUGGING_FACE_HUB_TOKEN` without printing either.
+If an earlier startup logged a token, revoke and replace that token separately.
+
+Prepare the local backend adapter:
+
+[source,shell]
+----
+python3 unmute-service/prepare-backend.py /path/to/unmute
+curl --fail http://127.0.0.1:11434/api/create \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"nodie-qwen3.5:9b","from":"qwen3.5:9b","parameters":{"num_ctx":8192},"stream":false}'
+----
+
+The alias shares Qwen's weights and fixes its context size for the OpenAI-compatible API.
+The backend adapter requests no reasoning output.
+The renderer's model setting alone cannot select the model in this installed Unmute version: its backend environment selects it.
+
+Set `NODIE_UNMUTE_DIR` to the absolute `unmute-service` directory, then apply `compose.override.yml` after the existing ai-stack Compose file.
+Use `up -d --no-deps unmute-stt unmute-tts unmute-backend` to limit the deployment to voice services.
+Keep the override in subsequent deployments; recreating services without it removes the repair.
+Speech batching is one concurrent user, with an 8 GiB host-memory limit per speech container.
+
+== Testing and rollback
+
+First test with synthetic audio and `allow_recording: false`, leaving the physical microphone untouched.
+Measure end-of-utterance to first audio separately from interruption detection and playback cancellation.
+Cold model loading is not representative of warm conversational latency.
+
+On the 24 GiB RTX 3090, initial tests required pausing MuseTalk to fit Unmute and Qwen alongside other services.
+Do not start both stacks blindly: inspect free GPU memory before restoring lip sync.
+Only switch `VOICE_MODE` from `local` to `unmute` after a successful end-to-end check; restart desktop and web services after changing it.
+To roll back, restore `VOICE_MODE=local`, stop the two Unmute speech containers, then restart MuseTalk and the desktop/web services.
+
+The legacy Unmute tool configuration is separate from the current local voice adapter.
+Speaker recognition PR #29, bounded local history, Reverie integration and voice-controlled device actions must be verified separately; changing the speech transport does not automatically connect them.
+
+The voice trial mounts only the read-only Reverie bridge instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands remain disconnected; Reverie recall is supplied through the bounded read-only bridge. Microphone capture starts off after restart.
+
+Warm synthetic testing on this host produced first audio approximately 1–1.5 seconds after the utterance and interruption detection in 0.5–0.6 seconds. These are server packet timings, not a physical speaker/microphone latency guarantee.
+
+== Empty tool configuration regression
+
+The legacy fork incorrectly waited for a nonempty tool list before passing audio to speech recognition.
+The generated handler override tracks completion of tool initialization, including an empty configuration or initialization failure, independently of tool count.
+A browser-level synthetic test must exercise the real Opus recorder with an empty MCP configuration; a direct backend test with legacy tools does not cover this failure.
+Routine microphone state is shown by its button, without repeated status popups. Errors use one notification location with a fallback.
+
+== Reverie recall
+
+The streaming backend can use a narrow stdio bridge exposing only `reverie.search_memories`.
+It launches the installed Reverie package with allowlisted Neo4j connection variables, restricts searches to five records and one relationship hop, and bounds the returned reference data.
+Memory writes and arbitrary database queries are not exposed.
+Qwen chooses search terms from the conversation; use names or relevant keywords rather than assuming a failed literal search proves nothing is stored.
+
+Run `node unmute-service/prepare-memory.cjs /absolute/path/to/Nod.ie/config.js neo4j` to reuse the existing configured connection.
+The optional final hostname is used only to replace a loopback Neo4j address inside Docker.
+The generated MCP file is private, ignored by Git and mode 0600. Never print or publish it.
+Set `NODIE_NODE_MODULES` to the absolute path of the installed Nod.ie `node_modules` directory before applying the Compose override.
+The dependency directory and read-only bridge are mounted read-only; no additional credentials are embedded in committed Compose files.
+
+Memory results are supplied as untrusted reference data instead of system instructions, without the legacy 100-character truncation.
+The generated handler and MCP-manager overrides omit variable data from diagnostic log messages, including transcripts, tool arguments, memory contents and subprocess environments.
+A memory outage must be reported as unavailable, not as proof that no memories exist.
+Recognition and persistent conversation-history integration remain separate work.
+
+The TTS startup stages only the nine demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
+
+Decoded audio carries a response generation. Interruptions invalidate queued output, and the decoder clears partial PCM buffers at generation changes while retaining its continuous Opus state. Late frames cannot restart animation, microphone ducking or playback in a later response.
