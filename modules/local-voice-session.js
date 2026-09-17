@@ -66,7 +66,7 @@ class LocalVoiceSession {
         this.audioUrl = URL.createObjectURL(new Blob([video ? result.video : result.audio], { type: video ? 'video/mp4' : 'audio/wav' }));
         const player = video || new Audio();
         this.player = player;
-        player.loop = false; player.muted = false; player.src = this.audioUrl;
+        player.loop = false; player.muted = Boolean(this.renderer.state.speakerMuted); player.src = this.audioUrl;
         manager?.setSpeechVideo(Boolean(video));
         player.onended = () => {
             if (this.player !== player) return;
@@ -98,6 +98,7 @@ class LocalVoiceSession {
         if (this.recorder?.state === 'recording') this.recorder.stop();
         this.recorder = null; this.releaseMicrophone(); this.releasePlayback();
         window.nodie.voiceCancel().catch(() => {}); this.state = 'idle';
+        this.renderer.controls?.update();
     }
 }
 window.LocalVoiceSession = LocalVoiceSession;

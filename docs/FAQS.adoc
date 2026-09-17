@@ -19,3 +19,9 @@ The Electron interface is a transparent, frameless, always-on-top desktop window
 === Does she have neural lip sync?
 
 Yes, when the optional local MuseTalk service is configured. It generates her mouth movements from each speech reply and plays the video and audio together. Rendering adds a short delay before playback. If the service is unavailable, speech still plays with a visible lip-sync warning.
+
+=== What do the buttons around Nod.ie do?
+
+The lower-left Lucide microphone button starts recording; clicking again sends the recording. Clicking it while she is replying interrupts that reply and starts a new recording. The lower-right speaker button mutes or unmutes actual audio output, including neural speech video; the choice survives a reload on that interface. These controls are separate from the avatar drag surface.
+
+The bottom camera button is visibly off and unavailable because camera capture and vision are not yet connected. Clicking it explains this without requesting camera permission. Llama 3.1 8B is text-only. Family face recognition and speaker identification require separate integration and opt-in enrolment; neither is active in this release.

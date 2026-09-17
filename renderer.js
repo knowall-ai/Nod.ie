@@ -13,6 +13,7 @@ const NodieRenderer = {
     // State
     state: {
         isConnected: false,
+        speakerMuted: false,
         isMuted: false, // Start unmuted to see waveform
         wsHandler: null,
         audioContext: null,
@@ -38,6 +39,7 @@ const NodieRenderer = {
 
     // UI Functions
     setStatus(status) {
+        this.controls?.update();
         const circle = document.getElementById('circle');
         if (!circle) return;
 
@@ -296,6 +298,7 @@ const NodieRenderer = {
                     // Initialize audio playback if needed
                     if (!this.state.audioPlayback && AudioPlayback) {
                         this.state.audioPlayback = new AudioPlayback();
+                        this.state.audioPlayback.setMuted(this.state.speakerMuted);
                         await this.state.audioPlayback.initialize();
                     }
 
@@ -371,6 +374,7 @@ const NodieRenderer = {
             await capture.start();
             if (this.state.audioCapture !== capture || this.state.isMuted) { capture.stop(); return; }
             this.state.analyser = capture.getAnalyser();
+            this.controls?.update();
             this.showNotification('Microphone active', 'success');
         } catch (error) {
             capture.stop();
@@ -383,6 +387,7 @@ const NodieRenderer = {
         this.state.audioCapture = null;
         this.state.analyser = null;
         capture?.stop();
+        this.controls?.update();
     },
     stopPlayback() {
         const playback = this.state.audioPlayback;
@@ -505,6 +510,7 @@ const NodieRenderer = {
         }
         const handle = document.getElementById('drag-handle');
         if (isElectron && handle) window.bindDesktopDrag(handle, window.nodie);
+        this.controls = new window.AvatarControls(this);
         // Set up click handler
         const circle = document.getElementById('circle');
         if (circle) {

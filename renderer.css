@@ -283,3 +283,29 @@ body[data-platform="electron"] #drag-handle:active { cursor: grabbing; }
 .avatar-active.avatar-speaking #avatar-canvas { display: none !important; }
 .avatar-active.avatar-speaking #avatar-video { display: block !important; }
 body[data-platform="electron"] #circle { touch-action: none; user-select: none; }
+
+/* Sibling controls stay separate from the avatar's click-and-drag surface. */
+#avatar-controls { position: absolute; inset: 0; pointer-events: none; z-index: 110; }
+.orbit-control {
+    position: absolute; width: 40px; height: 40px; padding: 9px;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px solid #f5a623; border-radius: 50%; background: #f5a623;
+    box-shadow: 0 2px 7px #0008; cursor: pointer; pointer-events: auto;
+    -webkit-app-region: no-drag; touch-action: manipulation;
+}
+.orbit-control img { width: 20px; height: 20px; pointer-events: none; }
+.orbit-control[data-on="false"] { background: #e1c39b; }
+.orbit-control:hover { background: #ffd45c; }
+.orbit-control:focus-visible { outline: 2px solid #fff1b8; outline-offset: 2px; }
+.orbit-control[aria-disabled="true"] { background: #95816c; border-color: #c5a37a; cursor: not-allowed; }
+.orbit-control:disabled { opacity: .65; cursor: wait; }
+#control-mic { left: 20px; top: 206px; }
+#control-camera { left: 130px; top: 254px; }
+#control-speaker { left: 240px; top: 206px; }
+
+/* Keep interaction hints below the face so they do not cover the moving lips. */
+#status-text {
+    top: auto; bottom: 48px; transform: translateX(-50%);
+    width: max-content; max-width: 170px; padding: 4px 8px;
+    border-radius: 12px; background: #291507cc; font-size: 11px;
+}

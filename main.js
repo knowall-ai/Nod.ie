@@ -9,6 +9,7 @@ const { LocalVoice } = require('./lib/local-voice');
 const { SecurityMonitor } = require('./security/monitor');
 const { Logger } = require('./lib/logger');
 const { Diagnostics } = require('./lib/diagnostics');
+const { dragPosition } = require('./lib/window-drag');
 if (!app.requestSingleInstanceLock()) { app.quit(); } else { start(); }
 function start() {
     const store = new Store();
@@ -68,7 +69,9 @@ function start() {
         if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
         const { screen } = require('electron');
         const origin = screen.getCursorScreenPoint();
-        const [x, y] = mainWindow.getPosition();
+        const start = mainWindow.getPosition();
+        const size = mainWindow.getSize();
+        let last = start;
         // Cursor and window positions are both desktop-independent pixels. Renderer
         // screenX/screenY mix coordinate spaces on scaled X11 desktops.
         dragMoved = false;
@@ -77,7 +80,11 @@ function start() {
             const point = screen.getCursorScreenPoint();
             if (!dragMoved && Math.hypot(point.x - origin.x, point.y - origin.y) < 5) return;
             dragMoved = true;
-            mainWindow.setPosition(Math.round(x + point.x - origin.x), Math.round(y + point.y - origin.y));
+            const next = dragPosition(origin, point, start, size, screen.getDisplayNearestPoint(point).workArea);
+            // Repeated identical moves can fight the window manager's edge constraints.
+            if (next[0] === last[0] && next[1] === last[1]) return;
+            last = next;
+            mainWindow.setPosition(...next);
         };
         dragTimer = setInterval(updateDrag, 16);
         dragDeadline = setTimeout(stopDrag, 30000);
