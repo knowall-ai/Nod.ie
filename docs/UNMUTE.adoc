@@ -75,3 +75,5 @@ Memory results are supplied as untrusted reference data instead of system instru
 The generated handler and MCP-manager overrides omit variable data from diagnostic log messages, including transcripts, tool arguments, memory contents and subprocess environments.
 A memory outage must be reported as unavailable, not as proof that no memories exist.
 Recognition and persistent conversation-history integration remain separate work.
+
+The TTS startup stages only the nine demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
