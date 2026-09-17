@@ -15,8 +15,8 @@ class AvatarControls {
         this.mic?.addEventListener('click', () => {
             if (renderer.state.isLoading) return;
             const voice = renderer.localVoice;
-            if (voice && ['processing', 'speaking'].includes(voice.state)) voice.cancel();
-            renderer.toggleMute();
+            if (voice) voice.toggleListening();
+            else renderer.toggleMute();
             this.update();
         });
         this.speaker?.addEventListener('click', () => this.setSpeakerMuted(!renderer.state.speakerMuted));
@@ -34,20 +34,23 @@ class AvatarControls {
     }
     applyVoiceControls(controls) {
         if (!controls || typeof controls !== 'object' || Array.isArray(controls) || Object.keys(controls).some(key => !['microphoneEnabled', 'speakerEnabled'].includes(key)) || (Object.hasOwn(controls, 'microphoneEnabled') && controls.microphoneEnabled !== false) || (Object.hasOwn(controls, 'speakerEnabled') && typeof controls.speakerEnabled !== 'boolean')) throw new Error('Invalid voice controls');
-        if (controls.microphoneEnabled === false) this.renderer.localVoice?.releaseMicrophone();
+        if (controls.microphoneEnabled === false && this.renderer.localVoice) {
+            this.renderer.localVoice.listeningEnabled = false;
+            this.renderer.localVoice.releaseMicrophone();
+        }
         if (Object.hasOwn(controls, 'speakerEnabled')) this.setSpeakerMuted(!controls.speakerEnabled);
         this.update();
     }
     update() {
         const state = this.renderer.state;
         const local = this.renderer.localVoice;
-        const micOn = local ? local.state === 'recording' && !state.isMuted : Boolean(state.audioCapture && !state.isMuted);
+        const micOn = local ? Boolean(local.listeningEnabled) : Boolean(state.audioCapture && !state.isMuted);
         if (this.mic) {
             this.mic.disabled = state.isLoading;
             this.mic.setAttribute('aria-pressed', String(micOn));
             this.mic.dataset.on = String(micOn);
             this.mic.setAttribute('aria-busy', String(local?.state === 'starting'));
-            this.mic.title = local?.state === 'starting' ? 'Opening microphone' : micOn ? 'Microphone on' : 'Microphone off';
+            this.mic.title = local?.state === 'starting' ? 'Opening microphone' : micOn ? (local && local.state !== 'recording' ? 'Listening enabled; microphone paused during reply' : 'Listening enabled') : 'Microphone off';
             this.mic.querySelector('img').src = this.icon(micOn ? 'mic' : 'mic-off');
         }
         if (this.speaker) {

@@ -53,7 +53,10 @@ function start() {
     handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
     handle('voice-health', () => voice.health());
-    handle('voice-turn', audio => voice.converse(audio));
+    handle('voice-turn', async audio => {
+        try { return await voice.converse(audio); }
+        catch (error) { return { failure: require('./lib/voice-error').publicError(error) }; }
+    });
     handle('clear-history', () => voice.clearHistory(), true);
     handle('voice-cancel', () => voice.cancel());
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));

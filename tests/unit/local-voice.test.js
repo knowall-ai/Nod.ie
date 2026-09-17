@@ -124,7 +124,7 @@ test('stage timings diagnose slow and failed requests without logging conversati
 
 test('spoken mute returns a validated silent action without speech or neural work', async () => {
     let calls = 0;
-    const voice = new LocalVoice({ config, fetchImpl: async url => {
+    const voice = new LocalVoice({ config, controlIntent: async () => true, fetchImpl: async url => {
         calls++;
         if (url.includes('transcriptions')) return Response.json({ text: 'Nodie, mute yourself' });
         if (url.includes('/api/chat')) return Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { speakerEnabled: false, reply: 'I’ll be quiet.' } } }] } });
@@ -158,7 +158,7 @@ test('Qwen voice requests disable thinking and never synthesize its separate thi
 
 test('a combined node question and speaker mute preserves the control after the mandatory snapshot', async () => {
     let reads = 0, chats = 0;
-    const voice = new LocalVoice({ config, nodeSnapshot: async () => { reads++; return { lightning: { activeChannels: 3 } }; }, fetchImpl: async (url, options) => {
+    const voice = new LocalVoice({ config, controlIntent: async () => true, nodeSnapshot: async () => { reads++; return { lightning: { activeChannels: 3 } }; }, fetchImpl: async (url, options) => {
         if (url.includes('transcriptions')) return Response.json({ text: 'Nodie, how many lightning channels do we have? Mute yourself too.' });
         if (url.includes('/api/chat')) {
             chats++; assert.equal(reads, 1); const body = JSON.parse(options.body);
@@ -171,4 +171,35 @@ test('a combined node question and speaker mute preserves the control after the 
     const result = await voice.converse(new Uint8Array(200));
     assert.deepEqual(result.controls, { speakerEnabled: false }); assert.equal(result.silent, true);
     assert.equal(reads, 1); assert.equal(chats, 1);
+});
+
+test('a declined model intent check returns no device action and generates its own clarification', async () => {
+    let chats = 0, checked; const wav = Buffer.alloc(44); wav.write('RIFF');
+    const voice = new LocalVoice({ config, controlIntent: async (text, controls) => { checked = { text, controls }; return false; }, fetchImpl: async (url, options) => {
+        if (url.includes('transcriptions')) return Response.json({ text: 'Mute yourself' });
+        if (url.includes('/api/chat')) {
+            if (++chats === 1) return Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { speakerEnabled: false, reply: 'Muted' } } }] } });
+            assert.match(JSON.parse(options.body).messages.at(-1).content, /No controls changed/);
+            return Response.json({ message: { content: 'Were you asking me to mute my speaker?' } });
+        }
+        return new Response(wav);
+    } });
+    const result = await voice.converse(new Uint8Array(200));
+    assert.deepEqual(checked, { text: 'Mute yourself', controls: { speakerEnabled: false } });
+    assert.equal(result.controls, undefined); assert.equal(result.silent, undefined);
+    assert.equal(result.reply, 'Were you asking me to mute my speaker?');
+});
+test('the semantic intent check has only current utterance and proposed controls and fails closed on malformed output', async () => {
+    let output = { allowed: false };
+    const voice = new LocalVoice({ config, fetchImpl: async (_url, options) => {
+        const body = JSON.parse(options.body);
+        assert.equal(body.messages.length, 2);
+        assert.deepEqual(JSON.parse(body.messages[1].content), { utterance: 'Hey Nodey, stop listening', proposed: { microphoneEnabled: false } });
+        assert.ok(!JSON.stringify(body).includes('old private turn'));
+        return Response.json({ message: { content: JSON.stringify(output) } });
+    } });
+    voice.history = [{ role: 'user', content: 'old private turn' }];
+    assert.equal(await voice.checkControlIntent('Hey Nodey, stop listening', { microphoneEnabled: false }), false);
+    output = { allowed: true }; assert.equal(await voice.checkControlIntent('Hey Nodey, stop listening', { microphoneEnabled: false }), true);
+    output = { allowed: 'true' }; await assert.rejects(voice.checkControlIntent('Hey Nodey, stop listening', { microphoneEnabled: false }), /Invalid device-intent/);
 });

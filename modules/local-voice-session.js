@@ -1,6 +1,6 @@
-/** Push-to-talk local voice session. No microphone or model work while idle. */
+/** Opt-in continuous conversation; capture pauses during replies and stops on cancellation. */
 class LocalVoiceSession {
-    constructor(renderer) { this.renderer = renderer; this.state = 'idle'; this.generation = 0; }
+    constructor(renderer) { this.renderer = renderer; this.state = 'idle'; this.generation = 0; this.listeningEnabled = false; this.emptyTurns = 0; }
     async initialize() {
         const health = await window.nodie.voiceHealth();
         this.renderer.state.isLoading = false;
@@ -18,6 +18,7 @@ class LocalVoiceSession {
         if (this.state === 'starting') { this.cancel(); return; }
         if (this.state === 'recording') { this.finish(); return; }
         if (this.state === 'processing' || this.state === 'speaking') { this.cancel(); this.status(''); return; }
+        this.listeningEnabled = true;
         const generation = ++this.generation;
         this.state = 'starting'; this.status('');
         try {
@@ -41,6 +42,25 @@ class LocalVoiceSession {
             this.limitTimer = setTimeout(() => this.finish(), 30000);
         } catch (error) { this.cancel(); this.status(error.message); }
     }
+    toggleListening() {
+        if (this.listeningEnabled) { this.cancel(); this.status(''); }
+        else { this.emptyTurns = 0; return this.toggle(); }
+    }
+    resumeListening(delay = 250) {
+        clearTimeout(this.resumeTimer);
+        if (!this.listeningEnabled) return;
+        const generation = this.generation;
+        this.resumeTimer = setTimeout(() => {
+            if (this.listeningEnabled && generation === this.generation && this.state === 'idle') this.toggle();
+        }, delay);
+    }
+    resetQuietRecording() {
+        const enabled = this.listeningEnabled;
+        this.cancel();
+        this.listeningEnabled = enabled;
+        this.status('');
+        this.resumeListening();
+    }
     startEndpointDetection(generation) {
         const detector = new window.EndOfSpeech(performance.now());
         const samples = new Float32Array(this.analyser.fftSize);
@@ -51,7 +71,7 @@ class LocalVoiceSession {
             for (const value of samples) energy += value * value;
             const outcome = detector.observe(Math.sqrt(energy / samples.length), performance.now());
             if (outcome === 'finished') this.finish();
-            else if (outcome === 'no-speech') { this.cancel(); this.status('No speech detected. Please try again.'); }
+            else if (outcome === 'no-speech') this.resetQuietRecording();
         }, 50);
     }
     finish() { clearInterval(this.endpointTimer); this.endpointTimer = null; clearTimeout(this.limitTimer); if (this.recorder?.state === 'recording') this.recorder.stop(); }
@@ -69,10 +89,17 @@ class LocalVoiceSession {
             if (generation !== this.generation) return;
             const result = await window.nodie.voiceTurn(audio);
             if (generation !== this.generation) return;
+            this.emptyTurns = 0;
             if (result.controls) this.renderer.controls.applyVoiceControls(result.controls);
-            if (result.silent) { this.state = 'idle'; this.status(''); return; }
+            if (result.silent) { this.state = 'idle'; this.status(''); this.resumeListening(); return; }
             await this.playReply(result, generation);
-        } catch (error) { if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.status(error.message); } }
+        } catch (error) {
+            if (generation === this.generation) {
+                this.releasePlayback(); this.state = 'idle';
+                if (error.code === 'no-speech' && ++this.emptyTurns < 3 && this.listeningEnabled) { this.status(''); this.resumeListening(1000); }
+                else { this.listeningEnabled = false; this.status(error.message); }
+            }
+        }
     }
     async playReply(result, generation, useVideo = true) {
         if (generation !== this.generation) return;
@@ -87,16 +114,16 @@ class LocalVoiceSession {
         manager?.setSpeechVideo(Boolean(video));
         player.onended = () => {
             if (this.player !== player) return;
-            this.releasePlayback(); this.state = 'idle'; this.status('');
+            this.releasePlayback(); this.state = 'idle'; this.status(''); this.resumeListening();
         };
         const failed = () => {
             if (this.player !== player || generation !== this.generation) return;
             this.releasePlayback();
             if (video) {
                 this.playReply({ ...result, lipSync: 'unavailable' }, generation, false).catch(() => {
-                    if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.status('Playback failed'); }
+                    if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.listeningEnabled = false; this.status('Playback failed'); }
                 });
-            } else { this.state = 'idle'; this.status('Playback failed'); }
+            } else { this.state = 'idle'; this.listeningEnabled = false; this.status('Playback failed'); }
         };
         player.onerror = failed;
         try { await player.play(); } catch { failed(); }
@@ -111,6 +138,7 @@ class LocalVoiceSession {
         this.audioUrl = null;
     }
     cancel() {
+        this.listeningEnabled = false; clearTimeout(this.resumeTimer); this.resumeTimer = null;
         ++this.generation; clearTimeout(this.limitTimer);
         if (this.recorder?.state === 'recording') this.recorder.stop();
         this.recorder = null; this.releaseMicrophone(); this.releasePlayback();
