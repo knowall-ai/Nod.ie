@@ -5,6 +5,7 @@
 class AudioPlaybackWeb {
     constructor() {
         this.muted = false;
+        this.interrupted = false;
         this.outputGain = null;
         this.audioContext = null;
         this.audioWorklet = null;
@@ -54,7 +55,7 @@ class AudioPlaybackWeb {
             
             // Handle decoded audio from worker (like official frontend)
             this.decoderWorker.onmessage = (event) => {
-                if (!event.data) return;
+                if (!event.data || this.interrupted) return;
                 
                 const frame = event.data[0];
                 if (frame) {
@@ -124,6 +125,19 @@ class AudioPlaybackWeb {
     }
 
     
+
+    interrupt() {
+        // Keep the Opus decoder alive: subsequent pages belong to the same stream.
+        this.interrupted = true;
+        this.outputWorklet?.port.postMessage({ type: 'reset' });
+        this.hasNotifiedPlaybackStart = false;
+    }
+
+    beginResponse() {
+        if (this.interrupted) this.outputWorklet?.port.postMessage({ type: 'reset' });
+        this.interrupted = false;
+        this.hasNotifiedPlaybackStart = false;
+    }
 
     setMuted(muted) {
         this.muted = Boolean(muted);

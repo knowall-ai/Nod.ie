@@ -1,0 +1,27 @@
+# Apply after the existing ai-stack Compose file. Set NODIE_UNMUTE_DIR to this directory.
+services:
+  unmute-stt:
+    volumes:
+      - ${NODIE_UNMUTE_DIR:?}/start-speech.sh:/app/start_moshi_server_public.sh:ro
+      - ${NODIE_UNMUTE_DIR:?}/stt.toml:/app/configs/stt.toml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+  unmute-tts:
+    volumes:
+      - ${NODIE_UNMUTE_DIR:?}/start-speech.sh:/app/start_moshi_server_public.sh:ro
+      - ${NODIE_UNMUTE_DIR:?}/tts.toml:/app/configs/tts.toml:ro
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+  unmute-backend:
+    environment:
+      KYUTAI_LLM_MODEL: nodie-qwen3.5:9b
+      OLLAMA_NUM_CTX: '8192'
+      USER_SILENCE_TIMEOUT: 'inf'
+    volumes:
+      - ${NODIE_UNMUTE_DIR:?}/mcp-trial.json:/app/.mcp.json:ro
+      - ${NODIE_UNMUTE_DIR:?}/mcp-trial.json:/app/.mcp.local.json:ro
+      - ${NODIE_UNMUTE_DIR:?}/generated/llm_utils.py:/app/unmute/llm/llm_utils.py:ro

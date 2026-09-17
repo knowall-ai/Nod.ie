@@ -1,0 +1,52 @@
+= Unmute streaming voice
+
+Unmute streams speech recognition, Qwen text generation and speech synthesis while keeping input audio flowing during replies.
+The desktop handles `input_audio_buffer.speech_started` and `unmute.interrupted_by_vad` by clearing buffered output and avatar audio.
+It retains the Opus decoder because subsequent audio pages belong to the same stream.
+Stopping speech does not disable the microphone; its button remains the listening control.
+
+== Existing installation repair
+
+The `unmute-service` override targets the existing KnowAll Unmute installation and ai-stack Compose services.
+It does not install a complete upstream stack.
+The installed Rust speech server is pinned to 0.6.3; this repair is not a claim that all upstream dependencies are current.
+The startup wrapper avoids shell tracing and the retired `huggingface-cli login` command.
+It uses inherited `HF_TOKEN` or `HUGGING_FACE_HUB_TOKEN` without printing either.
+If an earlier startup logged a token, revoke and replace that token separately.
+
+Prepare the local backend adapter:
+
+[source,shell]
+----
+python3 unmute-service/prepare-backend.py /path/to/unmute
+curl --fail http://127.0.0.1:11434/api/create \
+  -H 'Content-Type: application/json' \
+  -d '{"model":"nodie-qwen3.5:9b","from":"qwen3.5:9b","parameters":{"num_ctx":8192},"stream":false}'
+----
+
+The alias shares Qwen's weights and fixes its context size for the OpenAI-compatible API.
+The backend adapter requests no reasoning output.
+The renderer's model setting alone cannot select the model in this installed Unmute version: its backend environment selects it.
+
+Set `NODIE_UNMUTE_DIR` to the absolute `unmute-service` directory, then apply `compose.override.yml` after the existing ai-stack Compose file.
+Use `up -d --no-deps unmute-stt unmute-tts unmute-backend` to limit the deployment to voice services.
+Keep the override in subsequent deployments; recreating services without it removes the repair.
+Speech batching is one concurrent user, with an 8 GiB host-memory limit per speech container.
+
+== Testing and rollback
+
+First test with synthetic audio and `allow_recording: false`, leaving the physical microphone untouched.
+Measure end-of-utterance to first audio separately from interruption detection and playback cancellation.
+Cold model loading is not representative of warm conversational latency.
+
+On the 24 GiB RTX 3090, initial tests required pausing MuseTalk to fit Unmute and Qwen alongside other services.
+Do not start both stacks blindly: inspect free GPU memory before restoring lip sync.
+Only switch `VOICE_MODE` from `local` to `unmute` after a successful end-to-end check; restart desktop and web services after changing it.
+To roll back, restore `VOICE_MODE=local`, stop the two Unmute speech containers, then restart MuseTalk and the desktop/web services.
+
+The legacy Unmute tool configuration is separate from the current local voice adapter.
+Speaker recognition PR #29, bounded local history, Reverie integration and voice-controlled device actions must be verified separately; changing the speech transport does not automatically connect them.
+
+The voice trial mounts an empty MCP configuration instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands and memory access are not connected in this trial. Microphone capture starts off after restart.
+
+Warm synthetic testing on this host produced first audio approximately 1–1.5 seconds after the utterance and interruption detection in 0.5–0.6 seconds. These are server packet timings, not a physical speaker/microphone latency guarantee.

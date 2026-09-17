@@ -14,7 +14,7 @@ const NodieRenderer = {
     state: {
         isConnected: false,
         speakerMuted: false,
-        isMuted: false, // Start unmuted to see waveform
+        isMuted: true, // Microphone capture starts only through the listening control
         wsHandler: null,
         audioContext: null,
         mediaStream: null,
@@ -227,6 +227,8 @@ const NodieRenderer = {
                 if (!response.ok) throw new Error('System prompt could not be loaded');
                 return response.text();
             });
+            config.SYSTEM_PROMPT += `
+Streaming voice trial: the speech transport is Unmute with Qwen. The current local date and time is ${new Date().toString()}. Speaker identity, camera vision, saved conversation history, Reverie memory and voice-controlled device actions are not connected to this trial. Do not claim these capabilities; the visible microphone and speaker buttons work. Lip sync is paused to fit GPU memory. Use plain spoken words without emoji.`;
             this.messageQueue = Promise.resolve();
             const handler = new window.WebSocketHandler(config, {
                 onConnect: () => { this.state.isConnected = true; this.updateWSStatus('Connected'); this.checkIfFullyLoaded(); },
@@ -250,24 +252,21 @@ const NodieRenderer = {
                     console.error('Unmute reported a service error');
                 }
 
-                // Handle speech stopped - cancel any ongoing response generation
-                if (data.type === 'input_audio_buffer.speech_stopped') {
-                    console.log('🛑 Speech stopped detected');
-                    // Note: Unmute doesn't support response.cancel
-                    this.state.isGeneratingResponse = false;
-
-                    // Clear any accumulated audio since we're canceling
+                if (['input_audio_buffer.speech_started', 'unmute.interrupted_by_vad'].includes(data.type)) {
+                    this.state.audioPlayback?.interrupt();
+                    this.isAssistantSpeaking = false;
+                    this.responseAudioStarted = false;
+                    clearTimeout(this.pcmFlushTimeout);
+                    this.pcmFlushTimeout = null;
                     this.pcmAudioAccumulator = [];
-                    if (this.pcmFlushTimeout) {
-                        clearTimeout(this.pcmFlushTimeout);
-                        this.pcmFlushTimeout = null;
-                    }
+                    this.state.avatarManager?.setSpeechVideo(false);
+                    return;
                 }
 
                 // Reset audio playback notification flag for new responses
                 if (data.type === 'response.created') {
                     if (this.state.audioPlayback) {
-                        this.state.audioPlayback.hasNotifiedPlaybackStart = false;
+                        this.state.audioPlayback.beginResponse();
                     }
                     this.isAssistantSpeaking = true;
                     this.responseAudioStarted = false;
@@ -334,7 +333,7 @@ const NodieRenderer = {
                     // Return avatar to idle after a short delay to allow final audio to play
                     setTimeout(() => {
                         if (this.state.avatarManager) {
-                            this.state.avatarManager.setIdle();
+                            this.state.avatarManager.setSpeechVideo(false);
                         }
                     }, 500);
                 }
