@@ -79,3 +79,5 @@ Recognition and persistent conversation-history integration remain separate work
 The TTS startup stages only the nine demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
 
 Decoded audio carries a response generation. Interruptions invalidate queued output, and the decoder clears partial PCM buffers at generation changes while retaining its continuous Opus state. Late frames cannot restart animation, microphone ducking or playback in a later response.
+
+The desktop microphone starts enabled and begins capture after the voice connection is ready. A manual mute is respected across connection retries. The browser interface still requires its listening control.

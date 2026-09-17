@@ -2,12 +2,14 @@
 class LocalVoiceSession {
     constructor(renderer) { this.renderer = renderer; this.state = 'idle'; this.generation = 0; this.listeningEnabled = false; this.emptyTurns = 0; }
     async initialize() {
+        const startListening = !this.renderer.state.isMuted;
         const health = await window.nodie.voiceHealth();
         this.renderer.state.isLoading = false;
         this.renderer.state.isMuted = true;
         this.renderer.state.isConnected = health.ready;
         this.renderer.updateWSStatus(health.ready ? 'Local voice ready' : 'Unavailable');
         this.status(health.ready ? '' : `Unavailable: ${health.unavailable.join(', ')}`);
+        if (startListening && health.ready) await this.toggle();
     }
     status(text) {
         this.renderer.setStatus(this.state === 'processing' ? 'thinking' : 'idle');

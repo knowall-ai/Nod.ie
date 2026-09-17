@@ -14,7 +14,7 @@ const NodieRenderer = {
     state: {
         isConnected: false,
         speakerMuted: false,
-        isMuted: true, // Microphone capture starts only through the listening control
+        isMuted: !isElectron, // Desktop starts listening once connected; browser keeps its explicit control.
         wsHandler: null,
         audioContext: null,
         mediaStream: null,

@@ -62,3 +62,14 @@ test('a new response cancels the previous response avatar-reset timer',async()=>
  await r.handleRealtimeMessage({type:'response.created'});await r.handleRealtimeMessage({type:'response.done'});assert.equal(timers.size,1);
  await r.handleRealtimeMessage({type:'response.created'});assert.equal(timers.size,0);assert.equal(resets,0);
 });
+
+test('desktop starts listening when connected, and reconnect respects a user mute',()=>{
+ for(const platform of ['electron','web']) {
+  const context={window:{nodie:{platform},addEventListener(){}},document:{readyState:'loading',addEventListener(){}},console:{log(){},debug(){}},module:{exports:{}}};
+  vm.runInNewContext(fs.readFileSync('renderer.js','utf8'),context);const r=context.module.exports;
+  let starts=0;r.setStatus=()=>{};r.hideLoadingText=()=>{};r.startMicrophone=()=>starts++;
+  assert.equal(r.state.isMuted,platform!=='electron');r.state.isConnected=true;r.checkIfFullyLoaded();
+  assert.equal(starts,platform==='electron'?1:0);
+  r.state.isMuted=true;r.checkIfFullyLoaded();assert.equal(starts,platform==='electron'?1:0);
+ }
+});
