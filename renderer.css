@@ -295,7 +295,7 @@ body[data-platform="electron"] #circle { touch-action: none; user-select: none; 
 #control-mic { left: 17px; top: 183px; }
 #control-camera { left: 42px; top: 218px; }
 #control-speaker { left: 77px; top: 243px; }
-#control-settings { left: 119px; top: 254px; }
+#control-settings { left: 2px; top: 138px; }
 .orbit-control[hidden] { display: none; }
 
 /* Keep interaction hints below the face so they do not cover the moving lips. */
