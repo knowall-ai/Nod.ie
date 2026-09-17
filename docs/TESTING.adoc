@@ -13,3 +13,16 @@ Control acceptance uses synthetic microphone input and a real generated video to
 Spoken-control checks cover silent mute without TTS/MuseTalk work, rejection of microphone-on/camera/arbitrary actions, idempotent speaker state and invalid-action atomicity. Stage diagnostics are checked for successful and failed requests and exclusion of transcript/reply/error text. A hidden-browser waveform check samples the band at five-degree intervals and radii 125–137 pixels: alpha remains 255, the portrait centre stays transparent and microphone-off motion settles.
 
 Continuous conversation checks cover resume after playback, cancellation invalidating queued microphone starts, spoken microphone-off preventing resumption, and generated-audio browser capture across successive turns. Desktop bridge checks preserve the public no-speech message without Electron exception wrappers. The independent model intent gate is tested for current-utterance isolation, rejected proposals and malformed decisions.
+
+=== Native desktop input region
+
+On Linux/X11 with Python 3, libX11 and libXext installed, run:
+
+[source,bash]
+----
+node_modules/.bin/electron tests/desktop-input-region.cjs
+----
+
+This creates an invisible isolated Electron window, waits for its first paint, and queries its native XShape regions. It verifies corner pass-through, avatar/button input, unchanged visual bounds, recovery after movement and repeated external input-mask resets, and restoration when the helper stops. It does not move the pointer, click, open a microphone or access the camera. The development machine's native 900-pixel window at 300% scale passed this check; the running overlay's native region was also inspected. Unit tests additionally cover viewport mapping, geometry validation and drag retention for the polling fallback.
+
+The X11 overlay test checks every eligible exclusive ancestor frame as well as the client window. It verifies corner pass-through, avatar/control capture, empty masks, movement, repeated external resets and cleanup. Native helper shutdown is bounded by a 500 ms kill backstop and a 750 ms absolute wait.
