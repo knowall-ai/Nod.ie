@@ -13,6 +13,7 @@ async function load() {
     } else el('avatarStatus').textContent = config.MUSETALK_WS ? 'Realtime avatar configured' : 'Static portrait';
     render(await api.getSecurityStatus());
     await loadDiagnostics();
+    await loadSpeakers();
 }
 function render(status) {
     el('scan-status').textContent = `Status: ${status.state}. Last scan: ${status.checkedAt || 'not yet checked'}. ${status.error || ''}`;
@@ -56,3 +57,19 @@ el('save').onclick = async () => {
 };
 api.onSecurityStatus(render);
 load().catch(error);
+
+async function loadSpeakers() {
+    const status = await api.speakerStatus();
+    el('speaker-enabled').checked = status.enabled;
+    el('speaker-status').textContent = status.enabled ? 'Enabled. Requires the local speaker service; conversations still work if it is unavailable.' : 'Disabled';
+    el('speaker-profiles').replaceChildren();
+    for (const profile of status.profiles) {
+        const row = document.createElement('div');
+        const name = document.createElement('input'); name.value = profile.name || ''; name.placeholder = 'Unfamiliar speaker'; name.maxLength = 80; name.setAttribute('aria-label', 'Speaker name');
+        const rename = document.createElement('button'); rename.textContent = 'Save name'; rename.onclick = () => api.speakerEdit(profile.id, name.value).then(loadSpeakers).catch(error);
+        const forget = document.createElement('button'); forget.textContent = 'Forget'; forget.onclick = () => api.speakerEdit(profile.id, null).then(loadSpeakers).catch(error);
+        row.append(name, rename, forget); el('speaker-profiles').append(row);
+    }
+}
+el('speaker-enabled').onchange = () => api.speakerEnabled(el('speaker-enabled').checked).then(loadSpeakers).catch(error);
+el('speaker-forget').onclick = () => api.speakerForget().then(loadSpeakers).catch(error);

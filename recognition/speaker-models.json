@@ -1,0 +1,12 @@
+{
+  "files": {
+    "segmentation.onnx": "b9d683988380daa45cade934279c456003a43c48a5b5d6f213b3b3d134b25027",
+    "embedding.onnx": "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b"
+  },
+  "segmentationArchive": {
+    "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-reverb-diarization-v1.tar.bz2",
+    "sha256": "615761e980be1688da0ef81618c056134d63aa55ea0a5f1494c47393b9398eab",
+    "member": "sherpa-onnx-reverb-diarization-v1/model.int8.onnx"
+  },
+  "embeddingUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx"
+}

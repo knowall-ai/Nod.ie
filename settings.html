@@ -97,6 +97,12 @@
         <pre id="diagnostics-status" style="white-space: pre-wrap"></pre>
     </div>
     <div class="section">
+        <h2>Voice recognition</h2>
+        <p>Optional home experiment. Learns recurring voices locally; Nod.ie can ask an unfamiliar speaker their name. Matching can be wrong, especially with noise or overlapping voices.</p>
+        <label><input type="checkbox" id="speaker-enabled"> Recognise speakers during conversations</label>
+        <p id="speaker-status" role="status"></p>
+        <div id="speaker-profiles"></div>
+        <button id="speaker-forget">Forget voice profiles and disable recognition</button>
         <h2>Conversation history</h2>
         <p>The latest six local voice turns are saved privately on this computer and shared between desktop and browser. Clearing them does not delete Reverie memories.</p>
         <button id="clear-history">Clear saved conversation history</button>

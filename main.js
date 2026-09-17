@@ -16,7 +16,8 @@ function start() {
     const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
-    const voice = new LocalVoice({ logger, historyStore, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
+    const speakerRecognition = new (require('./lib/speaker-recognition').SpeakerRecognition)();
+    const voice = new LocalVoice({ logger, historyStore, speakerRecognition, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
     let mainWindow, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
     const stopDrag = () => { updateDrag?.(); clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; updateDrag = null; return dragMoved; };
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
@@ -57,6 +58,10 @@ function start() {
         try { return await voice.converse(audio); }
         catch (error) { return { failure: require('./lib/voice-error').publicError(error) }; }
     });
+    handle('speaker-status', () => speakerRecognition.store.status(), true);
+    handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
+    handle('speaker-edit', (id, name) => speakerRecognition.store.edit(id, name), true);
+    handle('speaker-forget', () => speakerRecognition.store.forget(), true);
     handle('clear-history', () => voice.clearHistory(), true);
     handle('voice-cancel', () => voice.cancel());
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
