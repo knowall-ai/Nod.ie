@@ -54,3 +54,19 @@ test('video catches up with audio after asynchronous decoder startup',async()=>{
     assert.ok(h.video.playbackRate<1 && h.video.playbackRate>=.9);
     h.queue.cancel();
 });
+
+test('the final audio restores idle even when its video never arrives',async()=>{
+    const pending=[];const held=[];
+    const h=harness(()=>new Promise(resolve=>pending.push(resolve)));
+    h.video.style={};
+    h.queue.renderer.state.avatarManager.idle={prepareSpeech(){},holdSpeech(_video,continuing){held.push(continuing)}};
+    h.queue.push(new Float32Array(30720),48000);h.queue.push(new Float32Array(30720),48000);
+    pending[0](new Uint8Array(16));await tick();
+    h.queue.context.currentTime=h.sources[1].at;h.sources[0].onended();
+    assert.equal(held.at(-1),true);
+    h.queue.context.currentTime=3;h.sources[1].onended();
+    assert.equal(held.at(-1),false);
+    assert.equal(h.queue.activeJob,null);
+    pending[1](new Uint8Array(16));await tick();assert.equal(h.queue.activeJob,null);
+    h.queue.cancel();
+});

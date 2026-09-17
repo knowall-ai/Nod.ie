@@ -67,7 +67,9 @@ class StreamingLipSync {
         source.onended=()=>{
             job.ended=true;this.sources.delete(source);source.disconnect();
             if(generation!==this.generation) return;
-            if(this.activeJob===job) this.release();
+            // The last audio may have no video (expired render or decoder failure).
+            if(!this.sources.size) this.release(false);
+            else if(this.activeJob===job) this.release();
             this.ready=this.ready.filter(item=>!item.ended);this.playNext();this.renderNext();
         };
         source.start(job.at);
