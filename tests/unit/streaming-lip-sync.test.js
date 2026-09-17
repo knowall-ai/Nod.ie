@@ -10,12 +10,12 @@ function harness(render){
     return {queue:new context.module.exports.StreamingLipSync(renderer),video,players,sources,errors,urls,cancels:()=>cancels};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
-test('streaming neural audio waits only for its segment and preserves segment order',async()=>{
+test('streaming PCM is scheduled before video resolves and preserves segment order',async()=>{
     const pending=[];const h=harness(audio=>new Promise(resolve=>pending.push({audio,resolve})));
     h.queue.push(new Float32Array(30720),48000);h.queue.push(new Float32Array(30720),48000);
-    assert.equal(pending.length,1);assert.equal(h.video.started,undefined);
+    assert.equal(pending.length,1);assert.equal(h.video.started,undefined);assert.equal(h.sources.length,2);
     const wav=Buffer.from(pending[0].audio);assert.equal(wav.toString('ascii',0,4),'RIFF');assert.equal(wav.readUInt32LE(40),61440);
-    pending[0].resolve(new Uint8Array(16));await new Promise(r=>setTimeout(r,130));assert.equal(h.video.started,true);assert.equal(pending.length,2);
+    pending[0].resolve(new Uint8Array(16));await new Promise(r=>setTimeout(r,780));assert.equal(h.video.started,true);assert.equal(pending.length,2);
     pending[1].resolve(new Uint8Array(16));await tick();assert.equal(h.urls.length,1);
     assert.equal(h.sources[1].at,h.sources[0].at+.64);h.queue.context.currentTime=h.sources[1].at;h.sources[0].onended();await tick();assert.equal(h.urls.length,2);h.queue.cancel();
 });
@@ -28,4 +28,17 @@ test('neural failure plays the same speech as audio and mute updates the active 
     const h=harness(async()=>{throw new Error('GPU unavailable')});h.queue.push(new Float32Array(30720),48000);await tick();
     assert.equal(h.errors.length,1);assert.equal(h.sources.length,1);assert.equal(h.urls.length,0);
     h.queue.setMuted(true);assert.equal(h.queue.gain.gain.value,0);h.queue.cancel();assert.equal(h.sources[0].stopped,true);
+});
+
+test('slow rendering cannot delay later PCM and expired videos are discarded',async()=>{
+    let finish;const h=harness(()=>new Promise(resolve=>finish=resolve));
+    h.queue.push(new Float32Array(30720),48000);h.queue.push(new Float32Array(30720),48000);
+    assert.equal(h.sources.length,2);assert.equal(h.sources[1].at,h.sources[0].at+.64);
+    h.queue.context.currentTime=3;h.sources[0].onended();h.sources[1].onended();
+    finish(new Uint8Array(16));await tick();assert.equal(h.urls.length,0);assert.equal(h.sources.length,2);h.queue.cancel();
+});
+test('server rejects segments cancelled while their upload was in progress',async()=>{
+    const {StreamingLipSync}=require('../../lib/streaming-lip-sync');const server=new StreamingLipSync({url:'http://127.0.0.1:1'});
+    const generation=server.generation;server.cancel();
+    await assert.rejects(server.render(new Uint8Array(44),generation),/cancelled/);
 });
