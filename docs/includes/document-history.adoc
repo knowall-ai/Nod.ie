@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|3cd5d5a |2026-09-17 |fix: bound overlay cleanup and clear validated input regions
 |bbe93a5 |2026-09-17 |fix: compare native input masks with intended geometry after resets
 |7618f66 |2026-09-17 |fix: preserve input regions through KWin frames and native moves
 |573f790 |2026-09-17 |test: verify native overlay input shape on scaled X11 desktops
@@ -9,6 +10,5 @@
 |92fc1d2 |2026-09-17 |fix: pass transparent overlay corners through to desktop
 |86f212f |2026-09-17 |Keep conversations enabled and independently verify spoken control intent
 |6a414f3 |2026-09-17 |Let the model infer direct address and device-control intent
-|4a19edc |2026-09-17 |Require direct name address for spoken device controls
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===
