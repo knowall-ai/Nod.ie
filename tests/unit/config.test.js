@@ -11,3 +11,12 @@ test('configuration rejects missing realtime URLs and embedded credentials', () 
     assert.throws(() => validate({ UNMUTE_BACKEND_URL: 'ws://user:password@localhost' }));
     assert.doesNotThrow(() => validate({ VOICE_MODE: 'local' }));
 });
+
+test('settings IPC accepts only plain objects with approved keys', () => {
+    const { validateSettingsPatch } = require('../../lib/config-schema');
+    for (const value of [null, [], new Date(), new Map(), new Uint8Array(), 'name', 1, Object.create({ AVATAR_ENABLED: true }), { toString: 'override' }, { UNKNOWN: true }]) {
+        assert.throws(() => validateSettingsPatch(value), /Unsupported settings/);
+    }
+    assert.doesNotThrow(() => validateSettingsPatch({ AVATAR_ENABLED: false, ASSISTANT_NAME: 'Nod.ie' }));
+    assert.throws(() => validateSettingsPatch({ AVATAR_ENABLED: 'false' }), /Invalid avatar setting/);
+});

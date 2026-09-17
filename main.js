@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
 const Store = require('electron-store');
 const env = require('./config');
-const { normalize, validate, aliases } = require('./lib/config-schema');
+const { normalize, validate, validateSettingsPatch, aliases } = require('./lib/config-schema');
 const { LocalVoice } = require('./lib/local-voice');
 const { SecurityMonitor } = require('./security/monitor');
 const { Logger } = require('./lib/logger');
@@ -60,8 +60,7 @@ function start() {
     handle('save-settings', settings => {
         let stage = 'validation';
         try {
-            if (!settings || typeof settings !== 'object' || Object.keys(settings).some(key => !['ASSISTANT_NAME', 'UNMUTE_BACKEND_URL', 'VOICE_MODEL', 'LLM_MODEL', 'GLOBAL_HOTKEY', 'AVATAR_ENABLED'].includes(key))) throw new Error('Unsupported settings');
-            if ('AVATAR_ENABLED' in settings && typeof settings.AVATAR_ENABLED !== 'boolean') throw new Error('Invalid avatar setting');
+            validateSettingsPatch(settings);
             const next = validate({ ...config(), ...settings });
             stage = 'storage';
             store.set(Object.fromEntries(Object.keys(settings).map(key => [aliases[key], next[key]])));
