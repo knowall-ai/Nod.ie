@@ -39,3 +39,8 @@ Yes. The desktop overlay can cross the panel boundary and partially leave the sc
 === Why can’t I change Avatar Quality?
 
 Quality is managed by the rendering service; the desktop does not offer quality presets. Show Avatar controls portrait visibility and disables neural rendering when hidden. The settings status distinguishes a hidden avatar, static portrait and configured local neural lip sync; configured does not guarantee a successful render.
+
+
+=== Why did she say “smiling face” at the end of a reply?
+
+The model had appended an emoji, which speech synthesis could read as its Unicode name. The spoken-reply prompt now requests words rather than visual decorations. The local voice adapter also removes emoji grapheme sequences before speech synthesis and saved conversation history, preserving ordinary numbers, punctuation and currency symbols. An emoji-only reply is rejected rather than synthesized.
