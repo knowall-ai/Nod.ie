@@ -1,0 +1,37 @@
+services:
+  musetalk:
+    build: 
+      context: .
+      dockerfile: Dockerfile.musetalk
+    container_name: musetalk-clean
+    ports:
+      - "8765:8765"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODEL_PATH=/app/models
+      - FACE_SIZE=256
+      - LOG_LEVEL=INFO
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./models:/app/models
+      - ../assets/avatars:/app/avatars
+    restart: unless-stopped
+    networks:
+      - ai-stack
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  ai-stack:
+    external: true

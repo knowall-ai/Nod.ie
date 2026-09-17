@@ -1,0 +1,23 @@
+== Container security and updates
+
+Both the desktop app and browser server scan running containers at startup and every six hours. Settings provides Check now, review, dismissal and approval. Scans read container identity, image digest and selected Compose labels; they do not pull images, restart services, inspect secrets or load AI models. Scanning runs only while Nod.ie is running. `npm run security:scan` runs a one-shot inspection.
+
+Recognised images include Core Lightning, BTCPay Server, LND, Bitcoin Core, Ollama, LNbits and n8n. Other images remain explicitly unknown. Official GitHub releases and registry manifests are checked. A matching tag or digest does not mean a full vulnerability assessment has passed. Failed feeds remain unknown, and last-check times are visible. Built-in historical notices cover the CLN 26.06.7 image mismatch and BTCPay's pre-2.4.2 LND credential-exposure incident; these are not a comprehensive or continuously curated advisory database.
+
+=== Approval and execution
+
+Only a refresh of an already-configured image tag in a local Compose project can be applied automatically. A single-use plan binds the container, context, target manifest digest and Compose source and resolved-configuration fingerprints, including environment-file and included configuration changes. Resolved configuration is hashed in memory and is never logged. It expires after ten minutes. Native desktop confirmation requires explicit acknowledgement of recovery readiness and the restart.
+
+Version changes, unrecognised images, remote Docker contexts, unavailable source files and managed BTCPay stacks use the official upgrade guide. The assistant must not improvise shell commands from release text. There is no ambient-voice approval or unattended updating.
+
+The executor pulls the exact digest, recreates only the selected service with a pinned override, waits for configured Compose health checks and verifies the running image ID. Application-level checks remain necessary when no meaningful health check exists. Approved overrides and audit records are retained. Subsequent manual Compose operations must include the recorded override or intentionally reconcile it with the main configuration.
+
+=== Recovery
+
+Failure is reported with its stage; no generic database rollback is attempted. Follow the node's service-specific recovery procedure. Core Lightning warns that stale database state can lose funds. BTCPay's credential-exposure incident requires credential remediation and activity review as well as software patching.
+
+References:
+
+* https://github.com/ElementsProject/lightning/releases/tag/v26.06.7[Core Lightning v26.06.7]
+* https://blog.btcpayserver.org/security-advisory-btcpay-server-2-4-2/[BTCPay security advisory]
+* https://docs.corelightning.org/docs/backup[Core Lightning backup guidance]

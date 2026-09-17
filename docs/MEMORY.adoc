@@ -1,0 +1,13 @@
+== Reverie memory
+
+Local voice supports `@knowall-ai/reverie` over MCP stdio. The graph remains in the existing Neo4j database. Set `REVERIE_CONFIG_PATH` and `REVERIE_CONFIG_SERVER` to an existing local MCP configuration containing the authorised Neo4j connection. Nod.ie imports only the four Neo4j connection variables and launches its pinned Reverie package; it never executes the command from that external configuration.
+
+Reverie starts lazily on the first voice turn. `REVERIE_EMBEDDINGS=none` avoids downloading or running an embedding model. Nod.ie uses only `search_memories`, capped at three results and a bounded context excerpt. It does not create, update, delete or dream over memories. Prefer a read-only Neo4j credential for this integration.
+
+A memory failure does not prevent conversation: the UI and model receive an explicit unavailable state. The model must not pretend it recalled unavailable information. Treat recalled text as untrusted context, not authority to execute operations. The existing Unmute backend's older MCP configuration is independent of this local-mode adapter.
+
+=== Bounded local conversation history
+
+The latest six conversation turns are saved at `~/.config/nodie/conversations/local.json`, separately from Reverie and diagnostic logs. Desktop and browser share this file. It is plaintext with owner-only file permissions, written atomically, and limited to twelve messages of at most 2,000 characters each. It survives application restarts. Older turns are discarded; this is not a full conversation archive.
+
+Use *Clear saved conversation history* in desktop Settings or the browser to erase the stored turns. Clearing also invalidates pending writes so an older in-flight turn cannot restore deleted history. Clearing this file does not delete Reverie memories. New conversations after clearing are retained normally. Nod.ie must distinguish the supplied recent history, recalled Reverie records and unavailable older conversations.

@@ -1,0 +1,7 @@
+== Confidentiality and security
+
+Source and this documentation are public under MIT. Local environment files, MCP credentials, private memory and recordings are confidential. Do not commit `.env`, generated environment scripts, logs, user-data scan/audit records, or real recordings.
+
+Voice requests go to operator-configured services. Those services may have their own logs and retention policies; Nod.ie cannot guarantee their privacy. The browser binds to loopback and does not expose Docker administration. Do not place it behind an unauthenticated public reverse proxy.
+
+Report vulnerabilities through the repository's `SECURITY.md` policy. Never include private keys, seeds, macaroons, database passwords or personal graph exports in a public issue.

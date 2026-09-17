@@ -1,385 +1,118 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain } = require('electron');
-const path = require('path');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, dialog, Notification, session, shell } = require('electron');
+const path = require('node:path');
+const fs = require('node:fs');
+const { pathToFileURL } = require('node:url');
 const Store = require('electron-store');
-require('dotenv').config();
-
-// Ensure single instance
-const gotTheLock = app.requestSingleInstanceLock();
-
-if (!gotTheLock) {
-  // Another instance is already running
-  console.log('Another instance of Nod.ie is already running');
-  app.quit();
-  return;
-}
-
-// Configuration store
-const store = new Store({
-  defaults: {
-    assistantName: process.env.ASSISTANT_NAME,
-    n8nWebhookUrl: process.env.N8N_WEBHOOK_URL,
-    unmuteFrontendUrl: process.env.UNMUTE_FRONTEND_URL,
-    unmuteBackendUrl: process.env.UNMUTE_BACKEND_URL,
-    voice: process.env.VOICE_MODEL || 'unmute-prod-website/ex04_narration_longform_00001.wav',
-    ollamaUrl: process.env.OLLAMA_URL || 'http://localhost:11434',
-    globalHotkey: process.env.GLOBAL_HOTKEY,
-    position: { x: null, y: null }
-  }
-});
-
-let mainWindow;
-let settingsWindow;
-let tray;
-
-function createWindow() {
-  // Create a small circular window
-  mainWindow = new BrowserWindow({
-    width: 120,
-    height: 120,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    resizable: false,
-    skipTaskbar: true,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      autoplayPolicy: 'no-user-gesture-required'
+const env = require('./config');
+const { normalize, validate, aliases } = require('./lib/config-schema');
+const { LocalVoice } = require('./lib/local-voice');
+const { SecurityMonitor } = require('./security/monitor');
+const { Logger } = require('./lib/logger');
+const { Diagnostics } = require('./lib/diagnostics');
+if (!app.requestSingleInstanceLock()) { app.quit(); } else { start(); }
+function start() {
+    const store = new Store();
+    const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
+    const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
+    const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
+    const voice = new LocalVoice({ logger, historyStore, diagnostics: () => diagnostics.status() });
+    let mainWindow, settingsWindow, tray, monitor, dragTimer, dragDeadline;
+    const stopDrag = () => { clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; };
+    const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
+    const isLocalFrame = (event, file) => event.senderFrame === event.sender.mainFrame && event.senderFrame.url === pathToFileURL(path.join(__dirname, file)).href;
+    const trusted = event => [mainWindow, settingsWindow].some(win => win && !win.isDestroyed() && event.sender === win.webContents) && (isLocalFrame(event, 'index.html') || isLocalFrame(event, 'settings.html'));
+    const handle = (channel, callback, settingsOnly = false) => ipcMain.handle(channel, (event, ...args) => {
+        if (!trusted(event) || (settingsOnly && event.sender !== settingsWindow?.webContents)) throw new Error('Untrusted IPC sender');
+        return callback(...args);
+    });
+    function secureWindow(options, file) {
+        const win = new BrowserWindow({ ...options, webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, autoplayPolicy: 'no-user-gesture-required' } });
+        win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+        win.webContents.on('will-navigate', event => event.preventDefault());
+        win.webContents.on('will-attach-webview', event => event.preventDefault());
+        win.loadFile(file);
+        return win;
     }
-  });
-
-  // Load saved position or default to bottom-right
-  const position = store.get('position');
-  if (position.x && position.y) {
-    mainWindow.setPosition(position.x, position.y);
-  } else {
-    const { width, height } = require('electron').screen.getPrimaryDisplay().workAreaSize;
-    mainWindow.setPosition(width - 140, height - 140);
-  }
-
-  mainWindow.loadFile('index.html');
-  
-  // Save position when moved
-  mainWindow.on('moved', () => {
-    const [x, y] = mainWindow.getPosition();
-    store.set('position', { x, y });
-  });
-
-  // Prevent window from being closed, just hide it (unless quitting)
-  mainWindow.on('close', (event) => {
-    if (!app.isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-    } else {
-      // Send cleanup signal to renderer
-      mainWindow.webContents.send('app-will-quit');
+    function showSettings() {
+        if (settingsWindow && !settingsWindow.isDestroyed()) return settingsWindow.focus();
+        settingsWindow = secureWindow({ width: 780, height: 850, parent: mainWindow, title: 'Nod.ie Settings' }, 'settings.html');
+        settingsWindow.on('closed', () => { settingsWindow = null; });
     }
-  });
-
-  // Make window draggable by enabling drag on the window
-  mainWindow.webContents.on('will-navigate', (event) => {
-    event.preventDefault();
-  });
-  
-  // Make window draggable with simple approach
-  mainWindow.webContents.on('did-finish-load', () => {
-    // Window is draggable by default with CSS
-  });
-  
-  // Enable right-click context menu
-  mainWindow.webContents.on('context-menu', (event, params) => {
-    event.preventDefault();
-    
-    const contextMenu = Menu.buildFromTemplate([
-      {
-        label: 'Settings',
-        click: () => {
-          createSettingsWindow();
+    function shortcuts() {
+        globalShortcut.unregisterAll();
+        const hotkey = config().GLOBAL_HOTKEY;
+        if (hotkey) {
+            try { if (!globalShortcut.register(hotkey, () => mainWindow.webContents.send('toggle-mute'))) console.warn('Mute shortcut unavailable'); }
+            catch { console.warn('Invalid mute shortcut'); }
         }
-      },
-      { type: 'separator' },
-      {
-        label: 'Reload',
-        accelerator: 'CmdOrCtrl+R',
-        click: () => mainWindow.reload()
-      },
-      {
-        label: 'Developer Tools',
-        accelerator: 'CmdOrCtrl+Shift+I',
-        click: () => mainWindow.webContents.openDevTools({ mode: 'detach' })
-      },
-      { type: 'separator' },
-      {
-        label: 'Hide Nod.ie',
-        click: () => mainWindow.hide()
-      },
-      {
-        label: 'Quit',
-        accelerator: 'CmdOrCtrl+Q',
-        click: () => {
-          mainWindow.destroy();
-          app.quit();
-        }
-      }
-    ]);
-    
-    contextMenu.popup();
-  });
-}
-
-function createSettingsWindow() {
-  // If settings window already exists, focus it
-  if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.focus();
-    return;
-  }
-  
-  settingsWindow = new BrowserWindow({
-    width: 600,
-    height: 700,
-    frame: true,
-    transparent: false,
-    alwaysOnTop: false,
-    resizable: true,
-    autoHideMenuBar: true,
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
-    },
-    title: 'Nod.ie Settings',
-    parent: mainWindow,
-    modal: false
-  });
-  
-  settingsWindow.loadFile('settings.html');
-  
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
-}
-
-function createTray() {
-  // Skip tray for now if icon doesn't exist
-  const iconPath = path.join(__dirname, 'icon.png');
-  const fs = require('fs');
-  
-  if (!fs.existsSync(iconPath)) {
-    console.warn('Tray icon not found, skipping tray creation');
-    return;
-  }
-  
-  tray = new Tray(iconPath);
-  
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show Nod.ie',
-      click: () => mainWindow.show()
-    },
-    {
-      label: 'Settings',
-      click: () => {
-        createSettingsWindow();
-      }
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        mainWindow.destroy();
-        app.quit();
-      }
+        globalShortcut.register('CommandOrControl+Shift+A', () => mainWindow.show());
+        globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
     }
-  ]);
-  
-  tray.setToolTip('Nod.ie - AI Assistant');
-  tray.setContextMenu(contextMenu);
-  
-  if (tray) {
-    tray.on('click', () => {
-      mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
+    handle('get-config', config);
+    handle('diagnostics-status', () => diagnostics.status());
+    handle('voice-health', () => voice.health());
+    handle('voice-turn', audio => voice.converse(audio));
+    handle('clear-history', () => voice.clearHistory(), true);
+    handle('voice-cancel', () => voice.cancel());
+    handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
+    handle('save-settings', settings => {
+        if (!settings || typeof settings !== 'object' || Object.keys(settings).some(key => !['ASSISTANT_NAME', 'UNMUTE_BACKEND_URL', 'VOICE_MODEL', 'LLM_MODEL', 'GLOBAL_HOTKEY', 'AVATAR_ENABLED'].includes(key))) throw new Error('Unsupported settings');
+        if ('AVATAR_ENABLED' in settings && typeof settings.AVATAR_ENABLED !== 'boolean') throw new Error('Invalid avatar setting');
+        const next = validate({ ...config(), ...settings });
+        for (const key of Object.keys(settings)) store.set(aliases[key], next[key]);
+        shortcuts();
+        mainWindow.webContents.send('config-changed', next);
+        return next;
+    }, true);
+    ipcMain.on('begin-drag', event => {
+        if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
+        const { screen } = require('electron');
+        const origin = screen.getCursorScreenPoint();
+        const [x, y] = mainWindow.getPosition();
+        // Cursor and window positions are both desktop-independent pixels. Renderer
+        // screenX/screenY mix coordinate spaces on scaled X11 desktops.
+        dragTimer = setInterval(() => {
+            if (mainWindow.isDestroyed()) return stopDrag();
+            const point = screen.getCursorScreenPoint();
+            mainWindow.setPosition(Math.round(x + point.x - origin.x), Math.round(y + point.y - origin.y));
+        }, 16);
+        dragDeadline = setTimeout(stopDrag, 30000);
     });
-  }
-}
-
-// Global hotkey handling
-function registerGlobalShortcuts() {
-  const hotkey = store.get('globalHotkey');
-  
-  // Register toggle mute hotkey
-  globalShortcut.register(hotkey, () => {
-    mainWindow.webContents.send('toggle-mute');
-  });
-  
-  // Show Nod.ie window
-  globalShortcut.register('CommandOrControl+Shift+A', () => {
-    mainWindow.show();
-  });
-}
-
-// IPC handlers for communication with renderer
-ipcMain.handle('get-config', () => {
-  return store.store;
-});
-
-ipcMain.handle('set-config', (event, key, value) => {
-  store.set(key, value);
-});
-
-// Removed IPC handler for get-prompt - prompt is now hardcoded in websocket-handler.js
-
-ipcMain.handle('send-to-claude', async (event, text) => {
-  // Integration with Claude CLI
-  const { exec } = require('child_process');
-  exec(`echo "${text}" | claude`, (error, stdout, stderr) => {
-    if (error) {
-      console.error('Claude error:', error);
-      return;
-    }
-    // Response will be handled by Claude hooks
-  });
-});
-
-ipcMain.handle('send-notification', async (event, data) => {
-  const n8nUrl = store.get('n8nWebhookUrl');
-  if (n8nUrl) {
-    const fetch = require('node-fetch');
-    await fetch(n8nUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-  }
-});
-
-// Handle system prompt reading and writing
-ipcMain.handle('read-system-prompt', async () => {
-  const fs = require('fs').promises;
-  const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
-  try {
-    const content = await fs.readFile(systemPromptPath, 'utf8');
-    return content;
-  } catch (error) {
-    throw new Error(`Failed to read system prompt: ${error.message}`);
-  }
-});
-
-ipcMain.handle('write-system-prompt', async (event, content) => {
-  const fs = require('fs').promises;
-  const systemPromptPath = path.join(__dirname, 'SYSTEM-PROMPT.md');
-  try {
-    await fs.writeFile(systemPromptPath, content, 'utf8');
-    return true;
-  } catch (error) {
-    throw new Error(`Failed to write system prompt: ${error.message}`);
-  }
-});
-
-// Notify main window when settings are updated
-ipcMain.handle('notify-settings-updated', () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('settings-updated');
-  }
-  return true;
-});
-
-// Get available Ollama models
-ipcMain.handle('get-ollama-models', async () => {
-  try {
-    const http = require('http');
-    const url = new URL(store.get('ollamaUrl') || 'http://localhost:11434');
-    
-    return new Promise((resolve) => {
-      const options = {
-        hostname: url.hostname,
-        port: url.port || 11434,
-        path: '/api/tags',
-        method: 'GET'
-      };
-      
-      const req = http.request(options, (res) => {
-        let data = '';
-        res.on('data', (chunk) => {
-          data += chunk;
+    ipcMain.on('end-drag', event => { if (trusted(event) && event.sender === mainWindow.webContents) stopDrag(); });
+    handle('security-status', () => monitor.status());
+    handle('security-scan', () => monitor.scan(), true);
+    handle('security-dismiss', id => monitor.dismiss(id), true);
+    handle('security-review', id => monitor.prepare(id), true);
+    handle('security-apply', async id => {
+        const plan = monitor.getPlan(id);
+        if (!plan.executable) { await shell.openExternal(plan.guide); return { status: 'manual', message: 'Official update instructions opened. No containers changed.' }; }
+        const result = await dialog.showMessageBox(settingsWindow, { type: 'warning', title: 'Approve this update', message: `Apply the reviewed update to ${plan.name}?`, detail: `${plan.summary}\n\nThe service will restart. Other services will not be updated. No automatic database rollback will be attempted.`, buttons: ['Cancel', 'Apply update'], defaultId: 0, cancelId: 0, checkboxLabel: 'I have verified the service-specific backup/recovery requirements and accept the restart.', checkboxChecked: false });
+        if (result.response !== 1 || !result.checkboxChecked) return { status: 'cancelled' };
+        return monitor.apply(id);
+    }, true);
+    app.whenReady().then(() => {
+        session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
+            callback(contents === mainWindow?.webContents && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href && permission === 'media' && !details.mediaTypes?.includes('video'));
         });
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.models && Array.isArray(parsed.models)) {
-              const modelNames = parsed.models.map(m => m.name);
-              console.log('Ollama models found:', modelNames);
-              resolve(modelNames);
-            } else {
-              console.log('No models in response');
-              resolve(['llama3.2:3b']);
-            }
-          } catch (e) {
-            console.error('Failed to parse Ollama response:', e);
-            resolve(['llama3.2:3b']);
-          }
-        });
-      });
-      
-      req.on('error', (error) => {
-        console.error('Failed to connect to Ollama:', error.message);
-        resolve(['llama3.2:3b']);
-      });
-      
-      req.end();
-    });
-  } catch (error) {
-    console.error('Failed to get Ollama models:', error);
-    return ['llama3.2:3b'];
-  }
-});
-
-// Handle window dragging
-ipcMain.on('move-window', (event, { deltaX, deltaY }) => {
-  if (mainWindow) {
-    const bounds = mainWindow.getBounds();
-    mainWindow.setBounds({
-      x: bounds.x + deltaX,
-      y: bounds.y + deltaY,
-      width: bounds.width,
-      height: bounds.height
-    });
-  }
-});
-
-app.whenReady().then(() => {
-  createWindow();
-  createTray();
-  registerGlobalShortcuts();
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});
-
-app.on('before-quit', () => {
-  app.isQuitting = true;
-  
-  // Send cleanup signal to renderer
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send('app-will-quit');
-  }
-});
-
-app.on('will-quit', () => {
-  globalShortcut.unregisterAll();
-});
-
-// Handle second instance attempt
-app.on('second-instance', () => {
-  // Someone tried to run a second instance, we should focus our window instead
-  if (mainWindow) {
-    if (!mainWindow.isVisible()) {
-      mainWindow.show();
-    }
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore();
-    }
-    mainWindow.focus();
-  }
-});
+        session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === mainWindow?.webContents && permission === 'media' && details.mediaType !== 'video');
+        mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true }, 'index.html');
+        const position = store.get('position');
+        const { screen } = require('electron');
+        const area = screen.getPrimaryDisplay().workArea;
+        if (position && Number.isFinite(position.x) && Number.isFinite(position.y) && screen.getAllDisplays().some(d => position.x >= d.workArea.x && position.y >= d.workArea.y && position.x + 300 <= d.workArea.x + d.workArea.width && position.y + 300 <= d.workArea.y + d.workArea.height)) mainWindow.setPosition(position.x, position.y);
+        else mainWindow.setPosition(area.x + area.width - 350, area.y + area.height - 350);
+        mainWindow.on('moved', () => { const [x, y] = mainWindow.getPosition(); store.set('position', { x, y }); });
+        mainWindow.on('close', event => { if (!app.isQuitting) { event.preventDefault(); mainWindow.hide(); } });
+        const menu = Menu.buildFromTemplate([{ label: 'Show Nod.ie', click: () => mainWindow.show() }, { label: 'Settings and security updates', click: showSettings }, { label: 'Reload', click: () => mainWindow.reload() }, { label: 'Developer tools', click: () => mainWindow.webContents.openDevTools({ mode: 'detach' }) }, { type: 'separator' }, { label: 'Quit', click: () => app.quit() }]);
+        mainWindow.webContents.on('context-menu', () => menu.popup());
+        if (fs.existsSync(path.join(__dirname, 'icon.png'))) { tray = new Tray(path.join(__dirname, 'icon.png')); tray.setToolTip('Nod.ie'); tray.setContextMenu(menu); tray.on('click', () => mainWindow.show()); }
+        shortcuts();
+        monitor = new SecurityMonitor({ stateDir: path.join(app.getPath('userData'), 'security'), onChange: status => { if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.webContents.send('security-status-changed', status); }, notify: count => { if (Notification.isSupported()) { const notice = new Notification({ title: 'Nod.ie: updates recommended', body: `${count} container update recommendation(s). Open Settings to review before applying.` }); notice.on('click', showSettings); notice.show(); } } });
+        diagnostics.start();
+        monitor.start().catch(() => logger.write('error', 'updates.monitor-failed'));
+        logger.write('info', 'desktop.started');
+    }).catch(error => { logger.write('error', 'desktop.start-failed', { code: error.code || 'unknown' }); app.quit(); });
+    app.on('before-quit', () => { app.isQuitting = true; stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
+    app.on('will-quit', () => globalShortcut.unregisterAll());
+    app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus(); });
+}

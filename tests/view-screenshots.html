@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Screenshots</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f0f0f0;
+            padding: 20px;
+        }
+        .screenshot {
+            margin: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .screenshot h3 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .screenshot img {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #ddd;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Nod.ie Test Screenshots</h1>
+    
+    <h2>Main States</h2>
+    <div class="grid">
+        <div class="screenshot">
+            <h3>1. Initial State (Muted)</h3>
+            <img src="screenshots/01-initial-state.png" alt="Initial state">
+        </div>
+        
+        <div class="screenshot">
+            <h3>2. Unmuted State</h3>
+            <img src="screenshots/02-unmuted.png" alt="Unmuted state">
+        </div>
+        
+        <div class="screenshot">
+            <h3>3. Final State</h3>
+            <img src="screenshots/03-final-state.png" alt="Final state">
+        </div>
+    </div>
+    
+    <h2>Video Frame Sequence</h2>
+    <div class="grid">
+        <div class="screenshot">
+            <h3>Frame 0</h3>
+            <img src="screenshots/video-frame-0.png" alt="Frame 0">
+        </div>
+        <div class="screenshot">
+            <h3>Frame 1</h3>
+            <img src="screenshots/video-frame-1.png" alt="Frame 1">
+        </div>
+        <div class="screenshot">
+            <h3>Frame 2</h3>
+            <img src="screenshots/video-frame-2.png" alt="Frame 2">
+        </div>
+        <div class="screenshot">
+            <h3>Frame 3</h3>
+            <img src="screenshots/video-frame-3.png" alt="Frame 3">
+        </div>
+        <div class="screenshot">
+            <h3>Frame 4</h3>
+            <img src="screenshots/video-frame-4.png" alt="Frame 4">
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,13 @@
+== Terms
+
+[cols="1,3",options="header"]
+|===
+|Term |Meaning
+|STT |Speech to text (transcription)
+|TTS |Text to speech
+|MCP |Model Context Protocol
+|Reverie |KnowAll AI's Neo4j graph-memory service
+|Digest |Content-addressed image identity, unlike a mutable registry tag
+|IPC |Inter-process communication through the restricted Electron bridge
+|Compose override |Additional deployment configuration pinning an approved service image
+|===

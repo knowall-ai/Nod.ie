@@ -1,0 +1,20 @@
+== Solution design
+
+Nod.ie is a local voice assistant with an Electron overlay and a loopback browser interface. The renderer has no Node.js access. A narrow preload bridge exposes validated application operations to the desktop. The browser server exposes voice operations only, guarded by loopback binding, Host validation and same-origin POST checks; Docker administration is not exposed over HTTP.
+
+=== Voice modes
+
+* `local`: on-demand, turn-based recording. Click to start, click again to send; recording stops automatically after 30 seconds. The microphone is released before transcription. Existing Whisper, Ollama and TTS services process each turn. This avoids starting the dedicated Unmute STT/TTS models.
+* `realtime`: the shared WebSocket connection sends Opus pages to Unmute, restores sessions with the system prompt after disconnects, and uses bounded reconnection backoff. Capture and playback implementations are shared between desktop and browser.
+
+Local mode uses the configured small transcription model on demand, the existing Ollama model and an already-running TTS service. It does not start containers, load embedding models, or schedule background inference. Availability probes check service reachability; a real recorded turn is the acceptance test.
+
+=== Trust boundaries
+
+The model receives conversation context and a bounded read-only memory excerpt. It has no Docker, shell, payment or memory-write tools in local mode. Update decisions use deterministic adapters and reviewed plans. Release notes and memory content are untrusted data, never executable instructions.
+
+Desktop windows use context isolation, sandboxing, navigation denial and sender-validated IPC. Configuration uses one public schema. Credentials remain in backend configuration and are not supplied to the renderer.
+
+=== Legacy integration
+
+MuseTalk remains optional. Local mode does not connect to it for inference. Historical diagnostics and experimental modules are retained for reference but are not the supported entry points. The customised external Unmute checkout must be upgraded separately, preserving its MCP changes.

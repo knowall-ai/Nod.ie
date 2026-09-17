@@ -1,0 +1,13 @@
+== Diagnostics and unusual activity
+
+Both the desktop and browser server sample Docker metadata and host resource pressure every minute while running. The first sample establishes a baseline; historical stopped containers do not generate stop alerts. Signals include failed health checks, out-of-memory termination, new running containers, restart-count increases, previously running containers stopping, and three consecutive samples of high load or low available memory. A changed deployment can legitimately trigger these signals. This is operational monitoring, not an intrusion-detection system: it does not inspect network traffic, authentication attempts, commands, or arbitrary system logs.
+
+Settings shows the most recent sample, retained alerts and recent application warnings/errors. In local voice mode, Nod.ie receives a bounded, read-only diagnostic snapshot with each turn and can explain it when asked. Monitoring failure is explicitly marked unavailable. The snapshot is untrusted data; it does not provide shell or update tools. Alerts are retained for an hour and notifications for the same signal are limited to once per hour. Baselines are rebuilt when the application restarts.
+
+Application logs are newline-delimited JSON in the application's user-data `logs` directory (the browser uses `~/.config/nodie/logs`). Each file rotates at approximately 2 MB, retaining one previous file. Only allowlisted event metadata is written: timestamps, severity, stage, safe error codes, counts and duration. Recordings, transcripts, memory text, credentials, raw service errors and arbitrary exception stacks are excluded. Files are owner-readable/writable. Log-write failure is reported once and does not terminate a conversation.
+
+Voice errors distinguish transcription, language-model and speech-synthesis failures; cancelling a turn aborts the active request. Memory failure permits conversation to continue and is disclosed as unavailable. Support reports should include the timestamp, event code and service state, not credentials or recordings.
+
+=== Lip-sync status
+
+Realtime MuseTalk integration remains in the source, but the lightweight local voice path currently displays a static avatar. The inspected legacy deployment had a Python syntax error, disabled model loading and an empty mounted model directory. Docker's running state alone did not establish application health. Restoring generated lip-sync requires repairing that deployment, verifying model assets and measuring latency/VRAM before connecting it to local speech playback. Ordinary video playback is not a substitute for generated lip-sync.

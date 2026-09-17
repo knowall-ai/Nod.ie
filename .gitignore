@@ -47,6 +47,7 @@ failed-audio-chunk.*
 *.mp4
 *.mov
 screenshots/
+tests/screenshots/
 # But keep documentation images
 !docs/images/*.png
 !docs/images/*.jpg
@@ -68,3 +69,16 @@ debug-*.js
 # Audio test files
 test-audio-*.ogg
 test-audio-*.wav
+tests/env-config.js
+
+security-state/
+
+# Generated documentation
+*.pdf
+docs/.asciidoctor/
+!docs/brand/knowall-logo-white.png
+
+.venv-voice/
+voice-models/
+
+__pycache__/

@@ -2,188 +2,47 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss: http: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
     <title>Nod.ie</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background: transparent;
-            overflow: hidden;
-            user-select: none;
-            /* No -webkit-app-region here - using custom drag handling */
-        }
-        
-        #circle {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            transition: background 0.3s ease, transform 0.3s ease;
-            /* No app-region - using mouse events for drag */
-            position: relative;
-        }
-        
-        #circle:hover {
-            /* No hover effect */
-        }
-        
-        #circle.idle {
-            /* Default purple gradient */
-        }
-        
-        #circle.listening {
-            /* Same purple gradient */
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        }
-        
-        #circle.thinking {
-            /* Keep purple gradient, add subtle pulsing animation */
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            animation: pulse 2s ease-in-out infinite;
-        }
-        
-        #circle.loading {
-            /* Gray gradient with spinning animation */
-            background: linear-gradient(135deg, #636e72 0%, #2d3436 100%);
-            animation: spin 1s linear infinite;
-        }
-        
-        #circle.loading #icon {
-            opacity: 0.5;
-        }
-        
-        @keyframes pulse {
-            0%, 100% {
-                transform: scale(1);
-            }
-            50% {
-                transform: scale(1.05);
-            }
-        }
-        
-        @keyframes spin {
-            0% {
-                transform: rotate(0deg);
-            }
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-        
-        #circle.muted {
-            opacity: 0.9;
-            background: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
-        }
-        
-        #mute-icon {
-            position: absolute;
-            bottom: 5px;
-            right: 5px;
-            width: 30px;
-            height: 30px;
-            background: rgba(0, 0, 0, 0.8);
-            border-radius: 50%;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            pointer-events: none;
-        }
-        
-        #circle.muted #mute-icon {
-            display: flex;
-        }
-        
-        /* Animations removed to prevent alignment issues */
-        
-        #icon {
-            width: 50px;
-            height: 50px;
-            fill: white;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            pointer-events: none;
-        }
-        
-        #waveform {
-            position: absolute;
-            width: 100px;
-            height: 100px;
-            top: 0;
-            left: 0;
-            pointer-events: none;
-            z-index: 200;
-        }
-        
-        .audio-ring {
-            /* Disabled - we don't want the spinning ring */
-            display: none;
-        }
-        
-        .notification {
-            position: fixed;
-            bottom: 130px;
-            left: 10px;
-            right: 10px;
-            background: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 10px;
-            border-radius: 10px;
-            display: none;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            max-width: 400px;
-            margin: 0 auto;
-            text-align: center;
-            transition: opacity 0.3s ease-in-out;
-            font-size: 12px;
-        }
-        
-        .notification.error {
-            background: rgba(220, 38, 38, 0.9);
-            border: 1px solid rgba(239, 68, 68, 0.5);
-        }
-        
-        .notification.success {
-            background: rgba(34, 197, 94, 0.9);
-            border: 1px solid rgba(74, 222, 128, 0.5);
-        }
-        
-        .notification.info {
-            background: rgba(59, 130, 246, 0.9);
-            border: 1px solid rgba(96, 165, 250, 0.5);
-        }
-        
-        .notification.transcript {
-            background: rgba(139, 92, 246, 0.9);
-            border: 1px solid rgba(167, 139, 250, 0.5);
-        }
-        
-        .notification.response {
-            background: rgba(236, 72, 153, 0.9);
-            border: 1px solid rgba(244, 114, 182, 0.5);
-        }
-    </style>
+    <link rel="stylesheet" href="renderer.css">
 </head>
 <body>
-    <div id="circle">
-        <svg id="icon" viewBox="0 0 24 24">
-            <path d="M12 15c1.66 0 3-1.34 3-3V6c0-1.66-1.34-3-3-3S9 4.34 9 6v6c0 1.66 1.34 3 3 3z"/>
-            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-        </svg>
+    <div id="app">
+        <div id="drag-handle" title="Drag to move Nod.ie" aria-label="Drag to move Nod.ie">⠿</div>
         <canvas id="waveform"></canvas>
-        <div class="audio-ring" id="audioRing"></div>
-        <div id="mute-icon">🔇</div>
+        <div id="circle" class="listening">
+            <div id="avatar-container">
+                <canvas id="avatar-canvas" width="250" height="250" style="border-radius: 50%;"></canvas>
+                <video id="avatar-video" alt="Nod.ie Avatar Animated" autoplay loop muted style="display: block;">
+                    <source src="assets/avatars/nodie-video-01.mp4" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div id="status-text" class="loading-text" style="display: none;"></div>
+        </div>
     </div>
     
+    <button id="web-clear-history" hidden>Clear saved conversation history</button>
     <div id="notification" class="notification"></div>
+    <div id="debug-info">
+        <div>Status: <span id="status">Initializing...</span></div>
+        <div>WebSocket: <span id="ws-status">Disconnected</span></div>
+        <div>Avatar: <span id="avatar-status">Not loaded</span></div>
+        <div>Console: <span id="console-errors">0 errors</span></div>
+    </div>
     
+
+    <script src="env-config.js"></script>
+    <script src="lib/config-schema.js"></script>
+    <script src="config-web.js"></script>
+    <script src="browser-bridge.js"></script>
+    <script src="node_modules/opus-recorder/dist/recorder.min.js"></script>
+    <script src="modules/audio-capture-web.js"></script>
+    <script src="modules/audio-playback-web.js"></script>
+    <script src="modules/musetalk-websocket-client.js"></script>
+    <script src="modules/avatar-manager.js"></script>
+    <script src="modules/websocket-handler.js"></script>
+    <script src="modules/local-voice-session.js"></script>
     <script src="renderer.js"></script>
 </body>
 </html>

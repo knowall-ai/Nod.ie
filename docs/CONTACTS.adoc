@@ -1,0 +1,8 @@
+== Contacts
+
+* Project: https://github.com/KnowAll-AI/Nod.ie
+* Support and private security contact: mailto:support@knowall.ai[support@knowall.ai]
+* Maintainer: Ben Weeks, KnowAll AI
+* Responsible disclosure and encrypted Nostr identities: repository `SECURITY.md`.
+
+Do not send vulnerability details publicly. Request an encryption key by email or use an encrypted Nostr message; see the disclosure policy.

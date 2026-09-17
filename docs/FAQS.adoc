@@ -1,0 +1,17 @@
+== Frequently asked questions
+
+=== Is Nod.ie public and open source?
+Yes. The repository is https://github.com/KnowAll-AI/Nod.ie and the root LICENSE contains the MIT terms.
+
+=== Does scanning use the GPU?
+No. Scans inspect metadata and query releases; they do not invoke language or speech models.
+
+=== Does Nod.ie update containers automatically?
+No. Scanning is automatic while the desktop runs; applying an update requires a reviewed plan and native desktop confirmation. Some deployments require their official update tool.
+
+=== Is ElevenLabs required?
+No. There is no ElevenLabs integration in this implementation. Local mode uses existing local transcription, Ollama and WAV speech services. Adding a paid/cloud provider is a separate integration decision.
+
+=== Does Nod.ie float over the desktop or run on the lock screen?
+
+The Electron interface is a transparent, frameless, always-on-top desktop window. Drag the small handle above the avatar to move it; clicking starts or stops the selected voice interaction. The browser is an alternative interface. KDE's protected lock screen does not display ordinary desktop windows above it. Lock-screen voice interaction is not implemented; it would need a separate, restricted KDE integration. Do not rely on screen locking alone to cancel an in-progress voice turn in this release; stop the turn before locking.

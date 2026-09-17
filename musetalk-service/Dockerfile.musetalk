@@ -1,0 +1,71 @@
+FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+
+# Set timezone and locale to avoid interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    git \
+    wget \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Clone MuseTalk repository
+RUN git clone https://github.com/TMElyralab/MuseTalk.git musetalk-src
+
+# Copy MuseTalk source into our working directory
+RUN cp -r musetalk-src/musetalk /app/musetalk
+
+# Install only MuseTalk core dependencies (no conflicting web frameworks)
+RUN pip install --no-cache-dir \
+    diffusers==0.30.2 \
+    accelerate==0.28.0 \
+    numpy==1.23.5 \
+    opencv-python==4.9.0.80 \
+    soundfile==0.12.1 \
+    transformers==4.39.2 \
+    huggingface_hub==0.30.2 \
+    librosa==0.11.0 \
+    einops==0.8.1 \
+    omegaconf \
+    ffmpeg-python \
+    moviepy \
+    gdown \
+    requests \
+    imageio[ffmpeg] \
+    fastapi==0.110.0 \
+    uvicorn==0.27.0
+
+# Install MMPose and related packages
+RUN pip install --no-cache-dir -U openmim && \
+    mim install mmengine && \
+    mim install "mmcv>=2.0.1" && \
+    mim install "mmdet>=3.1.0" && \
+    mim install "mmpose>=1.1.0"
+
+# Create models directory
+RUN mkdir -p /app/models
+
+# Copy our clean API and utils
+COPY musetalk_clean_api.py /app/
+COPY utils.py /app/
+COPY download_models.py /app/
+
+# Download models on build
+RUN python download_models.py
+
+# Expose port
+EXPOSE 8765
+
+# Run the clean API
+CMD ["uvicorn", "musetalk_clean_api:app", "--host", "0.0.0.0", "--port", "8765"]

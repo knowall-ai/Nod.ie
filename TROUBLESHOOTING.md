@@ -6,7 +6,8 @@
 |---------|----------|
 | Nod.ie can't hear me | 1. Check microphone permissions in system settings<br>2. Click circle to unmute (red = muted, purple = listening)<br>3. Run `arecord -l` to verify microphone detected |
 | Can't hear Nod.ie's responses | 1. Check system audio: `speaker-test -t wav -c 2`<br>2. Verify Unmute services: `cd ../unmute && docker compose ps`<br>3. Open Developer Tools → Console, look for "response.audio.delta" messages |
-| "Too many people are connected" error | 1. Kill all Nod.ie processes: `pkill -f "electron.*nodie"`<br>2. Restart Unmute: `cd ../unmute && docker compose restart`<br>3. Close any browser tabs with http://localhost:3000 open<br>4. Connection handling has been improved to prevent leaks |
+| "Internal server error" messages | **FIXED** - Empty audio data crashes backend<br>1. Update to latest version with audio validation<br>2. Check console for "Skipping too-short audio data" messages<br>3. Restart if using older version without validation |
+| "Too many people are connected" error | 1. Kill all Nod.ie processes: `pkill -f "electron.*nodie"`<br>2. Restart Unmute: `cd ../unmute && docker compose restart`<br>3. Close any browser tabs with http://localhost:3000 open<br>4. Increase batch_size in STT/TTS configs (see below) |
 | WebSocket connection failed | 1. Verify Unmute is running: `curl http://localhost:8765/v1/health`<br>2. Check port 8765 is available: `sudo netstat -tlnp \| grep 8765`<br>3. Restart Unmute services if needed |
 | White waveform disappearing | Canvas element ID mismatch - Fixed in ui-manager.js<br>Check audio context state in Console: `audioCapture?.audioContext?.state` |
 | Circle shows thinking state on startup | Fixed - only shows thinking when actually processing<br>Clear cache and restart if persists |
@@ -14,6 +15,7 @@
 | Audio format error: "unexpected ogg capture pattern" | MediaRecorder produces WebM, Unmute expects OGG<br>Fixed by switching to opus-recorder library |
 | Too many Electron processes | Multiple Nod.ie instances running<br>1. Kill all: `pkill -f "electron.*nodie"`<br>2. Check if killed: `ps aux \| grep -E "electron.*nodie" \| grep -v grep`<br>3. If persists, force kill: `killall -9 electron` |
 | Slow responses (10+ seconds) | Ollama running on CPU instead of GPU<br>1. Check GPU memory: `nvidia-smi`<br>2. Stop other GPU services<br>3. Restart Ollama: `docker restart ollama`<br>4. See "Performance Issues" section below |
+| STT mishears "Nod.ie" | Common mis-transcriptions: Navy, Nandi, Nody, Hody<br>The LLM is configured to recognize these as "Nod.ie"<br>Say "Node-ee" or "Noddy" for better recognition |
 
 ## Detailed Solutions
 
@@ -35,6 +37,124 @@
 | No audio despite receiving data | Check audio context state: `audioPlayback?.audioContext?.state` |
 | Audio cutting out | Check for errors in Console related to audio processing |
 | Response lag/latency | Audio chunks may be buffering - check Console for "Decoded audio frame" timing |
+
+### 🚨 Critical Bug: "Internal server error" (FIXED)
+
+**Problem**: Backend crashes with "Internal server error" messages and WebSocket disconnections.
+
+**Root Cause**: 
+- Unmute backend tries to access `opus_bytes[5]` without validating data length
+- Empty or malformed audio data (< 6 bytes) causes IndexError in backend
+- This was a regression introduced during avatar implementation work
+
+**Fix Applied**:
+Multi-layer validation prevents invalid audio data from reaching the backend:
+
+1. **Audio Capture Level**: Skip data < 6 bytes
+2. **Renderer Level**: Skip base64 data < 8 characters  
+3. **Backend Protection**: Backend expects minimum 6 bytes for BOS flag check
+
+**How to Verify Fix**:
+```bash
+# 1. Check console for validation messages
+Open Developer Tools → Console
+Look for: "⚠️ Skipping too-short audio data"
+
+# 2. Test with debug script
+node debug-audio-detailed.js
+# Should NOT crash backend with "Internal server error"
+
+# 3. Verify audio capture working
+# Console should show: "📤 Calling onAudioData with base64 chunk"
+```
+
+**Prevention**: Always validate audio data length before sending to WebSocket.
+
+### 🎭 MuseTalk Avatar Issues
+
+| Problem | Solution |
+|---------|----------|
+| MuseTalk WebSocket disconnects immediately | Check AVATAR_VIDEO_PATH environment variable is set |
+| "invalid literal for int() with base 10: 'cudacuda...'" | Function parameter error - fixed in get_image_prepare_material call |
+| MuseTalk shows "Disconnected" in web interface | Ensure container has AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4 |
+| No avatar video fallback | Add `<video>` tag with src="assets/avatars/nodie-video-01.mp4" |
+| Canvas shows no default avatar image | Check asset paths - use "../assets/" for tests, "./assets/" for main |
+| MuseTalk audio decoding fails - "[ogg @ 0x...] Codec not found" | Container's ffmpeg lacks proper Opus support - fixed with Python libraries (pydub, pyogg) |
+| "Audio decoding failed" in MuseTalk logs | OGG Opus format from browser not compatible with conda ffmpeg build |
+| MuseTalk generates frames but no lip-sync | Audio processing failing - check for "Successfully decoded Opus audio" in logs |
+| MuseTalk falls back to video cycling | Real audio not being processed - audio decoding step is failing |
+
+**Diagnosing MuseTalk Issues:**
+
+1. **Check MuseTalk service health:**
+   ```bash
+   curl http://localhost:8765/health
+   # Should return: {"status":"healthy","model_loaded":true,...}
+   ```
+
+2. **Check container environment:**
+   ```bash
+   docker exec musetalk env | grep AVATAR_VIDEO_PATH
+   # Should show: AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4
+   ```
+
+3. **Check WebSocket connection logs:**
+   ```bash
+   docker logs musetalk --tail 20
+   # Look for: "WebSocket client connected" without errors
+   ```
+
+4. **Check audio processing logs:**
+   ```bash
+   docker logs musetalk --tail 50 | grep -E "(Processing audio|Successfully decoded|Audio decoding failed)"
+   # Should show successful Opus decoding, not "Audio decoding failed"
+   ```
+
+5. **Verify real-time lip-sync:**
+   ```bash
+   # Open web test page: http://localhost:8095/tests/test-web.html
+   # Speak into microphone and check logs for:
+   docker logs musetalk --tail 10 | grep "Generated actual lip-synced frame"
+   # If missing, audio processing is failing
+   ```
+
+**Common MuseTalk Fixes:**
+
+1. **Set environment variable and restart:**
+   ```bash
+   cd musetalk-service
+   AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4 docker compose up -d
+   ```
+
+2. **Verify video files exist:**
+   ```bash
+   docker exec musetalk ls -la /app/avatars/
+   # Should list .mp4 files
+   ```
+
+3. **Check preprocessing errors:**
+   - Look for "Error preparing avatar" in logs
+   - Face detection may fail on some video frames
+   - Falls back to static video frames when MuseTalk fails
+
+4. **Fix Opus audio decoding (Current Issue):**
+   ```bash
+   # Update container with Python audio libraries
+   cd musetalk-service
+   docker compose down
+   docker compose up --build -d
+   
+   # Check if pydub and pyogg are installed
+   docker exec musetalk pip list | grep -E "(pydub|pyogg)"
+   ```
+
+5. **Test audio decoding:**
+   ```bash
+   # Speak into microphone on test page and check logs
+   docker logs musetalk --follow | grep -E "(decoded|audio)"
+   # Should see: "✅ Successfully decoded Opus audio"
+   # Not: "Audio decoding failed"
+   ```
 
 ### 🔄 Process Management
 
@@ -215,6 +335,8 @@ console.log(audioPlayback?.audioContext?.state)
 | "Too many people are connected" | Connection limit reached | Restart Unmute services |
 | "Cannot read properties of undefined (reading 'getContext')" | Canvas element not found | Fixed element ID reference |
 | "Invalid instructions format" | Wrong message format | Use discriminated union objects |
+| "invalid literal for int() with base 10: 'cudacudacuda...'" | MuseTalk function call error | Fixed get_image_prepare_material parameters |
+| "AVATAR_VIDEO_PATH environment variable not set" | MuseTalk WebSocket closes immediately | Set AVATAR_VIDEO_PATH=/app/avatars/nodie-video-03.mp4 |
 
 ## Prevention Tips
 
@@ -285,6 +407,70 @@ The following issues have been fixed:
 | Model parameter fix | Added missing 'model: llama3.2:3b' to session config |
 | PROMPT.md system | Created prompt loading system (simplified for size constraints) |
 | Renderer process fix | Removed Node.js fs/path modules from renderer |
+
+## STT/TTS Connection Limits
+
+The Unmute backend uses batch processing for STT (Speech-to-Text) and TTS (Text-to-Speech) services. By default, the development configuration only allows 1 STT connection and 2 TTS connections.
+
+### Increasing Connection Limits
+
+If you get "Too many people are connected" errors or need multiple Nod.ie instances:
+
+1. **Edit STT configuration** (`../unmute/services/moshi-server/configs/stt.toml`):
+   ```toml
+   # Change from:
+   batch_size = 1
+   # To (adjust based on GPU memory):
+   batch_size = 8
+   ```
+
+2. **Edit TTS configuration** (`../unmute/services/moshi-server/configs/tts.toml`):
+   ```toml
+   # Change from:
+   batch_size = 2
+   # To (adjust based on GPU memory):
+   batch_size = 8
+   ```
+
+3. **Rebuild and restart services**:
+   ```bash
+   cd ../unmute
+   docker compose build stt tts
+   docker compose restart stt tts
+   ```
+
+### GPU Memory Considerations
+
+Each additional connection uses more GPU memory:
+- **STT**: ~300-400 MB per connection
+- **TTS**: ~500-700 MB per connection
+
+Check your GPU memory before increasing batch size:
+```bash
+nvidia-smi --query-gpu=name,memory.total,memory.used,memory.free --format=csv
+```
+
+**Recommended batch sizes by GPU:**
+- RTX 3090 (24GB): batch_size = 8-16
+- RTX 3080 (10GB): batch_size = 4-8
+- RTX 3070 (8GB): batch_size = 2-4
+
+### Production vs Development Config
+
+The Unmute repository includes production configs with higher batch sizes:
+- `stt-prod.toml`: batch_size = 64
+- `tts-prod.toml`: batch_size = 64
+
+To use production configs, modify the docker-compose.yml:
+```yaml
+stt:
+  command: worker --config configs/stt-prod.toml
+
+tts:
+  command: worker --config configs/tts-prod.toml
+```
+
+**Note**: Production configs are optimized for server deployments with multiple GPUs.
 
 ## Still Having Issues?
 

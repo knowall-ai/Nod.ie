@@ -1,0 +1,36 @@
+== Installation
+
+Requires Node.js 22 or later, npm, a desktop/browser with microphone access, and configured voice services. Docker access is optional for update monitoring; do not grant Docker access to an untrusted account.
+
+[source,bash]
+----
+npm ci
+cp .env.example .env
+# Configure the endpoints and voice mode in .env.
+npm test
+npm start
+# Alternative, loopback browser:
+npm run web
+----
+
+The browser defaults to `http://127.0.0.1:8095`. Keep its server running, or use the documented user-service launcher. In local mode, click the avatar once to speak and again to send. Click during processing/playback to cancel. Audio is capped at 30 seconds and 5 MB.
+
+=== Ubuntu sandbox
+
+On Ubuntu systems restricting unprivileged user namespaces, Electron may need an application-specific AppArmor profile. Review and run `bash scripts/setup-linux-sandbox.sh`; administrator authentication is required. The script permits user namespaces for this Electron executable only. It does not disable Chromium's sandbox or change the global kernel policy. Re-run after moving the checkout. The web interface is available without this change.
+
+=== Configuration
+
+`VOICE_MODE=local` selects the lightweight path. Set `LOCAL_STT_URL`, `LOCAL_STT_MODEL`, `LOCAL_TTS_URL`, `OLLAMA_URL` and `LOCAL_LLM_MODEL`. The speech service must implement `/api/tts` returning WAV; the transcription service must implement `/v1/audio/transcriptions`.
+
+Realtime mode requires `UNMUTE_BACKEND_URL`, `LLM_MODEL` and `VOICE_MODEL`. Keep dedicated speech models stopped when unused on constrained hosts. Nod.ie does not automatically start them.
+
+=== Documentation build
+
+Install the Ruby gems listed in `docs/Gemfile`, then run `npm run docs`. The build produces only `docs/TECHNICAL_SOLUTION_DOCUMENT.pdf`; do not commit it. Source sections and the branded theme are version controlled.
+
+=== Optional CPU voice and persistent browser
+
+Run `bash scripts/setup-cpu-voice.sh` to install the pinned Python runtime and verify the downloaded model checksums. Run `bash scripts/start-voice-service.sh` on Linux with a user systemd session. The service binds to loopback port 8104, uses two CPU inference threads, and is limited to 1 GB of memory and two CPU cores. Configure `LOCAL_TTS_URL=http://127.0.0.1:8104`, `LOCAL_TTS_VOICE=af_heart`, and `LOCAL_TTS_SPEED=1.06`. Other supported voices are `af_bella`, `bf_emma` and `bf_isabella`.
+
+Run `bash scripts/start-web-service.sh` for a browser server that survives closing the launching terminal. These transient user services last for the current user session; they do not install a boot service. Stop them with `systemctl --user stop nodie-web nodie-voice`. Restart the browser server after changing `.env`.

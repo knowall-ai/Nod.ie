@@ -4,15 +4,28 @@
 
 class UIManager {
     constructor() {
-        this.circle = document.getElementById('circle');
-        this.notification = document.getElementById('notification');
-        this.waveform = document.getElementById('waveform');
-        this.audioRing = document.getElementById('audioRing');
         this.isMuted = false;
+        this._initialized = false;
+    }
+    
+    _ensureInitialized() {
+        if (!this._initialized) {
+            this.circle = document.getElementById('circle');
+            this.notification = document.getElementById('notification');
+            this.waveform = document.getElementById('waveform');
+            this.audioRing = document.getElementById('audioRing');
+            this._initialized = true;
+        }
     }
 
     setStatus(status) {
         console.log(`🎨 UI Status change: ${status} (muted: ${this.isMuted})`);
+        this._ensureInitialized();
+        
+        if (!this.circle) {
+            console.warn('UI not ready, skipping status update');
+            return;
+        }
         
         // Clear all classes first
         this.circle.className = '';
@@ -32,6 +45,13 @@ class UIManager {
     }
 
     showNotification(text, type = 'info') {
+        this._ensureInitialized();
+        
+        if (!this.notification) {
+            console.warn('Notification element not ready');
+            return;
+        }
+        
         this.notification.textContent = text;
         this.notification.style.display = 'block';
         this.notification.className = `notification ${type}`;
@@ -62,13 +82,13 @@ class UIManager {
         const canvas = this.waveform;
         const ctx = canvas.getContext('2d');
         
-        // Set canvas size
-        canvas.width = 100;
-        canvas.height = 100;
+        // Set canvas size to match the full circle
+        canvas.width = 250;
+        canvas.height = 250;
         
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
-        const radius = 40;
+        const radius = 115; // Just inside the 250px circle
         
         let visualizationActive = true;
         
@@ -110,8 +130,14 @@ class UIManager {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             // Draw circular waveform with rotating starting position
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-            ctx.lineWidth = 3;
+            // Add glow effect
+            ctx.shadowColor = 'rgba(247, 147, 26, 0.8)'; // Bitcoin orange glow
+            ctx.shadowBlur = 15;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 0;
+            
+            ctx.strokeStyle = 'rgba(247, 147, 26, 0.9)'; // Bitcoin orange
+            ctx.lineWidth = 8; // Much thicker line
             
             // Calculate rotating offset based on time (10 second rotation)
             const rotationOffset = (Date.now() % 10000) / 10000 * 360;
@@ -141,12 +167,12 @@ class UIManager {
             ctx.stroke();
             
             // Optional: Add a dot to show the current position
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.fillStyle = 'rgba(247, 147, 26, 1)'; // Bitcoin orange
             ctx.beginPath();
             const dotAngle = rotationOffset * Math.PI / 180;
             const dotX = centerX + radius * Math.cos(dotAngle);
             const dotY = centerY + radius * Math.sin(dotAngle);
-            ctx.arc(dotX, dotY, 3, 0, 2 * Math.PI);
+            ctx.arc(dotX, dotY, 5, 0, 2 * Math.PI);
             ctx.fill();
             
             // Show audio ring when there's significant audio

@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  musetalk-gpu:
+    image: pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+    container_name: nodie-musetalk-gpu
+    ports:
+      - "8766:8765"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - CUDA_VISIBLE_DEVICES=0
+    volumes:
+      - ./musetalk-repo:/app
+      - ../assets/avatars:/app/avatars
+      - ./models:/app/models
+    working_dir: /app
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: >
+      bash -c "
+      pip install -r requirements.txt &&
+      pip install fastapi uvicorn websockets &&
+      python app.py --server_port 8765
+      "
