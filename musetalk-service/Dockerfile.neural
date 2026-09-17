@@ -1,0 +1,15 @@
+FROM python:3.12-slim-bookworm
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1 OMP_NUM_THREADS=4 HF_HOME=/tmp/huggingface
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+RUN pip install --no-cache-dir --upgrade pip==26.2.1 setuptools==83.0.0
+RUN pip install --no-cache-dir torch==2.14.0 --index-url https://download.pytorch.org/whl/cu130
+COPY requirements-neural.txt /app/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
+COPY neural_api.py /app/neural_api.py
+WORKDIR /app
+RUN useradd --uid 1000 --create-home nodie
+USER nodie
+EXPOSE 8765
+CMD ["uvicorn", "neural_api:app", "--host", "0.0.0.0", "--port", "8765", "--no-access-log"]

@@ -17,4 +17,4 @@ Desktop windows use context isolation, sandboxing, navigation denial and sender-
 
 === Legacy integration
 
-MuseTalk remains optional. Local mode does not connect to it for inference. Historical diagnostics and experimental modules are retained for reference but are not the supported entry points. The customised external Unmute checkout must be upgraded separately, preserving its MCP changes.
+MuseTalk 1.5 is optional in local mode. When LOCAL_LIP_SYNC_URL is configured and avatars are enabled, the synthesized WAV is rendered into a new synchronized speech video. Rendering failures visibly fall back to audio-only playback. The service and its measured resource use are described in the neural lip synchronisation section. Historical diagnostics and experimental modules are retained for reference but are not the supported entry points. The customised external Unmute checkout must be upgraded separately, preserving its MCP changes.

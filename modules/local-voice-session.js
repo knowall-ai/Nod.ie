@@ -51,18 +51,48 @@ class LocalVoiceSession {
         this.state = 'processing'; this.status('Thinking… click to cancel');
         try {
             const audio = new Uint8Array(await new Blob(chunks).arrayBuffer());
+            if (generation !== this.generation) return;
             const result = await window.nodie.voiceTurn(audio);
             if (generation !== this.generation) return;
-            this.state = 'speaking';
-            this.status(result.memory === 'unavailable' ? 'Speaking (memory unavailable)' : 'Speaking — click to stop');
-            this.audioUrl = URL.createObjectURL(new Blob([result.audio], { type: 'audio/wav' }));
-            this.player = new Audio(this.audioUrl);
-            this.player.onended = () => { this.releasePlayback(); this.state = 'idle'; this.status('Click to speak'); };
-            this.player.onerror = () => { this.releasePlayback(); this.state = 'idle'; this.status('Playback failed. Click to try again.'); };
-            await this.player.play();
+            await this.playReply(result, generation);
         } catch (error) { if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.status(error.message); } }
     }
-    releasePlayback() { this.player?.pause(); this.player = null; if (this.audioUrl) URL.revokeObjectURL(this.audioUrl); this.audioUrl = null; }
+    async playReply(result, generation, useVideo = true) {
+        if (generation !== this.generation) return;
+        this.state = 'speaking';
+        const manager = this.renderer.state.avatarManager;
+        const video = useVideo && result.video && manager?.isEnabled() ? document.getElementById('avatar-video') : null;
+        this.status(result.lipSync === 'unavailable' ? 'Speaking (lip sync unavailable)' : result.memory === 'unavailable' ? 'Speaking (memory unavailable)' : 'Speaking — click to stop');
+        this.audioUrl = URL.createObjectURL(new Blob([video ? result.video : result.audio], { type: video ? 'video/mp4' : 'audio/wav' }));
+        const player = video || new Audio();
+        this.player = player;
+        player.loop = false; player.muted = false; player.src = this.audioUrl;
+        manager?.setSpeechVideo(Boolean(video));
+        player.onended = () => {
+            if (this.player !== player) return;
+            this.releasePlayback(); this.state = 'idle'; this.status('Click to speak');
+        };
+        const failed = () => {
+            if (this.player !== player || generation !== this.generation) return;
+            this.releasePlayback();
+            if (video) {
+                this.playReply({ ...result, lipSync: 'unavailable' }, generation, false).catch(() => {
+                    if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.status('Playback failed. Click to try again.'); }
+                });
+            } else { this.state = 'idle'; this.status('Playback failed. Click to try again.'); }
+        };
+        player.onerror = failed;
+        try { await player.play(); } catch { failed(); }
+    }
+    releasePlayback() {
+        if (this.player) {
+            this.player.onended = null; this.player.onerror = null;
+            this.player.pause(); this.player.removeAttribute('src'); this.player.load(); this.player = null;
+        }
+        this.renderer.state.avatarManager?.setSpeechVideo(false);
+        if (this.audioUrl) URL.revokeObjectURL(this.audioUrl);
+        this.audioUrl = null;
+    }
     cancel() {
         ++this.generation; clearTimeout(this.limitTimer);
         if (this.recorder?.state === 'recording') this.recorder.stop();

@@ -504,24 +504,19 @@ const NodieRenderer = {
             clearHistory.addEventListener('click', async () => { try { this.localVoice?.cancel(); await window.nodie.clearHistory(); this.showNotification('Saved conversation history cleared.', 'info'); } catch { this.showNotification('Could not clear saved history. Please retry.', 'error'); } });
         }
         const handle = document.getElementById('drag-handle');
-        if (isElectron && handle) {
-            handle.addEventListener('pointerdown', event => {
-                if (event.button !== 0) return;
-                event.preventDefault(); handle.setPointerCapture(event.pointerId); window.nodie.beginDrag();
-            });
-            for (const name of ['pointerup', 'pointercancel', 'lostpointercapture']) handle.addEventListener(name, () => window.nodie.endDrag());
-            window.addEventListener('blur', () => window.nodie.endDrag());
-        }
+        if (isElectron && handle) window.bindDesktopDrag(handle, window.nodie);
         // Set up click handler
         const circle = document.getElementById('circle');
         if (circle) {
+            const wasDragged = isElectron ? window.bindDesktopDrag(circle, window.nodie) : async () => false;
             circle.tabIndex = 0;
             circle.setAttribute('role', 'button');
             circle.setAttribute('aria-label', 'Talk to Nod.ie');
             circle.addEventListener('keydown', event => {
                 if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); if (!event.repeat && !this.state.isLoading) this.toggleMute(); }
             });
-            circle.addEventListener('click', () => {
+            circle.addEventListener('click', async event => {
+                if (event.detail !== 0 && await wasDragged()) return;
                 if (!this.state.isLoading) {
                     this.toggleMute();
                 } else {

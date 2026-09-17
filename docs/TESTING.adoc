@@ -5,3 +5,5 @@
 Browser acceptance uses Playwright with synthetic audio and checks the complete turn without accessing the user's microphone. Live acceptance verifies transcription, an Ollama reply, WAV output and read-only memory availability. Automated tests do not prove that a user's speaker or microphone is selected correctly.
 
 Dependency checks use `npm audit`. Updates to the pinned runtime and test tools require a fresh audit and regression run. Historical live diagnostic scripts are not the CI test suite.
+
+Neural playback checks cover bounded MP4 responses, invalid media, unavailable-service audio recovery, cancellation during rendering and disabled-avatar behaviour. A real MuseTalk-generated H.264/AAC reply is exercised in Chromium and sandboxed Electron, including return to the resting portrait and release of media URLs. Direct dragging is checked against the native desktop-coordinate result to distinguish movement from a voice-control click. Live GPU measurements are recorded in the lip synchronisation section; CI does not require an NVIDIA GPU.

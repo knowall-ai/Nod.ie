@@ -1,0 +1,41 @@
+== Neural lip synchronisation
+
+Local voice can send its synthesized WAV to MuseTalk 1.5 and play the returned H.264/AAC MP4. The video and speech use one media element and clock, avoiding drift between separately started audio and video. The service generates new mouth shapes from each reply; it does not loop a prerecorded talking video or use loudness-only animation. The current implementation animates the lower face of the bundled portrait, not full head/body motion.
+
+=== Installation
+
+An NVIDIA GPU and the NVIDIA Container Toolkit are required. The service intentionally fails startup without CUDA instead of silently attempting slow CPU inference. Model files occupy approximately 3.9 GB and are excluded from source control. The model manifest pins upstream revisions, sizes and SHA-256 digests; the setup script verifies existing files and downloads replacements atomically.
+
+[source,bash]
+----
+python3 scripts/setup-neural-models.py
+docker compose -f musetalk-service/compose.neural.yml up -d --build
+curl http://127.0.0.1:8768/health
+----
+
+Set `LOCAL_LIP_SYNC_URL=http://127.0.0.1:8768` in the private `.env`, enable the avatar, then restart the desktop/web service. Leave this variable empty to disable neural rendering. Changing the portrait also requires recalibrating the face rectangle and blending mask in `neural_api.py`; arbitrary avatar uploads are not supported.
+
+The separate `nodie-musetalk` deployment supersedes the inspected legacy `musetalk` service for local voice. It does not reuse the legacy API, which had disabled model loading and mounted an empty model directory. Existing source experiments remain separate from this supported path.
+
+=== Resources and latency
+
+On this workstation (RTX 3090, 24 GB VRAM), a 4.27-second speech sample generated 106 frames at 25 fps in 2.72 seconds after warm-up with Llama 3.1 8B loaded at an 8192-token context. PyTorch reported a 2911 MiB peak allocation; the container's host memory was approximately 2.1 GiB. Whole-machine GPU memory had approximately 9 GiB free. These are sample measurements, not guarantees under competing GPU workloads.
+
+The complete video is generated before playback, so rendering adds a short wait to each voice response. Models remain loaded between replies to avoid repeated startup costs, but no inference or video decoding runs while idle. Batch size is eight; the service bounds PyTorch GPU allocation to one quarter of device memory, host RAM to 12 GiB and CPU usage to four cores. Runtime/driver allocations are additional to PyTorch's limit. Startup warms up inference before reporting ready.
+
+=== Failure handling and privacy
+
+The service binds only to host loopback, runs as a non-root user with a read-only filesystem and model mounts, and uses temporary memory-backed storage for reply media. It accepts WAV uploads only, rejects browser Origin headers and permits one render at a time. Audio is limited to 5 MB and 30 seconds; output is limited to 20 MB. No client-supplied filenames, model paths, command strings or remote URLs are accepted.
+
+The application aborts cancelled requests; the service checks disconnection between inference batches and releases temporary files. Cancellation cannot interrupt a GPU kernel already running. A failed render leaves the WAV reply available and visibly reports that lip sync is unavailable. Playback failure also permits audio-only recovery. Ending or cancelling playback revokes media URLs and restores the resting portrait.
+
+Health reports include readiness, busy state and the last render's duration, frame count and GPU allocation. Logs contain operational metadata, not audio or transcript text. Generated media is not added to conversation history or retained after the request/playback finishes.
+
+=== Upstream references
+
+* https://github.com/TMElyralab/MuseTalk[MuseTalk implementation and model architecture]
+* https://huggingface.co/TMElyralab/MuseTalk[MuseTalk 1.5 weights]
+* https://huggingface.co/stabilityai/sd-vae-ft-mse[Stable Diffusion VAE weights]
+* https://huggingface.co/openai/whisper-tiny[Whisper tiny audio feature model]
+
+The restored runtime uses PyTorch 2.14.0 with CUDA 13.0, replacing the legacy PyTorch 2.0.1 deployment. CUDA 13 requires a compatible NVIDIA driver (580 or newer for minor-version compatibility). Dependency and base-image upgrades still require compatibility testing and security review. Container logs rotate at 5 MB with two files retained.
