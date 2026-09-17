@@ -8,6 +8,7 @@ class AvatarManager {
         this.store = null;
         this.enabled = config.AVATAR_ENABLED !== false;
         this.animated = false;
+        this.idleEnabled = config.AVATAR_IDLE_ENABLED !== false;
         this.frameQueue = [];
         this.maxQueueSize = 5;
         this.staticVideo = null;
@@ -20,6 +21,7 @@ class AvatarManager {
     }
 
     initialize() {
+        if(window.IdleAvatar) this.idle = new window.IdleAvatar({enabled:this.idleEnabled,avatarEnabled:this.enabled});
         // Initialize canvas with default image after DOM is ready
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
@@ -119,6 +121,10 @@ class AvatarManager {
     }
 
     setSpeechVideo(active) {
+        if(!window.NodieRenderer?.streamingLips) {
+            if(active) this.idle?.prepareSpeech();
+            else this.idle?.holdSpeech(document.getElementById('avatar-video'),false);
+        }
         const circle = document.getElementById('circle');
         circle?.classList.toggle('avatar-speaking', Boolean(active && this.enabled));
         this.setAnimationMode(Boolean(active && this.enabled));
@@ -149,6 +155,7 @@ class AvatarManager {
 
     setEnabled(enabled) {
         this.enabled = enabled;
+        this.idle?.setEnabled(this.idleEnabled, enabled);
         if (this.store) {
             this.store.set('avatarEnabled', enabled);
         }
@@ -407,6 +414,7 @@ class AvatarManager {
     cleanup() {
         this.setSpeechVideo(false);
         this.disposed = true;
+        this.idle?.dispose();
         this.musetalkWsClient?.disconnect();
         this.clearFrameQueue();
     }

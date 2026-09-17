@@ -87,3 +87,7 @@ Continuous listening is opt-in for each application session and is not restored 
 === Streaming Unmute avatar playback
 
 MuseTalk also supports Unmute: decoded PCM is queued independently of GPU rendering, and short video segments follow the audio clock. Local voice retains complete-response rendering; Unmute uses a fixed initial buffer and discards video that misses its playback window. Both paths support cancellation.
+
+=== Idle portrait and speech transitions
+
+A local silent idle clip supplies blinks and subtle pose movement without a resident neural animation model. The idle controller respects Settings and reduced-motion preferences, settles a blink before the initial speech buffer expires, and holds the previous decoded frame across speech segment changes. The static portrait remains beneath all media layers.
