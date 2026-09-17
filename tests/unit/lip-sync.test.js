@@ -46,3 +46,12 @@ test('cancelling neural rendering does not return a stale audio fallback or save
     const pending = voice.converse(new Uint8Array(100)); await started; voice.cancel();
     await assert.rejects(pending, { code: 'cancelled' }); assert.equal(voice.history.length, 0); assert.equal(voice.busy, false);
 });
+
+test('only separately scheduled streaming speech requests video-only encoding',async()=>{
+ for(const videoOnly of [false,true]) {
+  await renderSpeech(new Uint8Array(44),{url:'http://localhost',videoOnly,fetchImpl:async(_url,options)=>{
+   assert.equal(options.headers['X-Nodie-Video-Only'],videoOnly?'1':undefined);
+   return new Response(video,{headers:{'Content-Type':'video/mp4'}});
+  }});
+ }
+});

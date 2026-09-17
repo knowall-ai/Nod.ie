@@ -58,3 +58,5 @@ Real browser playback and unit checks cover ordered segments, continuous audio s
 Short segment/render buffering adds some first-audio latency compared with audio-only Unmute.
 
 PCM scheduling is independent of neural rendering. A fixed 750 ms initial playback buffer gives the first video time to render; subsequent audio is queued immediately on the same clock. Late videos catch up or are discarded when their audio has ended. Rendering timeouts cannot introduce additional silence, and cancellation during upload invalidates the segment before GPU work starts.
+
+Streaming Unmute requests video-only H.264 clips using `X-Nodie-Video-Only: 1`. Speech is already scheduled by Web Audio; an unused AAC track adds decoder startup latency. The default render response retains audio for the older local-voice player. Unsupported values of the header are rejected.
