@@ -29,6 +29,9 @@ LOG = logging.getLogger('nodie.musetalk')
 MAX_BYTES = 5 * 1024 * 1024
 MAX_SECONDS = 30
 FPS = 25
+BATCH_SIZE = int(os.environ.get("MUSETALK_BATCH_SIZE", "8"))
+if not 1 <= BATCH_SIZE <= 8:
+    raise ValueError("MUSETALK_BATCH_SIZE must be 1 to 8")
 MODEL_ROOT = Path(os.environ.get('MODEL_ROOT', '/models'))
 AVATAR_PATH = os.environ.get('AVATAR_PATH', '/avatars/nodie-default.png')
 engine = None
@@ -91,9 +94,10 @@ class Engine:
         self.last_stats = {}
         # Warm up feature extraction and kernels before /health reports ready.
         self.render(np.zeros(3200, np.float32), threading.Event())
+        torch.cuda.empty_cache()
 
     @torch.inference_mode()
-    def render(self, samples, cancelled):
+    def render(self, samples, cancelled, video_only=False):
         start = time.monotonic()
         torch.cuda.reset_peak_memory_stats()
         features = self.extractor(samples, sampling_rate=16000, return_tensors='pt').input_features.to(device=self.device, dtype=self.dtype)
@@ -105,15 +109,21 @@ class Engine:
         with tempfile.TemporaryDirectory(prefix='nodie-lips-') as directory:
             directory = Path(directory)
             wav = directory / 'speech.wav'; output = directory / 'reply.mp4'
-            sf.write(wav, samples, 16000, subtype='PCM_16')
-            args = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-f', 'rawvideo', '-pixel_format', 'bgr24', '-video_size', '512x512', '-framerate', str(FPS), '-i', 'pipe:0', '-i', str(wav), '-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22', '-pix_fmt', 'yuv420p', '-threads', '2', '-c:a', 'aac', '-shortest', '-movflags', '+faststart', str(output)]
+            if not video_only:
+                sf.write(wav, samples, 16000, subtype='PCM_16')
+            args = ['ffmpeg', '-hide_banner', '-loglevel', 'error', '-y', '-f', 'rawvideo', '-pixel_format', 'bgr24', '-video_size', '512x512', '-framerate', str(FPS), '-i', 'pipe:0']
+            if not video_only:
+                args += ['-i', str(wav)]
+            args += ['-c:v', 'libx264', '-preset', 'ultrafast', '-crf', '22', '-pix_fmt', 'yuv420p', '-threads', '2']
+            args += ['-an'] if video_only else ['-c:a', 'aac', '-shortest']
+            args += ['-movflags', '+faststart', str(output)]
             process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
                 x1, y1, x2, y2 = self.box
-                for at in range(0, count, 8):
+                for at in range(0, count, BATCH_SIZE):
                     if cancelled.is_set():
                         raise RuntimeError('cancelled')
-                    audio = chunks[at:at + 8] + self.encoding
+                    audio = chunks[at:at + BATCH_SIZE] + self.encoding
                     latent = self.latent.expand(len(audio), -1, -1, -1)
                     prediction = self.unet(latent, torch.tensor([0], device=self.device), encoder_hidden_states=audio).sample
                     faces = self.vae.decode(prediction / self.vae.config.scaling_factor).sample
@@ -161,6 +171,9 @@ async def render(request: Request):
     # Browser clients must go through Nod.ie's same-origin bridge.
     if request.headers.get('origin') or request.headers.get('content-type', '').split(';')[0] != 'audio/wav':
         raise HTTPException(403, 'Use the local application bridge')
+    video_only = request.headers.get('x-nodie-video-only', '0')
+    if video_only not in {'0', '1'}:
+        raise HTTPException(400, 'Invalid video-only mode')
     if busy.locked():
         raise HTTPException(409, 'Renderer busy')
     async with busy:
@@ -177,7 +190,7 @@ async def render(request: Request):
         except TimeoutError:
             raise HTTPException(408, 'Audio upload timed out')
         cancelled = threading.Event()
-        task = asyncio.create_task(asyncio.to_thread(engine.render, samples, cancelled))
+        task = asyncio.create_task(asyncio.to_thread(engine.render, samples, cancelled, video_only == '1'))
         deadline = time.monotonic() + 60
         try:
             while not task.done():
