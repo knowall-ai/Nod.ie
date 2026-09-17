@@ -39,3 +39,14 @@ test('both Unmute interruption events clear speech without stopping microphone c
     await renderer.handleRealtimeMessage({ type: 'input_audio_buffer.speech_stopped' });
     assert.equal(interrupted, 2);
 });
+test('a notification uses the avatar status or its fallback, never both', () => {
+    const status = { style: {} }, fallback = { style: {} };
+    let showStatus = true;
+    const context = { window: { addEventListener() {} }, document: { readyState: 'loading', addEventListener() {}, getElementById: id => id === 'status-text' ? (showStatus ? status : null) : id === 'notification' ? fallback : null }, console: { debug() {}, log() {} }, module: { exports: {} }, setTimeout() {} };
+    vm.runInNewContext(fs.readFileSync('renderer.js', 'utf8'), context);
+    context.module.exports.showNotification('Connection failed', 'error');
+    assert.equal(status.textContent, 'Connection failed'); assert.equal(fallback.textContent, undefined);
+    showStatus = false;
+    context.module.exports.showNotification('Connection failed', 'error');
+    assert.equal(fallback.textContent, 'Connection failed');
+});

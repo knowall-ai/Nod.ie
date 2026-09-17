@@ -50,3 +50,10 @@ Speaker recognition PR #29, bounded local history, Reverie integration and voice
 The voice trial mounts an empty MCP configuration instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands and memory access are not connected in this trial. Microphone capture starts off after restart.
 
 Warm synthetic testing on this host produced first audio approximately 1–1.5 seconds after the utterance and interruption detection in 0.5–0.6 seconds. These are server packet timings, not a physical speaker/microphone latency guarantee.
+
+== Empty tool configuration regression
+
+The legacy fork incorrectly waited for a nonempty tool list before passing audio to speech recognition.
+The generated handler override tracks completion of tool initialization, including an empty configuration or initialization failure, independently of tool count.
+A browser-level synthetic test must exercise the real Opus recorder with an empty MCP configuration; a direct backend test with legacy tools does not cover this failure.
+Routine microphone state is shown by its button, without repeated status popups. Errors use one notification location with a fallback.

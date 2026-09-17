@@ -25,3 +25,4 @@ services:
       - ${NODIE_UNMUTE_DIR:?}/mcp-trial.json:/app/.mcp.json:ro
       - ${NODIE_UNMUTE_DIR:?}/mcp-trial.json:/app/.mcp.local.json:ro
       - ${NODIE_UNMUTE_DIR:?}/generated/llm_utils.py:/app/unmute/llm/llm_utils.py:ro
+      - ${NODIE_UNMUTE_DIR:?}/generated/unmute_handler.py:/app/unmute/unmute_handler.py:ro

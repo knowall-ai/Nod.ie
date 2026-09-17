@@ -78,7 +78,7 @@ const NodieRenderer = {
 
         // Fallback to corner notification
         const notification = document.getElementById('notification');
-        if (notification) {
+        if (notification && !statusText) {
             notification.textContent = text;
             notification.className = `notification ${type}`;
             notification.style.display = 'block';
@@ -357,7 +357,6 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
             if (this.state.audioCapture !== capture || this.state.isMuted) { capture.stop(); return; }
             this.state.analyser = capture.getAnalyser();
             this.controls?.update();
-            this.showNotification('Microphone active', 'success');
         } catch (error) {
             capture.stop();
             if (this.state.audioCapture === capture) { this.state.audioCapture = null; this.state.isMuted = true; this.setStatus('idle'); }
@@ -384,7 +383,6 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
         this.setStatus('idle');
         if (this.state.isMuted) this.stopMicrophone();
         else this.startMicrophone();
-        this.showNotification(this.state.isMuted ? 'Muted' : 'Unmuted');
     },
     cleanup() {
         this.localVoice?.cancel();
