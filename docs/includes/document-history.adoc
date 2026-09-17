@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|b126884 |2026-09-17 |fix: unblock speech with empty tools and remove duplicate mic notices
 |cd57d78 |2026-09-17 |fix: restore Unmute streaming voice trial and interruption handling
 |86f212f |2026-09-17 |Keep conversations enabled and independently verify spoken control intent
 |6a414f3 |2026-09-17 |Let the model infer direct address and device-control intent
@@ -9,6 +10,5 @@
 |29cb4bb |2026-09-17 |Preserve voice controls after node lookups and reduce Qwen cold starts
 |49d61bf |2026-09-17 |Improve local voice responsiveness and select Qwen for vision preparation
 |41b092d |2026-09-17 |Improve desktop controls, panel dragging and live node awareness (#25)
-|a09a8e9 |2026-09-17 |Restore neural MuseTalk lip sync and direct avatar dragging
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

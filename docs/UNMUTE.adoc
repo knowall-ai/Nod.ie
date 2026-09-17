@@ -47,7 +47,7 @@ To roll back, restore `VOICE_MODE=local`, stop the two Unmute speech containers,
 The legacy Unmute tool configuration is separate from the current local voice adapter.
 Speaker recognition PR #29, bounded local history, Reverie integration and voice-controlled device actions must be verified separately; changing the speech transport does not automatically connect them.
 
-The voice trial mounts an empty MCP configuration instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands and memory access are not connected in this trial. Microphone capture starts off after restart.
+The voice trial mounts only the read-only Reverie bridge instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands remain disconnected; Reverie recall is supplied through the bounded read-only bridge. Microphone capture starts off after restart.
 
 Warm synthetic testing on this host produced first audio approximately 1–1.5 seconds after the utterance and interruption detection in 0.5–0.6 seconds. These are server packet timings, not a physical speaker/microphone latency guarantee.
 
@@ -57,3 +57,21 @@ The legacy fork incorrectly waited for a nonempty tool list before passing audio
 The generated handler override tracks completion of tool initialization, including an empty configuration or initialization failure, independently of tool count.
 A browser-level synthetic test must exercise the real Opus recorder with an empty MCP configuration; a direct backend test with legacy tools does not cover this failure.
 Routine microphone state is shown by its button, without repeated status popups. Errors use one notification location with a fallback.
+
+== Reverie recall
+
+The streaming backend can use a narrow stdio bridge exposing only `reverie.search_memories`.
+It launches the installed Reverie package with allowlisted Neo4j connection variables, restricts searches to five records and one relationship hop, and bounds the returned reference data.
+Memory writes and arbitrary database queries are not exposed.
+Qwen chooses search terms from the conversation; use names or relevant keywords rather than assuming a failed literal search proves nothing is stored.
+
+Run `node unmute-service/prepare-memory.cjs /absolute/path/to/Nod.ie/config.js neo4j` to reuse the existing configured connection.
+The optional final hostname is used only to replace a loopback Neo4j address inside Docker.
+The generated MCP file is private, ignored by Git and mode 0600. Never print or publish it.
+Set `NODIE_NODE_MODULES` to the absolute path of the installed Nod.ie `node_modules` directory before applying the Compose override.
+The dependency directory and read-only bridge are mounted read-only; no additional credentials are embedded in committed Compose files.
+
+Memory results are supplied as untrusted reference data instead of system instructions, without the legacy 100-character truncation.
+The generated handler and MCP-manager overrides omit variable data from diagnostic log messages, including transcripts, tool arguments, memory contents and subprocess environments.
+A memory outage must be reported as unavailable, not as proof that no memories exist.
+Recognition and persistent conversation-history integration remain separate work.
