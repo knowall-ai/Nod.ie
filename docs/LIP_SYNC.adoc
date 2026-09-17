@@ -56,3 +56,5 @@ First apply the Unmute voice-cache fix that excludes unused voices from TTS load
 On the RTX 3090, the combined stack used about 22 GiB; 640 ms of speech rendered in 484 ms, with peak MuseTalk allocations around 2395 MiB.
 Real browser playback and unit checks cover ordered segments, continuous audio scheduling, mute/fallback and interruption cancellation, without physical microphone capture.
 Short segment/render buffering adds some first-audio latency compared with audio-only Unmute.
+
+PCM scheduling is independent of neural rendering. A fixed 750 ms initial playback buffer gives the first video time to render; subsequent audio is queued immediately on the same clock. Late videos catch up or are discarded when their audio has ended. Rendering timeouts cannot introduce additional silence, and cancellation during upload invalidates the segment before GPU work starts.

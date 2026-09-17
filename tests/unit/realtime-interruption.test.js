@@ -3,23 +3,28 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 test('interruption clears buffered output, drops decoded tail, and preserves Opus continuity', async () => {
-    const posts = []; let worker;
+    const posts = []; let worker; let starts=0;
     class Context {
         constructor() { this.sampleRate = 48000; this.audioWorklet = { addModule: async () => {} }; }
         createGain() { return { gain: {}, connect() {}, disconnect() {} }; }
     }
     class Worker { constructor() { worker = this; } postMessage() {} }
-    const context = { module: { exports: {} }, window: { AudioContext: Context, location: { pathname: '/' } },
+    const context = { module: { exports: {} }, window: { NodieRenderer: {onAudioPlaybackStart(){starts++}}, AudioContext: Context, location: { pathname: '/' } },
         AudioWorkletNode: class { constructor() { this.port = { postMessage: x => posts.push(x) }; } connect() {} }, Worker, console: { log() {}, info() {}, debug() {} } };
     vm.runInNewContext(fs.readFileSync('modules/audio-playback-web.js', 'utf8'), context);
     const player = new context.module.exports(); await player.initialize();
     const decoder = player.decoderWorker;
-    worker.onmessage({ data: [new Float32Array(128)] });
+    worker.onmessage({ data: {generation:0,frames:[new Float32Array(128)]} });
     player.interrupt();
-    worker.onmessage({ data: [new Float32Array(128)] });
+    await player.processAudioDelta(new Uint8Array(0));
+    assert.equal(starts,0);
+    worker.onmessage({ data: {generation:0,frames:[new Float32Array(128)]} });
     assert.deepEqual(posts.map(x => x.type), ['audio', 'reset']);
     assert.equal(player.decoderWorker, decoder);
-    player.beginResponse(); worker.onmessage({ data: [new Float32Array(128)] });
+    player.beginResponse();
+    worker.onmessage({ data: {generation:0,frames:[new Float32Array(128)]} });
+    assert.deepEqual(posts.map(x => x.type), ['audio', 'reset', 'reset']);
+    worker.onmessage({ data: {generation:player.generation,frames:[new Float32Array(128)]} });
     assert.deepEqual(posts.map(x => x.type), ['audio', 'reset', 'reset', 'audio']);
 });
 test('both Unmute interruption events clear speech without stopping microphone capture', async () => {

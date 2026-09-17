@@ -77,3 +77,6 @@ A memory outage must be reported as unavailable, not as proof that no memories e
 Recognition and persistent conversation-history integration remain separate work.
 
 The bridge also exposes `reverie.save_memory`; see the memory chapter for limits, persistence confirmation and failure behavior.
+The TTS startup stages only the selected demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
+
+Decoded audio carries a response generation. Interruptions invalidate queued output, and the decoder clears partial PCM buffers at generation changes while retaining its continuous Opus state. Late frames cannot restart animation, microphone ducking or playback in a later response.
