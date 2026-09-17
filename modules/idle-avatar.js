@@ -7,7 +7,7 @@ class IdleAvatar {
         this.clip={name:'nodie-idle',duration:6,blinks:[2.25,4.7]};
         this.enabled=enabled;this.avatarEnabled=avatarEnabled;this.speaking=false;this.generation=0;
         this.motion=window.matchMedia('(prefers-reduced-motion: reduce)');
-        this.onMotion=()=>this.refresh();this.motion.addEventListener('change',this.onMotion);
+        this.onMotion=()=>{++this.generation;this.refresh();};this.motion.addEventListener('change',this.onMotion);
         this.video?.addEventListener('ended',()=>this.scheduleNext());
         this.video?.addEventListener('error',()=>{this.available=false;this.hideIdle();});
         this.available=true;this.refresh();
@@ -20,7 +20,7 @@ class IdleAvatar {
         this.video.play().then(()=>{
             if(generation!==this.generation || this.speaking || this.disposed || !this.enabled || !this.avatarEnabled || this.motion.matches) return;
             this.video.style.opacity='1';
-        }).catch(()=>this.hideIdle());
+        }).catch(()=>{if(generation===this.generation && !this.disposed)this.hideIdle();});
     }
     hideIdle() {clearTimeout(this.motionTimer);if(this.video){this.video.style.opacity='0';this.video.pause();}}
     setEnabled(enabled, avatarEnabled=this.avatarEnabled) {this.enabled=enabled;this.avatarEnabled=avatarEnabled;++this.generation;this.refresh();}

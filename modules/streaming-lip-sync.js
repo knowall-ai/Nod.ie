@@ -113,7 +113,7 @@ class StreamingLipSync {
         },Math.max(0,(job.at-this.context.currentTime)*1000));
     }
     /** Release the active video and its object URL. */
-    release(continuing = this.sources.size > 0) {
+    release(continuing = [...this.sources].some(source => source !== this.activeJob?.source)) {
         this.renderer.state.avatarManager?.idle?.holdSpeech(this.player, continuing);
         clearTimeout(this.videoTimer);clearTimeout(this.syncTimer); this.activeJob=null;
         if(this.player) { this.player.onended=null;this.player.onerror=null;this.player.pause();this.player.removeAttribute('src');this.player.load();this.player=null; }

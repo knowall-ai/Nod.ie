@@ -37,3 +37,13 @@ test('a head tilt cannot be selected again within one minute',()=>{
  const h=harness();h.idle.scheduleNext();h.run();assert.equal(h.idle.clip.name,'nodie-head-tilt');
  h.idle.scheduleNext();h.run();assert.notEqual(h.idle.clip.name,'nodie-head-tilt');h.idle.dispose();
 });
+
+test('a stale play rejection cannot hide a newer motion-preference playback',async()=>{
+ const h=harness();await Promise.resolve();let reject;
+ h.video.play=()=>new Promise((_resolve,r)=>{reject=r});h.idle.refresh();
+ h.motion.matches=true;h.idle.onMotion();
+ h.video.play=()=>{h.video.paused=false;return Promise.resolve()};
+ h.motion.matches=false;h.idle.onMotion();await Promise.resolve();
+ reject(new Error('old attempt'));await Promise.resolve();await Promise.resolve();
+ assert.equal(h.video.paused,false);assert.equal(h.video.style.opacity,'1');h.idle.dispose();
+});

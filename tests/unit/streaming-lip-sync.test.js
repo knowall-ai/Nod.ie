@@ -70,3 +70,11 @@ test('the final audio restores idle even when its video never arrives',async()=>
     pending[1](new Uint8Array(16));await tick();assert.equal(h.queue.activeJob,null);
     h.queue.cancel();
 });
+
+test('expiring final video does not count its own source as continuing speech',async()=>{
+ const h=harness(()=>new Promise(()=>{}));const held=[];
+ h.queue.renderer.state.avatarManager.idle={prepareSpeech(){},holdSpeech(_v,c){held.push(c)}};
+ h.queue.push(new Float32Array(30720),48000);
+ h.queue.activeJob={source:h.sources[0]};h.queue.release();
+ assert.equal(held.at(-1),false);h.queue.cancel();
+});
