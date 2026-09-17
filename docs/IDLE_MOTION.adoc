@@ -1,0 +1,19 @@
+== Idle portrait motion
+
+The bundled six-second silent idle clip provides occasional blinks and small head movements. It is rendered offline with https://github.com/KlingAIResearch/LivePortrait[LivePortrait] and played locally; no extra neural model remains resident during conversation. The generated motion is applied as a difference from the rendered neutral pose, preserving the original portrait and background. First and last frames return to the same neutral pose. Keyframes are interpolated to 25 frames per second.
+
+image::idle-avatar.png[Idle avatar,250,250]
+
+=== Controls and handoff
+
+*Idle motion* in Settings disables the clip independently of speech lip sync. Operating-system reduced-motion preferences also disable idle playback. Hidden avatars pause idle video. Missing or failed media leave the static portrait visible.
+
+When speech audio arrives, an in-progress blink can finish (at most 360 ms), then the idle layer dissolves to neutral over 160 ms. Each response has a 750 ms initial speech buffer; subsequent audio remains independently scheduled and never waits for neural rendering. A decoded speech frame must be presented before its layer is revealed. During segment changes, a canvas holds the previous frame until the next is presented. Interruption immediately cancels audio and invalidates pending transitions. These measures avoid blank frames; perceptual smoothness still requires visual testing on the target desktop.
+
+=== Rebuilding the bundled clip
+
+The offline script is `scripts/render-idle-avatar.py`. It requires the official LivePortrait source at commit `9b294b3d0536135442ea73cb01e6cb3ca7029dd3` and human base/retargeting weights from `KlingTeam/LivePortrait` at revision `82a4fa6735ca58432b6ce39301b4b9ee066dea47`. LivePortrait code is MIT licensed. This path uses the calibrated bundled portrait crop, not InsightFace models or face recognition. Keep the external source and weights outside the application repository.
+
+Use the existing `nodie/musetalk-neural:local` image with no network or GPU access, two CPU cores, an 8 GiB memory limit, a read-only filesystem and a small temporary filesystem. Mount the external source at `/liveportrait` read-only, the avatar directory at `/avatars` read-only and a writable output directory at `/output`. Run the renderer with the current user UID/GID. It writes 150 PNG frames; encode them with FFmpeg at 25 fps using H.264, `yuv420p`, CRF 18 and `+faststart`, without audio, to `assets/avatars/nodie-idle.mp4`.
+
+The script generates only the bundled avatar. It is not exposed through IPC or HTTP. Generated model weights and intermediate frames must not be committed. The runtime uses only the small MP4 asset, with no network download.

@@ -1,0 +1,69 @@
+/** Local idle video and bounded, cancellable transitions around speech playback. */
+class IdleAvatar {
+    constructor({enabled=true, avatarEnabled=true}={}) {
+        this.video=document.getElementById('avatar-idle');
+        this.cover=document.getElementById('avatar-handoff');
+        this.enabled=enabled;this.avatarEnabled=avatarEnabled;this.speaking=false;this.generation=0;
+        this.motion=window.matchMedia('(prefers-reduced-motion: reduce)');
+        this.onMotion=()=>this.refresh();this.motion.addEventListener('change',this.onMotion);
+        this.video?.addEventListener('error',()=>{this.available=false;this.hideIdle();});
+        this.available=true;this.refresh();
+    }
+    /** Start the bundled, silent idle clip only when motion and avatar are enabled. */
+    refresh() {
+        if(this.disposed || !this.video) return;
+        if(!this.enabled || !this.avatarEnabled || this.motion.matches || this.speaking || !this.available) {this.hideIdle();return;}
+        const generation=this.generation;
+        this.video.play().then(()=>{
+            if(generation!==this.generation || this.speaking || this.disposed || !this.enabled || !this.avatarEnabled || this.motion.matches) return;
+            this.video.style.opacity='1';
+        }).catch(()=>this.hideIdle());
+    }
+    hideIdle() {if(this.video){this.video.style.opacity='0';this.video.pause();}}
+    setEnabled(enabled, avatarEnabled=this.avatarEnabled) {this.enabled=enabled;this.avatarEnabled=avatarEnabled;++this.generation;this.refresh();}
+    /** Finish an in-progress blink, then dissolve to the unchanged neutral portrait. */
+    prepareSpeech() {
+        if(this.speaking) return this.settled || Promise.resolve();
+        this.speaking=true;const generation=++this.generation;clearTimeout(this.idleTimer);
+        const t=this.video?.currentTime%6;
+        let blinkRemaining=0;
+        for(const center of [2.25,4.7]) if(t>=center-.18 && t<center+.18) blinkRemaining=Math.max(blinkRemaining,(center+.18-t)*1000);
+        this.settled=new Promise(resolve=>{
+            setTimeout(()=>{
+                if(generation!==this.generation || this.disposed){resolve();return;}
+                if(this.video)this.video.style.opacity='0';
+                setTimeout(()=>{if(generation===this.generation)this.video?.pause();resolve();},160);
+            },Math.min(360,blinkRemaining));
+        });
+        return this.settled;
+    }
+    /** Preserve a decoded frame while the shared speech element loads its next segment. */
+    holdSpeech(video, continuing=false) {
+        if(this.cover && video?.readyState>=2) {
+            try {const ctx=this.cover.getContext('2d');ctx.drawImage(video,0,0,this.cover.width,this.cover.height);this.cover.style.transition='none';this.cover.style.opacity='1';}catch{}
+        }
+        if(continuing)return;
+        this.speaking=false;this.settled=null;const generation=++this.generation;
+        clearTimeout(this.idleTimer);
+        this.idleTimer=setTimeout(()=>{
+            if(generation!==this.generation || this.disposed)return;
+            this.fadeCover();if(this.video)this.video.currentTime=0;this.refresh();
+        },160);
+    }
+    /** Reveal only a decoded frame; stale readiness callbacks cannot replace a newer face. */
+    revealSpeech(video) {
+        const generation=this.generation;
+        const show=()=>{
+            if(generation!==this.generation || !this.speaking || this.disposed || video.paused)return;
+            video.style.opacity='1';this.fadeCover();
+        };
+        if(video.requestVideoFrameCallback) video.requestVideoFrameCallback(show);
+        else if(video.readyState>=2) show();
+        else video.addEventListener('loadeddata',show,{once:true});
+    }
+    fadeCover(){if(this.cover){this.cover.style.transition='opacity 120ms linear';this.cover.style.opacity='0';}}
+    /** Stop idle media and invalidate delayed transitions on application shutdown. */
+    dispose(){this.disposed=true;++this.generation;clearTimeout(this.idleTimer);this.hideIdle();this.motion.removeEventListener('change',this.onMotion);}
+}
+if(typeof window!=='undefined')window.IdleAvatar=IdleAvatar;
+if(typeof module!=='undefined')module.exports={IdleAvatar};

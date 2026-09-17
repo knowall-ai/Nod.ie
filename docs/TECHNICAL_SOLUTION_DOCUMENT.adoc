@@ -32,3 +32,5 @@ include::TROUBLESHOOTING.adoc[]
 include::FAQS.adoc[]
 include::TERMS.adoc[]
 include::CONTACTS.adoc[]
+
+include::IDLE_MOTION.adoc[]

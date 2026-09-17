@@ -304,3 +304,10 @@ body[data-platform="electron"] #circle { touch-action: none; user-select: none; 
     width: max-content; max-width: 170px; padding: 4px 8px;
     border-radius: 12px; background: #291507cc; font-size: 11px;
 }
+
+/* The neutral canvas stays beneath both decoded video layers; never expose a blank face. */
+#avatar-idle, #avatar-handoff { position:absolute; width:250px; height:250px; object-fit:cover; border-radius:50%; pointer-events:none; opacity:0; }
+#avatar-idle { z-index:11; transition:opacity 160ms linear; }
+#avatar-handoff { z-index:13; }
+.avatar-active.avatar-speaking #avatar-canvas { display:block !important; }
+#avatar-video { z-index:12; transition:opacity 120ms linear; }

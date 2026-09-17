@@ -334,7 +334,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
 
                     // Return avatar to idle after a short delay to allow final audio to play
                     setTimeout(() => {
-                        if (this.state.avatarManager && !this.isAssistantSpeaking) {
+                        if (this.state.avatarManager && !this.isAssistantSpeaking && !this.streamingLips?.sources.size) {
                             this.state.avatarManager.setSpeechVideo(false);
                         }
                     }, 500);
@@ -525,6 +525,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                 window.CONFIG = window.NodieConfig = config;
                 this.state.avatarEnabled = config.AVATAR_ENABLED;
                 this.state.avatarManager?.setEnabled(config.AVATAR_ENABLED);
+                if(this.state.avatarManager) {this.state.avatarManager.idleEnabled=config.AVATAR_IDLE_ENABLED;this.state.avatarManager.idle?.setEnabled(config.AVATAR_IDLE_ENABLED,config.AVATAR_ENABLED);}
                 this.stopMicrophone(); this.stopPlayback();
                 if (this.localVoice) { this.localVoice.cancel(); this.localVoice.initialize(); } else this.connectToUnmute();
             });
