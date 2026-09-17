@@ -253,6 +253,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                 }
 
                 if (['input_audio_buffer.speech_started', 'unmute.interrupted_by_vad'].includes(data.type)) {
+                    clearTimeout(this.avatarResetTimer);
                     this.state.audioPlayback?.interrupt();
                     this.isAssistantSpeaking = false;
                     this.responseAudioStarted = false;
@@ -265,6 +266,8 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
 
                 // Reset audio playback notification flag for new responses
                 if (data.type === 'response.created') {
+                    clearTimeout(this.avatarResetTimer);
+                    this.avatarResetTimer = null;
                     if (this.state.audioPlayback) {
                         this.state.audioPlayback.beginResponse();
                     }
@@ -331,8 +334,9 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                     // console.log('🔇 Assistant finished speaking');
 
                     // Return avatar to idle after a short delay to allow final audio to play
-                    setTimeout(() => {
-                        if (this.state.avatarManager && !this.isAssistantSpeaking) {
+                    clearTimeout(this.avatarResetTimer);
+                    this.avatarResetTimer = setTimeout(() => {
+                        if (this.state.avatarManager) {
                             this.state.avatarManager.setSpeechVideo(false);
                         }
                     }, 500);

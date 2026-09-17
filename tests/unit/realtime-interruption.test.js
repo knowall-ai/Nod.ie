@@ -55,3 +55,10 @@ test('a notification uses the avatar status or its fallback, never both', () => 
     context.module.exports.showNotification('Connection failed', 'error');
     assert.equal(fallback.textContent, 'Connection failed');
 });
+test('a new response cancels the previous response avatar-reset timer',async()=>{
+ const timers=new Map();let next=0,resets=0;
+ const context={window:{addEventListener(){}},document:{readyState:'loading',addEventListener(){}},console:{log(){},debug(){}},module:{exports:{}},setTimeout:(fn)=>{timers.set(++next,fn);return next},clearTimeout:id=>timers.delete(id)};
+ vm.runInNewContext(fs.readFileSync('renderer.js','utf8'),context);const r=context.module.exports;r.flushPCMAudio=()=>{};r.state.avatarManager={setSpeechVideo(){resets++}};
+ await r.handleRealtimeMessage({type:'response.created'});await r.handleRealtimeMessage({type:'response.done'});assert.equal(timers.size,1);
+ await r.handleRealtimeMessage({type:'response.created'});assert.equal(timers.size,0);assert.equal(resets,0);
+});
