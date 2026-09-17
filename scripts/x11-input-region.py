@@ -109,12 +109,12 @@ def main():
         x.XFree(values)
         return result
 
-    applied = {}
     shaped = set()
     data, pending = None, b''
     cached = None
     buffer = None
     count = 0
+    expected = ()
     try:
         while True:
             readable, _, _ = select.select([sys.stdin], [], [], 0.05)
@@ -130,7 +130,6 @@ def main():
                         raise ValueError('Input region message too large')
                     data = json.loads(line)
                     changed = True
-                    applied.clear()
                 if len(pending) > 8192:
                     raise ValueError('Input region message too large')
             if data is None:
@@ -144,13 +143,15 @@ def main():
                     values = rectangles(data, width, height)
                     count = len(values)
                     buffer = (Rectangle * count)(*values)
+                    expected = tuple((r.x, r.y, r.width, r.height) for r in values)
                     cached = (id(data), width, height)
                 for target in frames():
                     current = signature(target)
-                    if applied.get(target) != (width, height, current):
+                    # Compare with our intended mask, never a read-back that
+                    # Electron/KWin may already have reset in another connection.
+                    if current != expected:
                         shape.XShapeCombineRectangles(display, target, 2, 0, 0, buffer, count, 0, 3)
                         x.XSync(display, 0)
-                        applied[target] = (width, height, signature(target))
                         shaped.add(target)
             x.XSync(display, 0)
             if changed:

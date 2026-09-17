@@ -33,6 +33,14 @@ app.whenReady().then(async () => {
  const moved = read();
  assert.equal(contains(moved[2], 0, 0), false);
  assert.equal(contains(moved[2], width / 2, height / 2), true);
+ // Repeated external resets must never become the helper's desired mask.
+ for (let attempt = 0; attempt < 8; attempt++) {
+  execFileSync('python3', [path.join(__dirname, 'helpers/x11-input-region-read.py'), id, '--reset-input']);
+  await new Promise(resolve => setTimeout(resolve, 150));
+  const restored = read()[2];
+  assert.equal(contains(restored, 0, 0), false);
+  for (const r of regions) assert.equal(contains(restored, (r.x+r.width/2)*width/300, (r.y+r.height/2)*height/300), true);
+ }
  await send(null); assert.deepEqual(read()[2],initial[2]);
  await send({width:300,height:300,regions});
  child.stdin.end(); await new Promise(r=>child.once('exit',r)); assert.deepEqual(read()[2],initial[2]);
