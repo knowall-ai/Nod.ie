@@ -83,7 +83,7 @@ class StreamingLipSync {
         const player=this.player=video;
         this.url=URL.createObjectURL(new Blob([job.video], {type:'video/mp4'}));
         if(this.renderer.state.avatarManager?.idle) player.style.opacity='0';
-        player.src=this.url;player.loop=false;player.muted=true;player.load();
+        player.src=this.url;player.loop=false;player.muted=true;player.playbackRate=1;player.load();
         const fail=()=>{ if(generation===this.generation && this.player===player) this.renderer.state.avatarManager?.setSpeechVideo(false); };
         player.onerror=fail;
         this.videoTimer=setTimeout(async()=>{
@@ -92,13 +92,28 @@ class StreamingLipSync {
             // A late video catches up to the independent audio clock; it never delays speech.
             player.currentTime=Math.max(0,this.context.currentTime-job.at);
             this.renderer.state.avatarManager?.setSpeechVideo(true);
-            try {await player.play();if(generation===this.generation && this.player===player && this.activeJob===job)this.renderer.state.avatarManager?.idle?.revealSpeech(player);} catch {fail();}
+            try {
+                await player.play();
+                if(generation!==this.generation || this.player!==player || this.activeJob!==job || job.ended)return;
+                // Decoder startup advances the audio clock after the initial seek.
+                const elapsed=this.context.currentTime-job.at;
+                if(elapsed>=job.until-job.at){this.release();this.playNext();return;}
+                // Seeking again stalls decoding; gently catch up against the audio clock.
+                const synchronize=()=>{
+                    if(generation!==this.generation || this.player!==player || this.activeJob!==job || job.ended)return;
+                    const drift=this.context.currentTime-job.at-player.currentTime;
+                    player.playbackRate=Math.max(.9,Math.min(1.3,1+drift*4));
+                    this.syncTimer=setTimeout(synchronize,40);
+                };
+                synchronize();
+                this.renderer.state.avatarManager?.idle?.revealSpeech(player);
+            } catch {fail();}
         },Math.max(0,(job.at-this.context.currentTime)*1000));
     }
     /** Release the active video and its object URL. */
     release(continuing = this.sources.size > 0) {
         this.renderer.state.avatarManager?.idle?.holdSpeech(this.player, continuing);
-        clearTimeout(this.videoTimer); this.activeJob=null;
+        clearTimeout(this.videoTimer);clearTimeout(this.syncTimer); this.activeJob=null;
         if(this.player) { this.player.onended=null;this.player.onerror=null;this.player.pause();this.player.removeAttribute('src');this.player.load();this.player=null; }
         if(this.url) URL.revokeObjectURL(this.url); this.url=null;
         this.renderer.state.avatarManager?.setSpeechVideo(false);

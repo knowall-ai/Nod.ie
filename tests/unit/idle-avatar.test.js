@@ -16,7 +16,7 @@ test('hold the previous frame until a decoded speech frame is presented',async()
  const h=harness();h.idle.prepareSpeech();h.run();h.run();
  const speech={readyState:2,paused:false,style:{},requestVideoFrameCallback(cb){this.ready=cb}};
  h.idle.holdSpeech(speech,true);assert.equal(h.draws(),1);assert.equal(h.cover.style.opacity,'1');
- h.idle.revealSpeech(speech);assert.equal(speech.style.opacity,undefined);speech.ready();assert.equal(speech.style.opacity,'1');assert.equal(h.cover.style.opacity,'0');
+ h.idle.revealSpeech(speech);assert.equal(speech.style.opacity,undefined);speech.ready();assert.equal(speech.style.opacity,'1');assert.equal(h.cover.style.opacity,'0');assert.equal(h.cover.style.transition,'none');assert.equal(speech.style.transition,'none');
 });
 test('interruption invalidates a delayed decoded-frame callback',()=>{
  const h=harness();h.idle.prepareSpeech();const speech={readyState:2,paused:false,style:{},requestVideoFrameCallback(cb){this.ready=cb}};

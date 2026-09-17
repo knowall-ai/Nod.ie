@@ -58,6 +58,7 @@ class IdleAvatar {
     }
     /** Preserve a decoded frame while the shared speech element loads its next segment. */
     holdSpeech(video, continuing=false) {
+        this.continuingSpeech=continuing;
         if(this.cover && video?.readyState>=2) {
             try {const ctx=this.cover.getContext('2d');ctx.drawImage(video,0,0,this.cover.width,this.cover.height);this.cover.style.transition='none';this.cover.style.opacity='1';}catch{}
         }
@@ -74,7 +75,12 @@ class IdleAvatar {
         const generation=this.generation;
         const show=()=>{
             if(generation!==this.generation || !this.speaking || this.disposed || video.paused)return;
-            video.style.opacity='1';this.fadeCover();
+            // Between speech segments, replace the held frame immediately once decoded.
+            // Crossfading mouth shapes repeatedly makes articulation appear sluggish.
+            video.style.transition=this.continuingSpeech?'none':'opacity 120ms linear';
+            video.style.opacity='1';
+            if(this.continuingSpeech && this.cover){this.cover.style.transition='none';this.cover.style.opacity='0';}
+            else this.fadeCover();
         };
         if(video.requestVideoFrameCallback) video.requestVideoFrameCallback(show);
         else if(video.readyState>=2) show();

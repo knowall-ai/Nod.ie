@@ -42,3 +42,15 @@ test('server rejects segments cancelled while their upload was in progress',asyn
     const generation=server.generation;server.cancel();
     await assert.rejects(server.render(new Uint8Array(44),generation),/cancelled/);
 });
+
+test('video catches up with audio after asynchronous decoder startup',async()=>{
+    const h=harness(async()=>new Uint8Array(16));
+    h.video.play=async()=>{h.queue.context.currentTime=1.03;};
+    h.queue.push(new Float32Array(30720),48000);
+    await new Promise(r=>setTimeout(r,800));
+    assert.equal(h.video.currentTime,0);
+    assert.equal(h.video.playbackRate,1.3);
+    h.video.currentTime=.29;await new Promise(r=>setTimeout(r,50));
+    assert.ok(h.video.playbackRate<1 && h.video.playbackRate>=.9);
+    h.queue.cancel();
+});
