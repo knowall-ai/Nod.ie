@@ -10,4 +10,4 @@ Voice errors distinguish transcription, language-model and speech-synthesis fail
 
 === Lip-sync status
 
-Realtime MuseTalk integration remains in the source, but the lightweight local voice path currently displays a static avatar. The inspected legacy deployment had a Python syntax error, disabled model loading and an empty mounted model directory. Docker's running state alone did not establish application health. Restoring generated lip-sync requires repairing that deployment, verifying model assets and measuring latency/VRAM before connecting it to local speech playback. Ordinary video playback is not a substitute for generated lip-sync.
+Local voice uses the optional neural MuseTalk service described in the lip synchronisation section. A failed render records `lip-sync.unavailable` without logging reply contents and permits audio-only playback. The service's `/health` endpoint reports actual model readiness, busy state and the last render's timing/GPU allocation. Docker's running state alone is insufficient evidence of readiness.

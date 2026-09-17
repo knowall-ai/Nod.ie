@@ -17,7 +17,7 @@ contextBridge.exposeInMainWorld('nodie', {
     onConfigChanged: (fn) => subscribe('config-changed', fn),
     onQuit: (fn) => subscribe('app-will-quit', fn),
     beginDrag: () => ipcRenderer.send('begin-drag'),
-    endDrag: () => ipcRenderer.send('end-drag'),
+    endDrag: () => ipcRenderer.invoke('end-drag'),
     getDiagnostics: () => ipcRenderer.invoke('diagnostics-status'),
     getSecurityStatus: () => ipcRenderer.invoke('security-status'),
     scanSecurity: () => ipcRenderer.invoke('security-scan'),

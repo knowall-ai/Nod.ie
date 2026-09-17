@@ -1,0 +1,39 @@
+services:
+  nodie-musetalk:
+    image: nodie/musetalk-neural:local
+    build:
+      context: .
+      dockerfile: Dockerfile.neural
+    container_name: nodie-musetalk
+    ports:
+      - "127.0.0.1:8768:8765"
+    volumes:
+      - ../voice-models/musetalk:/models:ro
+      - ../assets/avatars:/avatars:ro
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 4
+    mem_limit: 12g
+    pids_limit: 256
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "2"
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s

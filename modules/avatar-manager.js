@@ -116,6 +116,12 @@ class AvatarManager {
         }
     }
 
+    setSpeechVideo(active) {
+        const circle = document.getElementById('circle');
+        circle?.classList.toggle('avatar-speaking', Boolean(active && this.enabled));
+        this.setAnimationMode(Boolean(active && this.enabled));
+    }
+
     showAvatar() {
         const circle = document.getElementById('circle');
         circle.classList.add('avatar-active', 'avatar-static');
@@ -132,6 +138,7 @@ class AvatarManager {
     }
 
     hideAvatar() {
+        this.setSpeechVideo(false);
         const circle = document.getElementById('circle');
         circle.classList.remove('avatar-active', 'avatar-animated', 'avatar-static');
         document.body.classList.remove('avatar-enabled');
@@ -396,6 +403,7 @@ class AvatarManager {
     }
 
     cleanup() {
+        this.setSpeechVideo(false);
         this.disposed = true;
         this.musetalkWsClient?.disconnect();
         this.clearFrameQueue();

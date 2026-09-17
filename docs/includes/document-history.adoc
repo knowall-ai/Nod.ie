@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|1c5cc6c |2026-09-17 |Bind update approvals to resolved Compose configuration
 |56f7bbb |2026-09-17 |Preserve bounded conversation history and correct HiDPI window dragging
 |3398c65 |2026-09-17 |Add private structured logs and read-only activity diagnostics
 |88ee6bf |2026-09-17 |Merge master while retaining the hardened desktop and voice implementation
@@ -9,6 +10,5 @@
 |d15092a |2026-09-17 |Improve desktop voice, security monitoring and branded documentation
 |18db8b0 |2025-07-17 |Document STT/TTS connection limits and batch size configuration
 |36990cc |2025-07-12 |Fix settings window issues and voice selection
-|cb04bb6 |2025-07-12 |fix: Implement settings window GUI (fixes #2)
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

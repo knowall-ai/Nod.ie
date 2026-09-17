@@ -1,0 +1,9 @@
+diffusers==0.40.0
+transformers==5.17.0
+fastapi==0.141.1
+uvicorn==0.53.0
+safetensors==0.8.0
+numpy==2.2.6
+scipy==1.15.3
+opencv-python-headless==4.11.0.86
+soundfile==0.13.1

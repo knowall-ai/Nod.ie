@@ -15,9 +15,9 @@ function start() {
     const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
-    const voice = new LocalVoice({ logger, historyStore, diagnostics: () => diagnostics.status() });
-    let mainWindow, settingsWindow, tray, monitor, dragTimer, dragDeadline;
-    const stopDrag = () => { clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; };
+    const voice = new LocalVoice({ logger, historyStore, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
+    let mainWindow, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
+    const stopDrag = () => { updateDrag?.(); clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; updateDrag = null; return dragMoved; };
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
     const isLocalFrame = (event, file) => event.senderFrame === event.sender.mainFrame && event.senderFrame.url === pathToFileURL(path.join(__dirname, file)).href;
     const trusted = event => [mainWindow, settingsWindow].some(win => win && !win.isDestroyed() && event.sender === win.webContents) && (isLocalFrame(event, 'index.html') || isLocalFrame(event, 'settings.html'));
@@ -71,14 +71,18 @@ function start() {
         const [x, y] = mainWindow.getPosition();
         // Cursor and window positions are both desktop-independent pixels. Renderer
         // screenX/screenY mix coordinate spaces on scaled X11 desktops.
-        dragTimer = setInterval(() => {
-            if (mainWindow.isDestroyed()) return stopDrag();
+        dragMoved = false;
+        updateDrag = () => {
+            if (mainWindow.isDestroyed()) return;
             const point = screen.getCursorScreenPoint();
+            if (!dragMoved && Math.hypot(point.x - origin.x, point.y - origin.y) < 5) return;
+            dragMoved = true;
             mainWindow.setPosition(Math.round(x + point.x - origin.x), Math.round(y + point.y - origin.y));
-        }, 16);
+        };
+        dragTimer = setInterval(updateDrag, 16);
         dragDeadline = setTimeout(stopDrag, 30000);
     });
-    ipcMain.on('end-drag', event => { if (trusted(event) && event.sender === mainWindow.webContents) stopDrag(); });
+    ipcMain.handle('end-drag', event => { if (!trusted(event) || event.sender !== mainWindow.webContents) throw new Error('Untrusted drag'); return stopDrag(); });
     handle('security-status', () => monitor.status());
     handle('security-scan', () => monitor.scan(), true);
     handle('security-dismiss', id => monitor.dismiss(id), true);

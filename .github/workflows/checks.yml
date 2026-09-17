@@ -16,6 +16,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm test
+      - name: Check neural service and model setup syntax
+        run: python3 -m py_compile musetalk-service/neural_api.py scripts/setup-neural-models.py
       - run: npm audit --audit-level=high
   documentation:
     runs-on: ubuntu-latest

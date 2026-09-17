@@ -2,6 +2,6 @@
 
 Documentation follows the KnowAll AI family used by Reverie: luminous green `#22C55E`, near-black `#020604`, and the white KnowAll.ai mark on the cover. The logo is reused from the public Reverie repository. Body pages use dark text on white for legibility; headings and links use darker green `#166534` for contrast.
 
-PDF typography uses bundled DejaVu Sans faces (licence included in `docs/themes`), with monospace code blocks. The custom theme defines A4 pages, consistent margins, running KnowAll AI/Nod.ie headers and page numbers. The existing Nod.ie overlay artwork is retained.
+PDF typography uses bundled DejaVu Sans faces (licence included in `docs/themes`), with monospace code blocks. The custom theme defines A4 pages, consistent margins, running KnowAll AI/Nod.ie headers and page numbers. The existing Nod.ie overlay artwork is retained. The desktop grab handle follows Nod.ie's orange/yellow identity: amber `#F5A623`, orange hover `#EE8B22`, yellow focus `#FFD45C`, and dark brown text `#291507`. The PDF retains KnowAll AI's green branding.
 
 The implementation follows the documentation, generate-docs and brand-guidelines skills in the T-Minus-15 plugin referenced by KnowAll AI's company plugin. The technical-document build uses the skill's canonical output filename; it is not a separately issued client proposal.
