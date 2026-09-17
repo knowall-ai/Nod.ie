@@ -13,7 +13,7 @@ npm start
 npm run web
 ----
 
-The browser defaults to `http://127.0.0.1:8095`. Keep its server running, or use the documented user-service launcher. In local mode, click the avatar once to speak and again to send. Click during processing/playback to cancel. Audio is capped at 30 seconds and 5 MB.
+The browser defaults to `http://127.0.0.1:8095`. Keep its server running, or use the documented user-service launcher. In local mode, click the microphone to enable continuous conversation; after detected speech, 900 ms of silence submits automatically. After a reply, listening resumes automatically. The mic button or a spoken microphone-off request ends the loop. Clicking the avatar while recording submits early; clicking it during processing/playback cancels. Audio is capped at 30 seconds and 5 MB. To change a voice control, address her by name: for example, “Nodie, mute yourself” or “Nodie, stop listening”. She interprets natural wording such as “Hey Nodie” or “Could you mute yourself, Nodie?” and likely transcription mistakes in her name. If the intended addressee or action is unclear, she should ask for clarification. Ordinary questions do not require the name; this does not wake a muted microphone.
 
 === Ubuntu sandbox
 
@@ -21,7 +21,7 @@ On Ubuntu systems restricting unprivileged user namespaces, Electron may need an
 
 === Configuration
 
-`VOICE_MODE=local` selects the lightweight path. Set `LOCAL_STT_URL`, `LOCAL_STT_MODEL`, `LOCAL_TTS_URL`, `OLLAMA_URL` and `LOCAL_LLM_MODEL`. The speech service must implement `/api/tts` returning WAV; the transcription service must implement `/v1/audio/transcriptions`.
+`VOICE_MODE=local` selects the lightweight path. Set `LOCAL_STT_URL`, `LOCAL_STT_MODEL`, `LOCAL_TTS_URL`, `OLLAMA_URL` and `LOCAL_LLM_MODEL`. The selected local model is `qwen3.5:9b` (download with `ollama pull qwen3.5:9b`); set `LOCAL_LLM_MODEL=qwen3.5:9b`. Its voice requests disable thinking. Camera input remains a separate, unimplemented capability. The speech service must implement `/api/tts` returning WAV; the transcription service must implement `/v1/audio/transcriptions`.
 
 Realtime mode requires `UNMUTE_BACKEND_URL`, `LLM_MODEL` and `VOICE_MODEL`. Keep dedicated speech models stopped when unused on constrained hosts. Nod.ie does not automatically start them.
 
@@ -31,6 +31,6 @@ Install the Ruby gems listed in `docs/Gemfile`, then run `npm run docs`. The bui
 
 === Optional CPU voice and persistent browser
 
-Run `bash scripts/setup-cpu-voice.sh` to install the pinned Python runtime and verify the downloaded model checksums. Run `bash scripts/start-voice-service.sh` on Linux with a user systemd session. The service binds to loopback port 8104, uses two CPU inference threads, and is limited to 1 GB of memory and two CPU cores. Configure `LOCAL_TTS_URL=http://127.0.0.1:8104`, `LOCAL_TTS_VOICE=af_heart`, and `LOCAL_TTS_SPEED=1.06`. Other supported voices are `af_bella`, `bf_emma` and `bf_isabella`.
+Run `bash scripts/setup-cpu-voice.sh` to install the pinned Python runtime and verify the downloaded model checksums. Run `bash scripts/start-voice-service.sh` on Linux with a user systemd session. The service binds to loopback port 8104, uses four CPU inference threads, and is limited to 1 GB of memory and four CPU cores. Configure `LOCAL_TTS_URL=http://127.0.0.1:8104`, `LOCAL_TTS_VOICE=af_heart`, and `LOCAL_TTS_SPEED=1.06`. Other supported voices are `af_bella`, `bf_emma` and `bf_isabella`.
 
 Run `bash scripts/start-web-service.sh` for a browser server that survives closing the launching terminal. These transient user services last for the current user session; they do not install a boot service. Stop them with `systemctl --user stop nodie-web nodie-voice`. Restart the browser server after changing `.env`.

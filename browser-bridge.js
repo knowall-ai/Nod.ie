@@ -3,7 +3,7 @@ if (!window.nodie && window.ENV_CONFIG?.VOICE_MODE === 'local') {
     const post = async (route, body, type = 'application/octet-stream') => {
         const response = await fetch(route, { method: 'POST', headers: { 'Content-Type': type }, body });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Voice request failed');
+        if (!response.ok) { const error = new Error(result.error || 'Voice request failed'); error.code = result.code; throw error; }
         return result;
     };
     window.nodie = {

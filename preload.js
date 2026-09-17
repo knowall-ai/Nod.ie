@@ -8,7 +8,11 @@ contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
     clearHistory: () => ipcRenderer.invoke('clear-history'),
     voiceHealth: () => ipcRenderer.invoke('voice-health'),
-    voiceTurn: (audio) => ipcRenderer.invoke('voice-turn', audio),
+    voiceTurn: async (audio) => {
+        const result = await ipcRenderer.invoke('voice-turn', audio);
+        if (result.failure) { const error = new Error(result.failure.error); error.code = result.failure.code; throw error; }
+        return result;
+    },
     voiceCancel: () => ipcRenderer.invoke('voice-cancel'),
     getConfig: () => ipcRenderer.invoke('get-config'),
     getSystemPrompt: () => ipcRenderer.invoke('get-system-prompt'),
