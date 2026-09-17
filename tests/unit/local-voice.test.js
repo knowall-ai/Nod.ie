@@ -100,3 +100,57 @@ test('an empty successful transcription is no-speech, not a failed service', asy
     await assert.rejects(voice.converse(new Uint8Array(200)), { code: 'no-speech', status: 422 });
     assert.equal(events.at(-1).code, 'no-speech'); assert.equal(voice.busy, false);
 });
+
+test('stage timings diagnose slow and failed requests without logging conversation content', async () => {
+    const events = []; const wav = Buffer.alloc(44); wav.write('RIFF');
+    const voice = new LocalVoice({ config, logger: { write: (_level, event, fields) => events.push({ event, ...fields }) }, fetchImpl: async url => {
+        if (url.includes('transcriptions')) return Response.json({ text: 'private conversation' });
+        if (url.includes('/api/chat')) return Response.json({ message: { tool_calls: [{ function: { name: 'respond_to_user', arguments: { reply: 'private reply' } } }] } });
+        return new Response(wav);
+    } });
+    await voice.converse(new Uint8Array(200));
+    const stages = events.filter(e => e.event === 'voice.stage');
+    assert.deepEqual(stages.map(e => e.stage), ['transcription', 'memory', 'model', 'speech']);
+    assert.ok(stages.every(e => Number.isFinite(e.durationMs) && e.durationMs >= 0));
+    assert.ok(!JSON.stringify(events).includes('private'));
+    events.length = 0;
+    voice.fetch = async () => { throw new Error('private service error'); };
+    await assert.rejects(voice.converse(new Uint8Array(200)), { code: 'transcription' });
+    assert.equal(events[0].stage, 'transcription');
+    assert.equal(events.at(-1).event, 'voice.failed');
+    assert.ok(!JSON.stringify(events).includes('private'));
+});
+
+test('spoken mute returns a validated silent action without speech or neural work', async () => {
+    let calls = 0;
+    const voice = new LocalVoice({ config, fetchImpl: async url => {
+        calls++;
+        if (url.includes('transcriptions')) return Response.json({ text: 'Mute yourself' });
+        if (url.includes('/api/chat')) return Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { speakerEnabled: false, reply: 'I’ll be quiet.' } } }] } });
+        throw new Error('Mute must not synthesize speech');
+    } });
+    const result = await voice.converse(new Uint8Array(200));
+    assert.deepEqual(result.controls, { speakerEnabled: false }); assert.equal(result.silent, true);
+    assert.equal(result.audio.length, 0); assert.equal(result.video, null); assert.equal(calls, 2);
+});
+test('spoken controls cannot open a microphone, camera or arbitrary settings', async () => {
+    for (const args of [{ microphoneEnabled: true }, { cameraEnabled: true }, { speakerEnabled: 'false' }, { command: 'shell' }, {}]) {
+        const voice = new LocalVoice({ config, fetchImpl: async url => url.includes('transcriptions') ? Response.json({ text: 'Change a device' }) : Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { ...args, reply: 'Done' } } }] } }) });
+        await assert.rejects(voice.converse(new Uint8Array(200)), { code: 'model' });
+        assert.equal(voice.history.length, 0);
+    }
+});
+
+test('Qwen voice requests disable thinking and never synthesize its separate thinking field', async () => {
+    const wav = Buffer.alloc(44); wav.write('RIFF'); let spoken;
+    const voice = new LocalVoice({ config: (key, fallback) => key === 'LOCAL_LLM_MODEL' ? 'qwen3.5:9b' : config(key, fallback), fetchImpl: async (url, options) => {
+        if (url.includes('transcriptions')) return Response.json({ text: 'Hello' });
+        if (url.includes('/api/chat')) {
+            assert.equal(JSON.parse(options.body).think, false);
+            return Response.json({ message: { thinking: 'Private reasoning must not be spoken', tool_calls: [{ function: { name: 'respond_to_user', arguments: { reply: 'Hello there!' } } }] } });
+        }
+        spoken = JSON.parse(options.body).text; return new Response(wav);
+    } });
+    await voice.converse(new Uint8Array(200));
+    assert.equal(spoken, 'Hello there!'); assert.equal(voice.history.at(-1).content, spoken);
+});

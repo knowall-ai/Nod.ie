@@ -151,80 +151,55 @@ const NodieRenderer = {
         const radius = 125; // Avatar is 250px diameter, so radius is 125px
 
         let animationId;
+        const segments = 120;
+        const levels = new Float32Array(segments);
+        let dataArray = new Uint8Array(0);
+        let lastFrame = performance.now();
 
         const draw = () => {
             animationId = requestAnimationFrame(draw);
-
-            // Clear canvas
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            // Draw orange waveform ring with glow
-            ctx.shadowColor = 'rgba(247, 147, 26, 1)';
-            ctx.shadowBlur = 20;
-            ctx.strokeStyle = 'rgba(247, 147, 26, 1)';
-            ctx.lineWidth = 6;
-
-            // Rotating offset for visual interest (10 second rotation)
-            const rotationOffset = (Date.now() % 10000) / 10000 * Math.PI * 2;
-
-            // Check if we have significant audio activity
-            let hasAudioActivity = false;
-            if (this.state.analyser) {
-                const bufferLength = this.state.analyser.frequencyBinCount;
-                const dataArray = new Uint8Array(bufferLength);
-                this.state.analyser.getByteFrequencyData(dataArray);
-
-                // Check for audio activity
-                for (let i = 0; i < bufferLength; i++) {
-                    if (dataArray[i] > 25) { // Threshold for activity
-                        hasAudioActivity = true;
-                        break;
-                    }
-                }
-
-                // If audio activity, draw reactive waveform
-                if (hasAudioActivity) {
-                    ctx.beginPath();
-                    const segments = 120;
-
-                    for (let i = 0; i <= segments; i++) {
-                        const angle = (i / segments) * Math.PI * 2 + rotationOffset;
-                        const freqIndex = Math.floor((i / segments) * bufferLength * 0.5);
-                        const amplitude = dataArray[freqIndex] / 255;
-                        const deformation = amplitude > 0.1 ? amplitude * 15 : 0;
-                        const r = radius + deformation;
-
-                        const x = centerX + r * Math.cos(angle);
-                        const y = centerY + r * Math.sin(angle);
-
-                        if (i === 0) {
-                            ctx.moveTo(x, y);
-                        } else {
-                            ctx.lineTo(x, y);
-                        }
-                    }
-                    ctx.closePath();
-                    ctx.stroke();
-                    // Fill back to the portrait edge: sound grows out of the circumference.
-                    ctx.moveTo(centerX + radius, centerY);
-                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                    ctx.fillStyle = 'rgba(247, 147, 26, 0.65)';
-                    ctx.fill('evenodd');
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                    ctx.stroke();
-                } else {
-                    // No activity - draw perfect smooth circle
-                    ctx.beginPath();
-                    ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                    ctx.stroke();
-                }
-            } else {
-                // No analyser - draw perfect smooth circle
-                ctx.beginPath();
-                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-                ctx.stroke();
+            const now = performance.now();
+            // Frame-rate-independent easing prevents noisy input from flashing the contour.
+            const easing = 1 - Math.exp(-Math.min(now - lastFrame, 100) / 90);
+            lastFrame = now;
+            const analyser = this.state.analyser;
+            if (analyser) {
+                if (dataArray.length !== analyser.frequencyBinCount) dataArray = new Uint8Array(analyser.frequencyBinCount);
+                analyser.getByteFrequencyData(dataArray);
             }
+            for (let i = 0; i < segments; i++) {
+                const amplitude = analyser ? (dataArray[Math.floor(i / segments * dataArray.length * 0.5)] || 0) / 255 : 0;
+                const target = amplitude > 0.1 ? amplitude * 15 : 0;
+                levels[i] += (target - levels[i]) * easing;
+            }
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // One steady, subtle halo; the moving contour itself has no repeated shadow passes.
+            ctx.shadowColor = 'rgba(247, 147, 26, 0.6)';
+            ctx.shadowBlur = 8;
+            ctx.strokeStyle = '#f7931a';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+
+            const rotationOffset = (now % 10000) / 10000 * Math.PI * 2;
+            ctx.beginPath();
+            for (let i = 0; i < segments; i++) {
+                const angle = i / segments * Math.PI * 2 + rotationOffset;
+                const r = radius + (levels[(i + segments - 1) % segments] + 2 * levels[i] + levels[(i + 1) % segments]) / 4;
+                const x = centerX + r * Math.cos(angle);
+                const y = centerY + r * Math.sin(angle);
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.closePath();
+            ctx.stroke();
+            // Opaque fill overlaps the base stroke, with the portrait centre left clear.
+            ctx.moveTo(centerX + radius - 1, centerY);
+            ctx.arc(centerX, centerY, radius - 1, 0, Math.PI * 2);
+            ctx.fillStyle = '#f7931a';
+            ctx.fill('evenodd');
         };
 
         draw();

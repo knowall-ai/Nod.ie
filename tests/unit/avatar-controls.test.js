@@ -30,3 +30,16 @@ test('microphone interrupts a reply before recording and camera only explains it
     assert.equal(elements['control-mic'].attrs['aria-pressed'], 'true');
     elements['control-camera'].handlers.click(); assert.match(calls.at(-1), /Camera is off/);
 });
+
+test('spoken controls are idempotent and reject invalid actions before changing devices', () => {
+    const { Controls, saved } = setup(); let released = 0;
+    const renderer = { state: { isMuted: true }, localVoice: { state: 'processing', releaseMicrophone: () => released++ } };
+    const controls = new Controls(renderer);
+    controls.applyVoiceControls({ microphoneEnabled: false, speakerEnabled: false });
+    controls.applyVoiceControls({ speakerEnabled: false });
+    assert.equal(released, 1); assert.equal(renderer.state.speakerMuted, true);
+    controls.applyVoiceControls({ speakerEnabled: true });
+    assert.equal(renderer.state.speakerMuted, false); assert.equal(saved.get(Controls.speakerStorageKey), 'false');
+    assert.throws(() => controls.applyVoiceControls({ microphoneEnabled: false, speakerEnabled: 'false' }));
+    assert.equal(released, 1); assert.equal(renderer.state.speakerMuted, false);
+});

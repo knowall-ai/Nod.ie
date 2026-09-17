@@ -6,7 +6,7 @@ function harness(videoPlay) {
     let revoked = 0, audioStarts = 0, visible = false;
     class Audio { play() { audioStarts++; return Promise.resolve(); } pause() {} removeAttribute() {} load() {} }
     const video = { play: videoPlay, pause() {}, removeAttribute() {}, load() {} };
-    const context = { window: { nodie: { voiceCancel: async () => {} } }, document: { getElementById: id => id === 'avatar-video' ? video : null }, Audio, Blob, clearTimeout,
+    const context = { window: { nodie: { voiceCancel: async () => {} } }, document: { getElementById: id => id === 'avatar-video' ? video : null }, Audio, Blob, clearTimeout, clearInterval,
         URL: { createObjectURL: () => 'blob:test', revokeObjectURL: () => revoked++ } };
     vm.runInNewContext(fs.readFileSync('modules/local-voice-session.js', 'utf8'), context);
     const session = new context.window.LocalVoiceSession({ state: { avatarManager: { isEnabled: () => true, setSpeechVideo: value => visible = value } }, setStatus() {} });

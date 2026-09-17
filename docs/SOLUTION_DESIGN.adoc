@@ -4,7 +4,7 @@ Nod.ie is a local voice assistant with an Electron overlay and a loopback browse
 
 === Voice modes
 
-* `local`: on-demand, turn-based recording. Click to start, click again to send; recording stops automatically after 30 seconds. The microphone is released before transcription. Existing Whisper, Ollama and TTS services process each turn. This avoids starting the dedicated Unmute STT/TTS models.
+* `local`: on-demand, turn-based recording. Click to start; recording submits after sustained voice energy followed by 900 ms of quiet. Click again to submit manually; recording stops after 30 seconds at most. Ten seconds without detected speech cancels capture locally. The microphone is released before transcription. Existing Whisper, Ollama and TTS services process each turn. This avoids starting the dedicated Unmute STT/TTS models.
 * `realtime`: the shared WebSocket connection sends Opus pages to Unmute, restores sessions with the system prompt after disconnects, and uses bounded reconnection backoff. Capture and playback implementations are shared between desktop and browser.
 
 Local mode uses the configured small transcription model on demand, the existing Ollama model and an already-running TTS service. It does not start containers, load embedding models, or schedule background inference. Availability probes check service reachability; a real recorded turn is the acceptance test.
@@ -48,3 +48,34 @@ A local warm-pipeline sample measured approximately 0.2 s transcription, 0.4 s r
 Recognised Bitcoin/Lightning requests and immediate metric follow-ups require a fresh snapshot before any answer, even if the model would otherwise skip the lookup. Other wording can still select the tool. This direct path avoids an unnecessary tool-selection round for recognised requests. Numeric node fields must be non-negative safe integers or canonical decimal strings; balances are capped at Bitcoin’s total supply and pending counts at one million. Malformed results are unavailable.
 
 The desktop-only Lucide cog opens the existing Settings and security panel through sender-validated IPC. It is hidden in the browser, where administration remains unavailable. Audio-reactive waves fill the band between the portrait circumference and the displaced outer contour, so the animation grows directly from the portrait border rather than floating separately.
+
+Voice diagnostics record duration-only `voice.stage` events for transcription, memory recall, each model call, node lookups, speech synthesis and neural lip sync. No transcript, reply or audio is logged. Timings also cover failed stages; the existing failure event identifies the failed turn.
+
+A fixed 16-word synthetic speech benchmark on the Ryzen 5 7600 measured median CPU synthesis time of 1,665 ms with two inference threads and 1,157 ms with four (three warm samples each, identical voice and audio length). Local Kokoro therefore uses four bounded inference threads, disables idle thread spinning and retains its 1 GiB memory limit. This improves synthesis only; complete neural video generation still delays the first audible response.
+
+The waveform uses an opaque orange band overlapping the portrait-border stroke. Temporal and neighbouring-bin smoothing reduce microphone-noise flicker. A single subtle halo stays on the base circumference rather than being redrawn on every moving contour and fill.
+
+=== Spoken local device controls
+
+The local voice model can call `set_voice_controls` to turn the microphone off and mute or unmute the speaker. Arguments are validated at the backend and renderer; actions set an explicit state instead of toggling. Only the current, uncancelled turn can apply them, using the same persistent speaker preference as the button. The model writes its own acknowledgement. A speaker-mute command returns without generating speech or lip-sync video and applies silently. A microphone-off command leaves push-to-talk recording off; click the microphone to speak again. Commands are processed when the recording is submitted, including automatic submission after a speech pause; they are not continuously interpreted while recording.
+
+Camera capture and vision remain unavailable. Requests to start the camera must explain that limitation; stopping it leaves the already-off camera off. The tool cannot start a microphone or camera, execute commands, or change arbitrary settings. These controls apply to local mode; the legacy Unmute mode does not receive this tool.
+
+=== Local model comparison, 17 September 2026
+
+Llama 3.1 8B Q4_K_M and Qwen 3.5 9B Q4_K_M were tested on the RTX 3090 with an 8,192-token context and 160-token output limit. Qwen thinking was disabled. Seven synthetic questions covered greetings, date, camera availability, node counts, a history-backed follow-up, explicit tool use and liquidity explanation. Each model had one initial pass and two warm passes; sampling used temperature zero and seed 42. Transcription, speech, memory and node data were fixtures for the model-only comparison. Both models remained GPU-resident during the comparison. This was a small application-specific check, not a general intelligence benchmark, and preceded the addition of the device-control tool.
+
+[cols="2,1,1",options="header"]
+|===
+|Measurement |Llama 3.1 8B |Qwen 3.5 9B
+|Median model-path time, 14 warm questions |366 ms |1,028 ms
+|Completed warm requests |14/14 |14/14
+|Typical ordinary-conversation model calls |1 |2
+|Complete voice response, three synthetic turns |7.31–9.14 s |10.13–10.67 s
+|===
+
+Complete voice tests used the same input recording, real recall, four-thread Kokoro and MuseTalk, but generated different replies. Those totals are therefore not a controlled measure of model speed alone. Synthesized audio was not played and no conversation history was persisted. Replies in this sample were longer than the earlier six-second sample. Following this comparison, the user selected Qwen 3.5 9B as the active model to prepare for a separate vision change. Qwen voice requests explicitly disable thinking; separate reasoning fields are never sent to speech. The existing explicit-final-reply safeguard remains in place. This selection prioritises the intended multimodal direction over the measured model-path latency; camera capture and vision are not enabled by switching models.
+
+Request completion does not mean factual correctness: Llama's liquidity definition confused sending with receiving; Qwen added an unsupported “on hold” description to an inactive channel. Both need further quality evaluation. Qwen's current direct-answer behavior often triggers the application's second-call safeguard against speaking tool-selection commentary. Switching models alone does not remove the principal delay: complete speech and neural video generation before playback. Streaming speech/video segments would require a separate playback-pipeline change.
+
+Automatic end-of-speech detection samples microphone energy every 50 ms while recording, requires 250 ms of sustained voice activity, then allows a 900 ms pause. This is a lightweight energy detector, not semantic sentence detection; loud background noise can delay submission and a long mid-sentence pause can submit early. Manual submission and the 30-second limit remain available. The detector stops on submission, cancellation and microphone release, with no microphone polling while idle.

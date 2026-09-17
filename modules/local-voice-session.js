@@ -37,11 +37,26 @@ class LocalVoiceSession {
             this.recorder.onstop = () => { if (generation !== this.generation) return; this.releaseMicrophone(); this.send(chunks, generation); };
             this.recorder.start(250);
             this.state = 'recording'; this.renderer.state.isMuted = false; this.status('');
+            this.startEndpointDetection(generation);
             this.limitTimer = setTimeout(() => this.finish(), 30000);
         } catch (error) { this.cancel(); this.status(error.message); }
     }
-    finish() { clearTimeout(this.limitTimer); if (this.recorder?.state === 'recording') this.recorder.stop(); }
+    startEndpointDetection(generation) {
+        const detector = new window.EndOfSpeech(performance.now());
+        const samples = new Float32Array(this.analyser.fftSize);
+        this.endpointTimer = setInterval(() => {
+            if (generation !== this.generation || this.state !== 'recording') return;
+            this.analyser.getFloatTimeDomainData(samples);
+            let energy = 0;
+            for (const value of samples) energy += value * value;
+            const outcome = detector.observe(Math.sqrt(energy / samples.length), performance.now());
+            if (outcome === 'finished') this.finish();
+            else if (outcome === 'no-speech') { this.cancel(); this.status('No speech detected. Please try again.'); }
+        }, 50);
+    }
+    finish() { clearInterval(this.endpointTimer); this.endpointTimer = null; clearTimeout(this.limitTimer); if (this.recorder?.state === 'recording') this.recorder.stop(); }
     releaseMicrophone() {
+        clearInterval(this.endpointTimer); this.endpointTimer = null;
         this.stream?.getTracks().forEach(t => t.stop()); this.stream = null;
         this.source?.disconnect(); this.source = null;
         this.context?.close().catch(() => {}); this.context = null;
@@ -54,6 +69,8 @@ class LocalVoiceSession {
             if (generation !== this.generation) return;
             const result = await window.nodie.voiceTurn(audio);
             if (generation !== this.generation) return;
+            if (result.controls) this.renderer.controls.applyVoiceControls(result.controls);
+            if (result.silent) { this.state = 'idle'; this.status(''); return; }
             await this.playReply(result, generation);
         } catch (error) { if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.status(error.message); } }
     }

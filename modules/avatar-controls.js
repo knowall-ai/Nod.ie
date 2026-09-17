@@ -19,14 +19,23 @@ class AvatarControls {
             renderer.toggleMute();
             this.update();
         });
-        this.speaker?.addEventListener('click', () => {
-            renderer.state.speakerMuted = !renderer.state.speakerMuted;
-            if (renderer.localVoice?.player) renderer.localVoice.player.muted = renderer.state.speakerMuted;
-            renderer.state.audioPlayback?.setMuted(renderer.state.speakerMuted);
-            try { localStorage.setItem(AvatarControls.speakerStorageKey, String(renderer.state.speakerMuted)); } catch { /* Still works without persistence. */ }
-            this.update();
-        });
+        this.speaker?.addEventListener('click', () => this.setSpeakerMuted(!renderer.state.speakerMuted));
         this.camera?.addEventListener('click', () => renderer.showNotification('Camera is off. Vision is not connected yet.', 'info'));
+        this.update();
+    }
+    setSpeakerMuted(muted) {
+        if (typeof muted !== 'boolean') throw new Error('Invalid speaker state');
+        const renderer = this.renderer;
+        renderer.state.speakerMuted = muted;
+        if (renderer.localVoice?.player) renderer.localVoice.player.muted = muted;
+        renderer.state.audioPlayback?.setMuted(muted);
+        try { localStorage.setItem(AvatarControls.speakerStorageKey, String(muted)); } catch { /* Still works without persistence. */ }
+        this.update();
+    }
+    applyVoiceControls(controls) {
+        if (!controls || typeof controls !== 'object' || Array.isArray(controls) || Object.keys(controls).some(key => !['microphoneEnabled', 'speakerEnabled'].includes(key)) || (Object.hasOwn(controls, 'microphoneEnabled') && controls.microphoneEnabled !== false) || (Object.hasOwn(controls, 'speakerEnabled') && typeof controls.speakerEnabled !== 'boolean')) throw new Error('Invalid voice controls');
+        if (controls.microphoneEnabled === false) this.renderer.localVoice?.releaseMicrophone();
+        if (Object.hasOwn(controls, 'speakerEnabled')) this.setSpeakerMuted(!controls.speakerEnabled);
         this.update();
     }
     update() {

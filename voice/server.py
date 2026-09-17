@@ -11,7 +11,8 @@ from types import SimpleNamespace
 
 root = Path(__file__).resolve().parents[1]
 options = rt.SessionOptions()
-options.intra_op_num_threads = 2
+options.intra_op_num_threads = 4
+options.add_session_config_entry('session.intra_op.allow_spinning', '0')
 options.inter_op_num_threads = 1
 options.execution_mode = rt.ExecutionMode.ORT_SEQUENTIAL
 session = rt.InferenceSession(str(root / 'voice-models/kokoro-v1.0.onnx'), sess_options=options, providers=['CPUExecutionProvider'])
@@ -53,7 +54,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == '/health':
-            self.reply(200, json.dumps({'status': 'healthy', 'device': 'cpu', 'threads': 2, 'voices': sorted(voices)}).encode())
+            self.reply(200, json.dumps({'status': 'healthy', 'device': 'cpu', 'threads': 4, 'voices': sorted(voices)}).encode())
         else:
             self.reply(404, b'{}')
 
