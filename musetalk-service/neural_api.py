@@ -29,6 +29,9 @@ LOG = logging.getLogger('nodie.musetalk')
 MAX_BYTES = 5 * 1024 * 1024
 MAX_SECONDS = 30
 FPS = 25
+BATCH_SIZE = int(os.environ.get("MUSETALK_BATCH_SIZE", "8"))
+if not 1 <= BATCH_SIZE <= 8:
+    raise ValueError("MUSETALK_BATCH_SIZE must be 1 to 8")
 MODEL_ROOT = Path(os.environ.get('MODEL_ROOT', '/models'))
 AVATAR_PATH = os.environ.get('AVATAR_PATH', '/avatars/nodie-default.png')
 engine = None
@@ -91,6 +94,7 @@ class Engine:
         self.last_stats = {}
         # Warm up feature extraction and kernels before /health reports ready.
         self.render(np.zeros(3200, np.float32), threading.Event())
+        torch.cuda.empty_cache()
 
     @torch.inference_mode()
     def render(self, samples, cancelled):
@@ -110,10 +114,10 @@ class Engine:
             process = subprocess.Popen(args, stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
                 x1, y1, x2, y2 = self.box
-                for at in range(0, count, 8):
+                for at in range(0, count, BATCH_SIZE):
                     if cancelled.is_set():
                         raise RuntimeError('cancelled')
-                    audio = chunks[at:at + 8] + self.encoding
+                    audio = chunks[at:at + BATCH_SIZE] + self.encoding
                     latent = self.latent.expand(len(audio), -1, -1, -1)
                     prediction = self.unet(latent, torch.tensor([0], device=self.device), encoder_hidden_states=audio).sample
                     faces = self.vae.decode(prediction / self.vae.config.scaling_factor).sample

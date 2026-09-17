@@ -59,6 +59,8 @@ class AudioPlaybackWeb {
                 
                 const frame = event.data[0];
                 if (frame) {
+                    const lips = window.NodieRenderer?.streamingLips;
+                    if (lips?.enabled()) { lips.push(frame, this.audioContext.sampleRate); return; }
                     console.debug('🔊 Sending decoded audio to worklet');
                     this.outputWorklet.port.postMessage({
                         frame: frame,

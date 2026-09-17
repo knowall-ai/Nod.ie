@@ -1,0 +1,6 @@
+services:
+  nodie-musetalk:
+    environment:
+      MUSETALK_BATCH_SIZE: '4'
+    volumes:
+      - ${NODIE_STREAM_LIPS_DIR:?}/neural_api.py:/app/neural_api.py:ro
