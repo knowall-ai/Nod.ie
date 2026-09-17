@@ -137,6 +137,9 @@ body[data-platform="web"] #circle.loading {
     z-index: 10;
 }
 
+/* Parent display wins over legacy inline visibility and MuseTalk child styles. */
+#circle:not(.avatar-active) #avatar-container { display: none; }
+
 /* Show avatar elements when active */
 .avatar-active #avatar-canvas {
     display: block !important; /* Force display with !important */

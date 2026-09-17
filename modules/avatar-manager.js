@@ -33,6 +33,8 @@ class AvatarManager {
         // Apply initial avatar state
         if (this.enabled) {
             this.showAvatar();
+        } else {
+            this.hideAvatar();
         }
 
         // Initialize static video player (Electron only)

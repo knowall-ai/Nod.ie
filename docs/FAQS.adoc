@@ -35,3 +35,7 @@ Yes, in local voice mode she can choose the read-only `get_node_status` tool, in
 === Can I put her over the system clock?
 
 Yes. The desktop overlay can cross the panel boundary and partially leave the screen, with a recoverable portion kept visible. Linux uses a dock-type window to prevent the panel avoidance that previously caused upward drift.
+
+=== Why can’t I change Avatar Quality?
+
+Quality is managed by the rendering service; the desktop does not offer quality presets. Show Avatar controls portrait visibility and disables neural rendering when hidden. The settings status distinguishes a hidden avatar, static portrait and configured local neural lip sync; configured does not guarantee a successful render.

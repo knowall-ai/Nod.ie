@@ -6,8 +6,11 @@ async function load() {
     const config = await api.getConfig();
     el('avatarEnabled').checked = config.AVATAR_ENABLED;
     for (const [id, key] of Object.entries({ assistantName: 'ASSISTANT_NAME', unmuteBackendUrl: 'UNMUTE_BACKEND_URL', voiceModel: 'VOICE_MODEL', globalHotkey: 'GLOBAL_HOTKEY' })) el(id).value = config[key] || '';
-    el('avatarQuality').disabled = true;
-    el('avatarStatus').textContent = config.MUSETALK_WS ? 'Configured' : 'Not configured';
+    if (!config.AVATAR_ENABLED) el('avatarStatus').textContent = 'Hidden';
+    else if (config.VOICE_MODE === 'local') {
+        try { const health = await api.voiceHealth(); el('avatarStatus').textContent = health.avatar?.lipSyncConfigured ? 'Neural lip sync configured' : 'Static portrait'; }
+        catch { el('avatarStatus').textContent = 'Status unavailable'; }
+    } else el('avatarStatus').textContent = config.MUSETALK_WS ? 'Realtime avatar configured' : 'Static portrait';
     render(await api.getSecurityStatus());
     await loadDiagnostics();
 }
