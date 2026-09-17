@@ -24,3 +24,9 @@ MuseTalk 1.5 is optional in local mode. When LOCAL_LIP_SYNC_URL is configured an
 Locally bundled Lucide SVGs provide microphone, camera and speaker controls around the avatar. Icons retain their upstream licence and pinned provenance under `assets/icons/lucide`. Speaker mute applies to both local media playback and realtime Web Audio gain, with an interface-local browser-storage preference. Camera capture remains unavailable. Status hints sit below the face so they do not obscure lip movement.
 
 Dragging uses native desktop-independent coordinates, clamps the entire window to the destination display's usable area, and avoids repeated requests for an unchanged position. On the inspected 300% scaled desktop, the 300-DIP window occupies 900 physical pixels. The window stops at the usable screen edge instead of requesting off-screen positions.
+
+=== Conversational wording principle
+
+Nod.ie chooses her own spoken wording. Application code supplies verified facts and structured events, controls timing and permissions, and selects the delivery channel. The language model composes the utterance within factual, length and tone constraints. Do not use fixed spoken scripts or a rotating list of prewritten announcements. If generation fails, show a factual status instead of silently substituting canned speech. Stable control labels, accessibility text and technical errors remain deterministic.
+
+The requested future unfamiliar-person notification is spoken, but its wording must be generated from an event describing an unmatched face and the recognition uncertainty. Recognition must never establish permission to perform privileged actions. Camera capture, family enrolment and speaker identification are not implemented by the current controls change.
