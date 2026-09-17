@@ -21,6 +21,7 @@ test('local turn supplies clock context, bounds model work and validates WAV out
     assert.match(chat.messages[0].content, /on-screen portrait avatar/);
     assert.match(chat.messages[0].content, /ask a brief clarification/);
     assert.deepEqual(chat.options, { num_predict: 160, num_ctx: 8192 });
+    assert.equal(chat.keep_alive, '30m');
     assert.equal(voice.busy, false);
     voice.fetch = async url => url.includes('transcriptions') ? Response.json({ text: 'Hi' }) : url.includes('/api/chat') ? Response.json({ message: { content: 'Hello' } }) : new Response('invalid audio');
     await assert.rejects(voice.converse(new Uint8Array(200)), /Speech synthesis failed/);
@@ -88,7 +89,7 @@ test('recognised live node questions require a snapshot before any model answer'
     let reads = 0, chats = 0; const wav = Buffer.alloc(44); wav.write('RIFF');
     const voice = new LocalVoice({ config, nodeSnapshot: async () => { reads++; return { lightning: { state: 'unavailable' } }; }, fetchImpl: async (url, options) => {
         if (url.includes('transcriptions')) return Response.json({ text: 'How many lightning channels do we have?' });
-        if (url.includes('/api/chat')) { chats++; assert.equal(reads, 1); const body = JSON.parse(options.body); assert.equal(body.tools, undefined); assert.match(body.messages.at(-1).content, /unavailable/); return Response.json({ message: { content: 'I cannot check the node right now.' } }); }
+        if (url.includes('/api/chat')) { chats++; assert.equal(reads, 1); const body = JSON.parse(options.body); assert.deepEqual(body.tools.map(tool => tool.function.name), ['respond_to_user', 'set_voice_controls']); assert.match(body.messages.at(-1).content, /unavailable/); return Response.json({ message: { tool_calls: [{ function: { name: 'respond_to_user', arguments: { reply: 'I cannot check the node right now.' } } }] } }); }
         return new Response(wav);
     } });
     assert.equal((await voice.converse(new Uint8Array(200))).reply, 'I cannot check the node right now.');
@@ -153,4 +154,21 @@ test('Qwen voice requests disable thinking and never synthesize its separate thi
     } });
     await voice.converse(new Uint8Array(200));
     assert.equal(spoken, 'Hello there!'); assert.equal(voice.history.at(-1).content, spoken);
+});
+
+test('a combined node question and speaker mute preserves the control after the mandatory snapshot', async () => {
+    let reads = 0, chats = 0;
+    const voice = new LocalVoice({ config, nodeSnapshot: async () => { reads++; return { lightning: { activeChannels: 3 } }; }, fetchImpl: async (url, options) => {
+        if (url.includes('transcriptions')) return Response.json({ text: 'How many lightning channels do we have? Mute yourself too.' });
+        if (url.includes('/api/chat')) {
+            chats++; assert.equal(reads, 1); const body = JSON.parse(options.body);
+            assert.deepEqual(body.tools.map(tool => tool.function.name), ['respond_to_user', 'set_voice_controls']);
+            assert.equal(JSON.parse(body.messages.at(-1).content).lightning.activeChannels, 3);
+            return Response.json({ message: { tool_calls: [{ function: { name: 'set_voice_controls', arguments: { speakerEnabled: false, reply: 'Three channels are active; muting my speaker.' } } }] } });
+        }
+        throw new Error('A mute command must not generate audio');
+    } });
+    const result = await voice.converse(new Uint8Array(200));
+    assert.deepEqual(result.controls, { speakerEnabled: false }); assert.equal(result.silent, true);
+    assert.equal(reads, 1); assert.equal(chats, 1);
 });
