@@ -17,3 +17,7 @@
 |Update status unknown |Check Docker permissions, registry connectivity and GitHub rate limits. Unknown is not patched.
 |Update plan changed or expired |Scan and review a new plan. Do not reuse an old approval.
 |===
+
+=== Settings changes and silent recordings
+
+Desktop settings attempts log `settings.saved` or `settings.failed` with a validation/storage/apply stage and no setting values. Failed saves keep the panel open and scroll to the error. A successful transcription with no recognised words reports `no-speech`, not an unavailable speech service; try a clear recording before investigating service health.

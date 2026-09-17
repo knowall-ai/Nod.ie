@@ -94,3 +94,9 @@ test('recognised live node questions require a snapshot before any model answer'
     assert.equal((await voice.converse(new Uint8Array(200))).reply, 'I cannot check the node right now.');
     assert.equal(chats, 1);
 });
+test('an empty successful transcription is no-speech, not a failed service', async () => {
+    const events = [];
+    const voice = new LocalVoice({ config, logger: { write: (_level, event, fields) => events.push({ event, ...fields }) }, fetchImpl: async () => Response.json({ text: ' ' }) });
+    await assert.rejects(voice.converse(new Uint8Array(200)), { code: 'no-speech', status: 422 });
+    assert.equal(events.at(-1).code, 'no-speech'); assert.equal(voice.busy, false);
+});

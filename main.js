@@ -58,13 +58,22 @@ function start() {
     handle('voice-cancel', () => voice.cancel());
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
-        if (!settings || typeof settings !== 'object' || Object.keys(settings).some(key => !['ASSISTANT_NAME', 'UNMUTE_BACKEND_URL', 'VOICE_MODEL', 'LLM_MODEL', 'GLOBAL_HOTKEY', 'AVATAR_ENABLED'].includes(key))) throw new Error('Unsupported settings');
-        if ('AVATAR_ENABLED' in settings && typeof settings.AVATAR_ENABLED !== 'boolean') throw new Error('Invalid avatar setting');
-        const next = validate({ ...config(), ...settings });
-        for (const key of Object.keys(settings)) store.set(aliases[key], next[key]);
-        shortcuts();
-        mainWindow.webContents.send('config-changed', next);
-        return next;
+        let stage = 'validation';
+        try {
+            if (!settings || typeof settings !== 'object' || Object.keys(settings).some(key => !['ASSISTANT_NAME', 'UNMUTE_BACKEND_URL', 'VOICE_MODEL', 'LLM_MODEL', 'GLOBAL_HOTKEY', 'AVATAR_ENABLED'].includes(key))) throw new Error('Unsupported settings');
+            if ('AVATAR_ENABLED' in settings && typeof settings.AVATAR_ENABLED !== 'boolean') throw new Error('Invalid avatar setting');
+            const next = validate({ ...config(), ...settings });
+            stage = 'storage';
+            store.set(Object.fromEntries(Object.keys(settings).map(key => [aliases[key], next[key]])));
+            stage = 'apply';
+            shortcuts();
+            mainWindow.webContents.send('config-changed', next);
+            logger.write('info', 'settings.saved', { count: Object.keys(settings).length });
+            return next;
+        } catch (error) {
+            logger.write('error', 'settings.failed', { stage, code: stage === 'validation' ? 'invalid-settings' : 'save-failed' });
+            throw error;
+        }
     }, true);
     ipcMain.on('begin-drag', event => {
         if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
