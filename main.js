@@ -57,7 +57,13 @@ function start() {
         try { return await voice.converse(audio); }
         catch (error) { return { failure: require('./lib/voice-error').publicError(error) }; }
     });
-    handle('clear-history', () => voice.clearHistory(), true);
+    handle('transcript-session', async () => ({ epoch: (await historyStore.load()).epoch }));
+    handle('transcript-save', (epoch, turn) => historyStore.upsert(epoch, turn));
+    handle('clear-history', async () => {
+        const result = await voice.clearHistory();
+        mainWindow?.webContents.send('history-cleared', { epoch: (await historyStore.load()).epoch });
+        return result;
+    }, true);
     handle('voice-cancel', () => voice.cancel());
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
