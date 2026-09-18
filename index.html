@@ -10,7 +10,7 @@
     <div id="app">
         <div id="avatar-controls" role="group" aria-label="Nod.ie device controls">
             <button id="control-mic" class="orbit-control" type="button" aria-label="Microphone" aria-pressed="false" disabled title="Microphone off"><img src="assets/icons/lucide/mic-off.svg" alt="" aria-hidden="true"></button>
-            <button id="control-camera" class="orbit-control" type="button" aria-label="Camera off — vision not available" aria-pressed="false" aria-disabled="true" title="Camera off — vision is not connected yet"><img src="assets/icons/lucide/camera-off.svg" alt="" aria-hidden="true"></button>
+            <button id="control-camera" class="orbit-control" type="button" aria-label="Turn camera preview on" aria-pressed="false" title="Camera off"><video class="camera-preview" muted playsinline aria-hidden="true" hidden></video><img src="assets/icons/lucide/camera-off.svg" alt="" aria-hidden="true"></button>
             <button id="control-speaker" class="orbit-control" type="button" aria-label="Speaker" aria-pressed="true" title="Speaker on"><img src="assets/icons/lucide/volume-2.svg" alt="" aria-hidden="true"></button>
             <button id="control-settings" class="orbit-control" type="button" aria-label="Settings" title="Settings" hidden><img src="assets/icons/lucide/settings.svg" alt="" aria-hidden="true"></button>
         </div>
@@ -49,6 +49,8 @@
     <script src="modules/end-of-speech.js"></script>
     <script src="modules/local-voice-session.js"></script>
     <script src="modules/desktop-drag.js"></script>
+    <script src="modules/vision-frame-selector.js"></script>
+    <script src="modules/vision-camera.js"></script>
     <script src="modules/avatar-controls.js"></script>
     <script src="renderer.js"></script>
 </body>
