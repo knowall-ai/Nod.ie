@@ -97,15 +97,15 @@ class Engine:
         torch.cuda.empty_cache()
 
     @torch.inference_mode()
-    def render(self, samples, cancelled, video_only=False):
+    def render(self, samples, cancelled, video_only=False, start_frame=0, frame_count=None):
         start = time.monotonic()
         torch.cuda.reset_peak_memory_stats()
         features = self.extractor(samples, sampling_rate=16000, return_tensors='pt').input_features.to(device=self.device, dtype=self.dtype)
         hidden = self.whisper.encoder(features, output_hidden_states=True).hidden_states
         hidden = torch.stack(hidden, dim=2)[:, :math.floor(len(samples) / 16000 * 50)]
         hidden = torch.cat([torch.zeros_like(hidden[:, :4]), hidden, torch.zeros_like(hidden[:, :12])], dim=1)
-        count = max(1, math.floor(len(samples) / 16000 * FPS))
-        chunks = torch.cat([hidden[:, i * 2:i * 2 + 10] for i in range(count)], dim=0).reshape(count, 50, 384)
+        count = frame_count if frame_count is not None else max(1, math.floor(len(samples) / 16000 * FPS))
+        chunks = torch.cat([hidden[:, i * 2:i * 2 + 10] for i in range(start_frame, start_frame + count)], dim=0).reshape(count, 50, 384)
         with tempfile.TemporaryDirectory(prefix='nodie-lips-') as directory:
             directory = Path(directory)
             wav = directory / 'speech.wav'; output = directory / 'reply.mp4'
@@ -189,8 +189,17 @@ async def render(request: Request):
             raise HTTPException(400, 'Invalid WAV audio')
         except TimeoutError:
             raise HTTPException(408, 'Audio upload timed out')
+        start_frame, frame_count = 0, None
+        if 'x-nodie-start-frame' in request.headers or 'x-nodie-frame-count' in request.headers:
+            try:
+                start_frame = int(request.headers['x-nodie-start-frame'])
+                frame_count = int(request.headers['x-nodie-frame-count'])
+                if video_only != '1' or not 0 <= start_frame <= 8 or not 1 <= frame_count <= 33 or (start_frame + frame_count) / FPS > len(samples) / 16000 + 1e-6:
+                    raise ValueError('Invalid frame range')
+            except (KeyError, ValueError):
+                raise HTTPException(400, 'Invalid frame range')
         cancelled = threading.Event()
-        task = asyncio.create_task(asyncio.to_thread(engine.render, samples, cancelled, video_only == '1'))
+        task = asyncio.create_task(asyncio.to_thread(engine.render, samples, cancelled, video_only == '1', start_frame, frame_count))
         deadline = time.monotonic() + 60
         try:
             while not task.done():

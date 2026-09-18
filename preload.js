@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld('nodie', {
         if (result.failure) { const error = new Error(result.failure.error); error.code = result.failure.code; throw error; }
         return result;
     },
-    renderLipSegment: audio => ipcRenderer.invoke('lip-segment', audio),
+    renderLipSegment: (audio, trim) => ipcRenderer.invoke('lip-segment', audio, trim),
     cancelLipSync: () => ipcRenderer.invoke('lip-cancel'),
     voiceCancel: () => ipcRenderer.invoke('voice-cancel'),
     getConfig: () => ipcRenderer.invoke('get-config'),
