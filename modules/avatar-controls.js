@@ -1,4 +1,4 @@
-/** Visible device controls. Camera stays off until a vision pipeline exists. */
+/** Visible device controls, including an opt-in camera preview. */
 class AvatarControls {
     static speakerStorageKey = 'nodie.speaker-muted';
     constructor(renderer) {
@@ -20,8 +20,33 @@ class AvatarControls {
             this.update();
         });
         this.speaker?.addEventListener('click', () => this.setSpeakerMuted(!renderer.state.speakerMuted));
-        this.camera?.addEventListener('click', () => renderer.showNotification('Camera is off. Vision is not connected yet.', 'info'));
+        this.preview = this.camera?.querySelector('video');
+        if (window.VisionCamera && this.preview) {
+            this.cameraSource = new window.VisionCamera({
+                preview: this.preview,
+                onFrame: frame => { this.latestFrame = frame; },
+                onError: message => renderer.showNotification(message, 'error'),
+                onState: () => { if (!this.cameraSource?.active) this.latestFrame = null; this.updateCamera(); }
+            });
+            window.addEventListener('pagehide', () => this.cameraSource.stop());
+        }
+        this.camera?.addEventListener('click', () => {
+            if (!this.cameraSource) return renderer.showNotification('Camera is off. Preview is unavailable.', 'info');
+            if (this.cameraSource.active || this.cameraSource.starting) this.cameraSource.stop();
+            else void this.cameraSource.start();
+        });
         this.update();
+    }
+    updateCamera() {
+        if (!this.camera || !this.preview) return;
+        const active = Boolean(this.cameraSource?.active), starting = Boolean(this.cameraSource?.starting);
+        this.camera.dataset.on = String(active);
+        this.camera.setAttribute('aria-pressed', String(active));
+        this.camera.setAttribute('aria-busy', String(starting));
+        this.camera.setAttribute('aria-label', active ? 'Turn camera preview off' : starting ? 'Cancel opening camera' : 'Turn camera preview on');
+        this.camera.title = active ? 'Camera on — preview only; scene understanding is not connected yet' : starting ? 'Opening camera — click to cancel' : 'Camera off';
+        this.preview.hidden = !active;
+        this.camera.querySelector('img').hidden = active;
     }
     setSpeakerMuted(muted) {
         if (typeof muted !== 'boolean') throw new Error('Invalid speaker state');
@@ -42,6 +67,7 @@ class AvatarControls {
         this.update();
     }
     update() {
+        this.updateCamera();
         const state = this.renderer.state;
         const local = this.renderer.localVoice;
         const micOn = local ? Boolean(local.listeningEnabled) : Boolean(state.audioCapture && !state.isMuted);

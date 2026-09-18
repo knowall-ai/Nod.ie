@@ -115,9 +115,9 @@ function start() {
     }, true);
     app.whenReady().then(() => {
         session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
-            callback(contents === mainWindow?.webContents && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href && permission === 'media' && !details.mediaTypes?.includes('video'));
+            callback(contents === mainWindow?.webContents && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href && permission === 'media');
         });
-        session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === mainWindow?.webContents && permission === 'media' && details.mediaType !== 'video');
+        session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === mainWindow?.webContents && permission === 'media' && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href);
         mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true, ...(process.platform === 'linux' ? { type: 'dock' } : {}) }, 'index.html');
         // A Linux dock overlay avoids KWin's normal-window panel avoidance and resize drift.
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
