@@ -60,3 +60,11 @@ Short segment/render buffering adds some first-audio latency compared with audio
 PCM scheduling is independent of neural rendering. A fixed 750 ms initial playback buffer gives the first video time to render; subsequent audio is queued immediately on the same clock. Late videos catch up or are discarded when their audio has ended. Rendering timeouts cannot introduce additional silence, and cancellation during upload invalidates the segment before GPU work starts.
 
 Streaming Unmute requests video-only H.264 clips using `X-Nodie-Video-Only: 1`. Speech is already scheduled by Web Audio; an unused AAC track adds decoder startup latency. The default render response retains audio for the older local-voice player. Unsupported values of the header are rejected.
+
+=== Speech context across clips
+
+The streaming adapter preserves up to 320 ms of preceding PCM and uses up to 160 ms of following PCM when it is already queued or decoded. MuseTalk extracts speech features from this overlapping window, then renders only the current segment's frames. This preserves neighbouring phoneme context that was lost when every clip was analysed as an independent utterance. The first segment and a true utterance ending may have no neighbouring context; playback does not wait for future speech to arrive.
+
+Only the original segment PCM is scheduled for playback. Context is never repeated audibly and is cleared on interruption or a new response. The existing 1.3-second WAV limit still applies. Frame trimming uses validated integer `startFrame` (0–8) and `frameCount` (1–33) values, forwarded as `X-Nodie-Start-Frame` and `X-Nodie-Frame-Count`; the selected range must fit the submitted audio. The neural endpoint permits trimming only for video-only clips. Requests without trimming retain their existing behavior.
+
+A same-audio comparison with a whole-reply render can assess mouth-shape continuity independently of playback timing. Pixel differences in the mouth region are diagnostic measurements, not a substitute for watching normal conversation on the desktop.

@@ -8,7 +8,7 @@ if (!window.nodie && window.ENV_CONFIG) {
     };
     window.nodie = {
         platform: 'web',
-        renderLipSegment: async audio => { const r = await fetch('/lip/segment', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: audio }); if (!r.ok) throw new Error('Lip sync unavailable'); return new Uint8Array(await r.arrayBuffer()); },
+        renderLipSegment: async (audio, trim) => { const r = await fetch('/lip/segment', { method: 'POST', headers: { 'Content-Type': 'audio/wav', ...(trim ? {'X-Nodie-Start-Frame': String(trim.startFrame), 'X-Nodie-Frame-Count': String(trim.frameCount)} : {}) }, body: audio }); if (!r.ok) throw new Error('Lip sync unavailable'); return new Uint8Array(await r.arrayBuffer()); },
         cancelLipSync: () => post('/lip/cancel'),
         getConfig: async () => window.ENV_CONFIG,
         getSystemPrompt: async () => (await fetch('/system-prompt')).text(),

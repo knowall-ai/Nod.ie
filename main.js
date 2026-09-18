@@ -53,7 +53,7 @@ function start() {
     handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
     const streamLips = new (require('./lib/streaming-lip-sync').StreamingLipSync)({ url: env.getConfig('LOCAL_LIP_SYNC_URL'), enabled: () => config().AVATAR_ENABLED });
-    handle('lip-segment', audio => streamLips.render(audio));
+    handle('lip-segment', (audio, trim) => streamLips.render(audio, undefined, trim));
     handle('lip-cancel', () => streamLips.cancel());
     app.on('before-quit', () => streamLips.cancel());
     handle('voice-health', () => voice.health());
