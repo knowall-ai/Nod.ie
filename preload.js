@@ -6,6 +6,9 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
+    transcriptSession: () => ipcRenderer.invoke('transcript-session'),
+    saveTranscript: (epoch, turn) => ipcRenderer.invoke('transcript-save', epoch, turn),
+    onHistoryCleared: fn => subscribe('history-cleared', fn),
     clearHistory: () => ipcRenderer.invoke('clear-history'),
     voiceHealth: () => ipcRenderer.invoke('voice-health'),
     voiceTurn: async (audio) => {
