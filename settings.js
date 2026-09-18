@@ -61,15 +61,39 @@ load().catch(error);
 async function loadSpeakers() {
     const status = await api.speakerStatus();
     el('speaker-enabled').checked = status.enabled;
-    el('speaker-status').textContent = status.enabled ? 'Enabled. Requires the local speaker service; conversations still work if it is unavailable.' : 'Disabled';
+    el('speaker-status').textContent = status.enabled ? 'Enabled for local voice mode. Speaker identification is not connected to Unmute yet.' : 'Disabled. Speaker identification is not connected to Unmute yet.';
     el('speaker-profiles').replaceChildren();
+    if (!status.profiles.length) el('speaker-profiles').textContent = 'No voice profiles learned yet.';
+    const label = profile => `${profile.name || 'Unfamiliar speaker'} (${profile.id.slice(0, 8)})`;
     for (const profile of status.profiles) {
         const row = document.createElement('div');
         const name = document.createElement('input'); name.value = profile.name || ''; name.placeholder = 'Unfamiliar speaker'; name.maxLength = 80; name.setAttribute('aria-label', 'Speaker name');
         const rename = document.createElement('button'); rename.textContent = 'Save name'; rename.onclick = () => api.speakerEdit(profile.id, name.value).then(loadSpeakers).catch(error);
-        const forget = document.createElement('button'); forget.textContent = 'Forget'; forget.onclick = () => api.speakerEdit(profile.id, null).then(loadSpeakers).catch(error);
-        row.append(name, rename, forget); el('speaker-profiles').append(row);
+        const details = document.createElement('p'); details.textContent = `${label(profile)} · ${profile.voiceSamples || 1} voice sample(s) · Last heard ${new Date(profile.lastSeen).toLocaleString()}`;
+        const forget = document.createElement('button'); forget.textContent = 'Remove voice profile'; forget.onclick = async () => {
+            if (!window.confirm(`Remove the voice profile for ${label(profile)}? Reverie memories will remain.`)) return;
+            forget.disabled = true;
+            try { await api.speakerEdit(profile.id, null); await loadSpeakers(); } catch (err) { error(err); } finally { forget.disabled = false; }
+        };
+        row.append(details, name, rename, forget);
+        if (status.profiles.length > 1) {
+            const target = document.createElement('select'); target.setAttribute('aria-label', `Merge ${label(profile)} into`);
+            const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Choose person to keep'; target.append(placeholder);
+            for (const other of status.profiles.filter(p => p.id !== profile.id)) {
+                const option = document.createElement('option'); option.value = other.id; option.textContent = label(other); target.append(option);
+            }
+            const merge = document.createElement('button'); merge.textContent = 'Merge duplicate'; merge.disabled = true;
+            target.onchange = () => { merge.disabled = !target.value; };
+            merge.onclick = async () => {
+                const other = status.profiles.find(p => p.id === target.value);
+                if (!other || !window.confirm(`Merge ${label(profile)} into ${label(other)}? Keep the destination name and both sets of voice samples. This cannot be undone.`)) return;
+                merge.disabled = true;
+                try { await api.speakerMerge(profile.id, other.id); await loadSpeakers(); } catch (err) { error(err); } finally { merge.disabled = !target.value; }
+            };
+            row.append(target, merge);
+        }
+        el('speaker-profiles').append(row);
     }
 }
 el('speaker-enabled').onchange = () => api.speakerEnabled(el('speaker-enabled').checked).then(loadSpeakers).catch(error);
-el('speaker-forget').onclick = () => api.speakerForget().then(loadSpeakers).catch(error);
+el('speaker-forget').onclick = () => { if (window.confirm('Remove all voice profiles and disable recognition? Reverie memories will remain.')) api.speakerForget().then(loadSpeakers).catch(error); };

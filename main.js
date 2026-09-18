@@ -61,6 +61,7 @@ function start() {
     handle('speaker-status', () => speakerRecognition.store.status(), true);
     handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
     handle('speaker-edit', (id, name) => speakerRecognition.store.edit(id, name), true);
+    handle('speaker-merge', (source, target) => speakerRecognition.store.merge(source, target), true);
     handle('speaker-forget', () => speakerRecognition.store.forget(), true);
     handle('clear-history', () => voice.clearHistory(), true);
     handle('voice-cancel', () => voice.cancel());

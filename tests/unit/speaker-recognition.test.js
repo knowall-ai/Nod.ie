@@ -66,3 +66,24 @@ test('voice integration supplies named context without vectors and only exposes 
     } });
     const reply = await voice.converse(new Uint8Array(200)); assert.equal(named, 1); assert.equal(reply.reply, 'Nice to meet you, Ben.'); assert.equal(reply.speakers.state, 'ready');
 });
+test('merging retains both voices under the chosen person and invalidates old observations', async t => {
+ const store=await fixture(t);await store.configure(true);const {epoch}=await store.load();
+ const observed=await store.observe(result(vector(0),vector(1)),epoch);
+ const [a,b]=observed.speakers;await store.edit(b.id,'Ben');
+ await store.merge(a.id,b.id);
+ const status=await store.status();assert.equal(status.profiles.length,1);assert.equal(status.profiles[0].voiceSamples,2);assert.equal(status.profiles[0].name,'Ben');
+ const saved=await store.load();
+ for(const v of [vector(0),vector(1)])assert.equal((await store.observe(result(v),saved.epoch)).speakers[0].id,b.id);
+ assert.equal((await store.observe(result(vector(2)),epoch)).state,'disabled');
+ await assert.rejects(store.merge(b.id,b.id));await assert.rejects(store.merge(a.id,b.id));
+ await store.edit(b.id,null);assert.equal((await store.status()).profiles.length,0);
+});
+test('merge refuses capacity overflow without partially removing a person',async t=>{
+ const store=await fixture(t);await store.configure(true);let epoch=(await store.load()).epoch;
+ const first=await store.observe(result(...Array.from({length:7},(_,i)=>vector(i))),epoch);
+ const second=await store.observe(result(vector(7),vector(8)),epoch);
+ const target=first.speakers[0].id;
+ for(const s of [...first.speakers.slice(1),...second.speakers.slice(0,1)])await store.merge(s.id,target);
+ await assert.rejects(store.merge(second.speakers[1].id,target),/eight/);
+ const status=await store.status();assert.equal(status.profiles.length,2);assert.equal(status.profiles.find(p=>p.id===target).voiceSamples,8);
+});
