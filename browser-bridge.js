@@ -11,6 +11,8 @@ if (!window.nodie && window.ENV_CONFIG?.VOICE_MODE === 'local') {
         getConfig: async () => window.ENV_CONFIG,
         getSystemPrompt: async () => (await fetch('/system-prompt')).text(),
         clearHistory: () => post('/voice/clear-history'),
+        analyseVision: image => post('/vision/analyse', image, 'image/jpeg'),
+        cancelVision: () => post('/vision/cancel'),
         voiceHealth: () => post('/voice/health'),
         voiceTurn: async audio => { const result = await post('/voice/turn', audio); result.audio = Uint8Array.from(atob(result.audio), c => c.charCodeAt(0)); if (result.video) result.video = Uint8Array.from(atob(result.video), c => c.charCodeAt(0)); return result; },
         voiceCancel: () => post('/voice/cancel'),

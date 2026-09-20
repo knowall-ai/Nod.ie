@@ -1,8 +1,8 @@
 /** Opt-in camera source. Only selected JPEGs reach the supplied analysis callback. */
 class VisionCamera {
-    constructor({ onFrame, onError = () => {}, onState = () => {}, preview = null, mediaDevices = navigator.mediaDevices, document = globalThis.document, clock = () => performance.now(), selector = new window.VisionFrameSelector() } = {}) {
+    constructor({ onFrame, canAnalyse = () => true, onError = () => {}, onState = () => {}, preview = null, mediaDevices = navigator.mediaDevices, document = globalThis.document, clock = () => performance.now(), selector = new window.VisionFrameSelector() } = {}) {
         if (typeof onFrame !== 'function') throw new Error('An analysis callback is required');
-        Object.assign(this, { onFrame, onError, onState, preview, mediaDevices, document, clock, selector });
+        Object.assign(this, { onFrame, canAnalyse, onError, onState, preview, mediaDevices, document, clock, selector });
         this.generation = 0; this.active = false; this.starting = false;
     }
     async start() {
@@ -36,14 +36,14 @@ class VisionCamera {
         this.requested = true; void this.tick(); return true;
     }
     async tick() {
-        if (!this.active || this.busy || this.video.readyState < 2) return;
+        if (!this.active || this.busy || !this.canAnalyse() || this.video.readyState < 2) return;
         const token = this.busy = {}, generation = this.generation;
         try {
             this.smallContext.drawImage(this.video, 0, 0, 64, 48);
             const choice = this.selector.select(this.smallContext.getImageData(0, 0, 64, 48).data, this.clock(), Boolean(this.requested));
             if (!choice) return;
             this.requested = false;
-            const scale = Math.min(1, 640 / this.video.videoWidth, 480 / this.video.videoHeight);
+            const scale = Math.min(1, 384 / this.video.videoWidth, 288 / this.video.videoHeight);
             if (!Number.isFinite(scale) || scale <= 0) return;
             this.full.width = Math.max(1, Math.round(this.video.videoWidth * scale));
             this.full.height = Math.max(1, Math.round(this.video.videoHeight * scale));
@@ -51,7 +51,8 @@ class VisionCamera {
             const blob = await new Promise(resolve => this.full.toBlob(resolve, 'image/jpeg', .75));
             if (!blob || blob.size > 512000) throw new Error('Frame could not be encoded');
             if (generation !== this.generation || !this.active) return;
-            await this.onFrame({ image: blob, reason: choice.reason, capturedAt: new Date().toISOString(), signal: this.controller.signal });
+            const result = await this.onFrame({ image: blob, reason: choice.reason, capturedAt: new Date().toISOString(), signal: this.controller.signal });
+            if (result?.retry && generation === this.generation) this.selector.reset();
         } catch {
             if (generation === this.generation && this.active) this.onError('Selected camera frame could not be analysed.');
         } finally { if (this.busy === token) this.busy = null; }

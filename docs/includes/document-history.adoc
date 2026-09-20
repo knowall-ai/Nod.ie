@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|5829fea |2026-09-18 |Add opt-in camera button preview and selective frame capture
 |74b9a61 |2026-09-17 |fix: isolate interrupted decoder output by response generation
 |11c751c |2026-09-17 |perf: exclude unused cached voices from TTS GPU loading
 |6e96e52 |2026-09-17 |fix: reconnect read-only Reverie recall to Unmute and protect memory logs
@@ -9,6 +10,5 @@
 |cd57d78 |2026-09-17 |fix: restore Unmute streaming voice trial and interruption handling
 |86f212f |2026-09-17 |Keep conversations enabled and independently verify spoken control intent
 |6a414f3 |2026-09-17 |Let the model infer direct address and device-control intent
-|4a19edc |2026-09-17 |Require direct name address for spoken device controls
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

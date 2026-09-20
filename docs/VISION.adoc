@@ -4,7 +4,9 @@
 
 The camera button is an opt-in live preview. It starts off on each launch and shows the camera feed inside its amber circular border while enabled. Clicking it again stops the tracks, clears the preview and discards the retained frame. Microphone capture remains independent; this camera stream requests no audio.
 
-This first vision change supplies camera capture and frame selection only. Qwen scene interpretation, face identification, spoken observations and Reverie observation writes are not connected. The preview tooltip explicitly describes that limitation. No camera images are saved to disk or sent to a model by this implementation.
+In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. A short description and capture timestamp are supplied through Unmute's session instructions without clearing conversation history. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
+
+Face identification, unsolicited spoken observations and Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
 
 == Selection policy
 
@@ -12,9 +14,9 @@ Every 250 ms, compare a 64 by 48 pixel image locally on the CPU. Compare against
 
 Wait 500 ms for the scene to settle, or at most 2.5 seconds during continuous movement. Automatic selections have a five-second cooldown. Refresh an unchanged scene every 60 seconds. The `requestFrame()` API selects immediately when the camera is already enabled; it never turns on an off camera. Spoken requests will need a separate tool integration.
 
-Only selected frames are encoded as JPEG, bounded to 640 by 480 pixels and 512 KB. The current UI retains only the most recent selected frame in memory. The analysis callback permits one in-flight request, dropping intermediate frames rather than growing a queue. A future consumer must honor its abort signal and discard results after camera shutdown.
+Only selected frames are encoded as JPEG, bounded to 384 by 288 pixels and 512 KB. The current UI retains only the latest description in memory. The analysis callback permits one in-flight request, dropping intermediate frames rather than growing a queue. The consumer honors its abort signal and discards results after camera shutdown. Analysis waits for two seconds without voice events, is limited to one attempt per 15 seconds, and is cancelled when a response or new user transcription starts. Requests have a 12-second deadline, a 140-token generation limit and a 32 KB response-body limit. Vision shares the voice model and can still add contention; these limits do not guarantee latency.
 
-Pixel changes are triggers, not a judgement of interest or danger. Small or brief events can be missed; illumination changes and camera movement can still cause false triggers. Scene interpretation and any home-awareness notifications need separate validation, repeated confirmation and notification cooldowns. This is not an alarm system.
+Pixel changes are triggers, not a judgement of interest or danger. Small or brief events can be missed; illumination changes and camera movement can still cause false triggers. Any home-awareness notifications need separate validation, repeated confirmation and notification cooldowns. This is not an alarm system.
 
 == Validation
 

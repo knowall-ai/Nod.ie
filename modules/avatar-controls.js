@@ -22,11 +22,13 @@ class AvatarControls {
         this.speaker?.addEventListener('click', () => this.setSpeakerMuted(!renderer.state.speakerMuted));
         this.preview = this.camera?.querySelector('video');
         if (window.VisionCamera && this.preview) {
+            renderer.visionContext = new window.VisionContext(renderer, window.nodie);
             this.cameraSource = new window.VisionCamera({
                 preview: this.preview,
-                onFrame: frame => { this.latestFrame = frame; },
+                canAnalyse: () => renderer.visionContext.canAnalyse(),
+                onFrame: frame => renderer.visionContext.analyse(frame),
                 onError: message => renderer.showNotification(message, 'error'),
-                onState: () => { if (!this.cameraSource?.active) this.latestFrame = null; this.updateCamera(); }
+                onState: () => { renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
             });
             window.addEventListener('pagehide', () => this.cameraSource.stop());
         }
@@ -44,7 +46,7 @@ class AvatarControls {
         this.camera.setAttribute('aria-pressed', String(active));
         this.camera.setAttribute('aria-busy', String(starting));
         this.camera.setAttribute('aria-label', active ? 'Turn camera preview off' : starting ? 'Cancel opening camera' : 'Turn camera preview on');
-        this.camera.title = active ? 'Camera on — preview only; scene understanding is not connected yet' : starting ? 'Opening camera — click to cancel' : 'Camera off';
+        this.camera.title = active ? (this.renderer.localVoice ? 'Camera preview on — scene analysis requires Unmute voice mode' : 'Camera on — selected frames analysed locally') : starting ? 'Opening camera — click to cancel' : 'Camera off';
         this.preview.hidden = !active;
         this.camera.querySelector('img').hidden = active;
     }

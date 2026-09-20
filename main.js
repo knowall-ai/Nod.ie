@@ -52,6 +52,10 @@ function start() {
     handle('get-config', config);
     handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
+    const vision = new (require('./lib/vision-analysis').VisionAnalysis)({ url: env.getConfig('OLLAMA_URL', 'http://127.0.0.1:11434'), model: env.getConfig('LOCAL_VISION_MODEL', env.LLM_MODEL || 'nodie-qwen3.5:9b') });
+    handle('vision-analyse', image => vision.analyse(image));
+    handle('vision-cancel', () => vision.cancel());
+    app.on('before-quit', () => vision.cancel());
     handle('voice-health', () => voice.health());
     handle('voice-turn', async audio => {
         try { return await voice.converse(audio); }
