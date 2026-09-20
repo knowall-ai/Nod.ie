@@ -102,6 +102,15 @@
         <button id="clear-history">Clear saved conversation history</button>
         <p id="history-status" role="status"></p>
     </div>
+    <div class="section">
+        <h2>People — faces</h2>
+        <label><input type="checkbox" id="face-enabled"> Learn and recognise faces locally</label>
+        <p>Uses selected frames only while the camera is on. Unknown profiles expire after seven days. Names are labels, not verified identities.</p>
+        <p id="face-status" role="status"></p>
+        <button id="face-refresh">Refresh faces</button>
+        <div id="face-profiles"></div>
+        <button id="face-forget">Forget all face profiles</button>
+    </div>
     <p id="settings-error" role="alert"></p>
     <div class="button-row">
         <button class="btn-secondary" id="cancel">Cancel</button>

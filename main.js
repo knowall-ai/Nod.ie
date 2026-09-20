@@ -53,7 +53,16 @@ function start() {
     handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
     const vision = new (require('./lib/vision-analysis').VisionAnalysis)({ url: env.getConfig('OLLAMA_URL', 'http://127.0.0.1:11434'), model: env.getConfig('LOCAL_VISION_MODEL', env.LLM_MODEL || 'nodie-qwen3.5:9b') });
-    handle('vision-analyse', image => vision.analyse(image));
+    const faces = new (require('./lib/face-recognition').FaceRecognition)();
+    handle('face-analyse', image => faces.analyse(image));
+    handle('face-cancel', () => faces.cancel());
+    handle('face-status', () => faces.store.status(), true);
+    handle('face-enabled', enabled => { faces.cancel(); return faces.store.configure(enabled); }, true);
+    handle('face-edit', (id, name) => faces.store.edit(id, name), true);
+    handle('face-merge', (source, target) => faces.store.merge(source, target), true);
+    handle('face-forget', () => { faces.cancel(); return faces.store.forget(); }, true);
+    app.on('before-quit', () => faces.cancel());
+    handle('vision-analyse' , image => vision.analyse(image));
     handle('vision-cancel', () => vision.cancel());
     app.on('before-quit', () => vision.cancel());
     handle('voice-health', () => voice.health());

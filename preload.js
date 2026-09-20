@@ -7,6 +7,13 @@ const subscribe = (channel, callback) => {
 contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
     clearHistory: () => ipcRenderer.invoke('clear-history'),
+    analyseFaces: image => ipcRenderer.invoke('face-analyse', image),
+    cancelFaces: () => ipcRenderer.invoke('face-cancel'),
+    faceStatus: () => ipcRenderer.invoke('face-status'),
+    faceEnabled: enabled => ipcRenderer.invoke('face-enabled', enabled),
+    faceEdit: (id, name) => ipcRenderer.invoke('face-edit', id, name),
+    faceMerge: (source, target) => ipcRenderer.invoke('face-merge', source, target),
+    faceForget: () => ipcRenderer.invoke('face-forget'),
     analyseVision: image => ipcRenderer.invoke('vision-analyse', image),
     cancelVision: () => ipcRenderer.invoke('vision-cancel'),
     voiceHealth: () => ipcRenderer.invoke('voice-health'),
