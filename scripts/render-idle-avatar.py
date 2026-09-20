@@ -25,9 +25,13 @@ with torch.inference_mode():
  mask=np.zeros((size,size),np.float32);cv2.ellipse(mask,(size//2,int(size*.48)),(int(size*.48),int(size*.48)),0,0,360,1,-1);mask=cv2.GaussianBlur(mask,(41,41),0)[...,None]
  output=Path('/output');output.mkdir(exist_ok=True)
  preview='--preview' in sys.argv or '--motion-preview' in sys.argv
- tilt='--tilt' in sys.argv
- times=([0.,1.8,4.2] if '--motion-preview' in sys.argv else [0.,3.,6.]) if preview else sorted(set([round(i*.3,2) for i in range(21)]+[round(c+d,2) for c in [2.25,4.7] for d in [-.18,-.09,0,.09,.18]]))
- if tilt: times=[0.,.5,1.,1.5,2.,2.5,3.]
+ gesture=next((name for name in ['tilt','left','right'] if '--'+name in sys.argv),None)
+ duration=3 if gesture else 6
+ frame_count=75 if gesture else 150
+ # Render every output frame. Crossfading sparse poses ghosts eyes and hair.
+ times=([0.,1.8,4.2] if '--motion-preview' in sys.argv else [0.,3.,6.]) if preview else np.linspace(0,duration,frame_count).tolist()
+ # Remove the near-stationary apex samples so the small tilt does not dwell.
+ if gesture=='tilt' and not preview: times=[t for i,t in enumerate(times) if not 36<=i<=40]
  count=len(times)
  keys=[]
  started=time.monotonic()
@@ -38,9 +42,12 @@ with torch.inference_mode():
   amplitude=math.sin(math.pi*t/6)**2
   # Small but visible pose changes; the wider feathered mask includes the hair.
   rotation=get_rotation_matrix(info['pitch']+amplitude*1.2*math.sin(t*.7),info['yaw']+amplitude*4.0*math.sin(t),info['roll']+amplitude*1.8*math.sin(t*.8))
-  if tilt:
+  if gesture:
    blink=0
-   rotation=get_rotation_matrix(info['pitch'],info['yaw'],info['roll']+2.2*math.sin(math.pi*t/3)**2)
+   envelope=math.sin(math.pi*t/3)**2
+   yaw=(-3.5 if gesture=='left' else 3.5 if gesture=='right' else 0)*envelope
+   roll=(2.2 if gesture=='tilt' else 0)*envelope
+   rotation=get_rotation_matrix(info['pitch'],info['yaw']+yaw,info['roll']+roll)
   target=info['scale'][...,None]*(info['kp']@rotation+info['exp']);target[:,:,:2]+=info['t'][:,None,:2]
   target+= (closed-opened)*min(1,blink)
   target=w.stitching(kp,target)
@@ -54,24 +61,5 @@ with torch.inference_mode():
  print(json.dumps({'frames':count,'seconds':round(time.monotonic()-started,2),'gpu':use_gpu,'peak_mib':round(torch.cuda.max_memory_allocated()/1048576) if use_gpu else 0}),flush=True)
 
  if not preview:
-  frame_count=75 if tilt else 150
-  duration=3 if tilt else 6
-  for i in range(frame_count):
-   t=i*duration/(frame_count-1)
-   right=min(np.searchsorted(times,t,side='right'),count-1);left=max(0,right-1)
-   ratio=(t-times[left])/(times[right]-times[left]) if right!=left else 0
-   frame=cv2.addWeighted(keys[left],1-ratio,keys[right],ratio,0)
+  for i,frame in enumerate(keys):
    if not cv2.imwrite(str(output/f'frame-{i:04d}.png'),frame): raise RuntimeError('Could not write frame')
-
-  # Reuse the neural trajectory for shorter directional gestures. Feather each
-  # gesture to the unchanged portrait so every clip starts and ends at neutral.
-  for name,start,end in ([] if tilt else [('look-left',0,3),('look-right',3,6)]):
-   folder=output/name;folder.mkdir(exist_ok=True)
-   for i in range(75):
-    local=i*3/74;t=start+local
-    right=min(np.searchsorted(times,t,side='right'),count-1);left=max(0,right-1)
-    ratio=(t-times[left])/(times[right]-times[left]) if right!=left else 0
-    frame=cv2.addWeighted(keys[left],1-ratio,keys[right],ratio,0)
-    edge=min(1,local/.5,(3-local)/.5);weight=edge*edge*(3-2*edge)
-    frame=cv2.addWeighted(source,1-weight,frame,weight,0)
-    if not cv2.imwrite(str(folder/f'frame-{i:04d}.png'),frame): raise RuntimeError('Could not write gesture frame')

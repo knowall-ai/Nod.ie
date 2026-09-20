@@ -33,7 +33,7 @@ class IdleAvatar {
             if(generation!==this.generation || this.speaking || this.disposed)return;
             const blink={name:'nodie-idle-blink',duration:6,blinks:[2.25,4.7]};
             const choices=[blink,blink,blink,blink,blink,{name:'nodie-look-left',duration:3,blinks:[2.25]},{name:'nodie-look-right',duration:3,blinks:[1.7]}];
-            if(Date.now()-this.lastTilt>=60000)choices.push({name:'nodie-head-tilt',duration:3,blinks:[]});
+            if(Date.now()-this.lastTilt>=60000)choices.push({name:'nodie-head-tilt',duration:2.8,blinks:[]});
             const options=choices.filter(clip=>clip.name!==this.clip.name || clip.name===blink.name);
             this.clip=options[Math.floor(Math.random()*options.length)];
             if(this.clip.name==='nodie-head-tilt')this.lastTilt=Date.now();
