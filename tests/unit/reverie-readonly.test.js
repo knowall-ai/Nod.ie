@@ -21,7 +21,7 @@ const {createMemoryServer}=require('../../unmute-service/reverie-readonly.cjs');
 async function linked(server){const client=new Client({name:'test',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await server.connect(b);await client.connect(a);return {client,async close(){await client.close();await server.close()}};}
 test('actual MCP handler trims queries, fixes search limits and converts upstream failures',async()=>{
  let failed=false,seen;
- const pair=await linked(createMemoryServer(async()=>({async callTool(call,_schema,options){seen={call,options};return failed?{isError:true,content:[]}:{content:[{type:'text',text:'[]'}]};}})));
+ const pair=await linked(createMemoryServer(async()=>({async callTool(call,_schema,options){seen={call,options};return failed?{isError:true,content:[]}:{content:[{type:'text',text:'[{"memory":{"name":"Example"}}]'}]};}})));
  try{
   const result=await pair.client.callTool({name:'search_memories',arguments:{query:'  Example  '}});
   assert.equal(JSON.parse(result.content[0].text).status,'ok');
@@ -35,4 +35,17 @@ test('actual upstream MCP timeout becomes unavailable rather than an empty resul
  const upstream=await linked(upstreamServer);const bridge=await linked(createMemoryServer(async()=>upstream.client,{searchTimeout:25}));
  try{const result=await bridge.client.callTool({name:'search_memories',arguments:{query:'Example'}});assert.equal(result.isError,true);assert.equal(JSON.parse(result.content[0].text).status,'unavailable');}
  finally{await bridge.close();await upstream.close();}
+});
+
+test('keyword miss falls back to scored semantic candidates within the same deadline',async()=>{
+ const calls=[];const pair=await linked(createMemoryServer(async()=>({async callTool(call,_schema,options){calls.push({call,options});return {content:[{type:'text',text:JSON.stringify(calls.length===1?[]:[{memory:{name:'Benjamin',_match:'semantic',_score:.7,embedding:[1,2],name_embedding:[3,4]}}])}]};}})));
+ try {const result=JSON.parse((await pair.client.callTool({name:'search_memories',arguments:{query:'Benjamen'}})).content[0].text);assert.equal(result.retrieval,'hybrid');assert.equal(result.memories[0].memory._match,'semantic');assert.equal(result.memories[0].memory.embedding,undefined);assert.equal(calls[1].call.arguments.search_mode,'hybrid');assert.ok(calls[1].options.timeout<=4000);assert.equal(calls.length,2);}finally{await pair.close();}
+});
+test('semantic failure marks incomplete recall rather than claiming no memories',async()=>{
+ let calls=0;const pair=await linked(createMemoryServer(async()=>({async callTool(){if(++calls===2)throw Error('unavailable');return {content:[{type:'text',text:'[]'}]};}})));
+ try {const result=JSON.parse((await pair.client.callTool({name:'search_memories',arguments:{query:'variant'}})).content[0].text);assert.equal(result.semanticUnavailable,true);assert.deepEqual(result.memories,[]);}finally{await pair.close();}
+});
+test('explicit embedding opt-out never attempts semantic retrieval',async()=>{
+ let calls=0;const pair=await linked(createMemoryServer(async()=>({async callTool(){calls++;return {content:[{type:'text',text:'[]'}]};}}),{hybrid:false}));
+ try {await pair.client.callTool({name:'search_memories',arguments:{query:'variant'}});assert.equal(calls,1);}finally{await pair.close();}
 });

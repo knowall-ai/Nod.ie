@@ -19,3 +19,11 @@ The streaming voice bridge exposes bounded `search_memories` and `save_memory` t
 Names are limited to 160 characters, facts to 1,500 characters and accumulated notes to 12,000 characters. Identical fact lines are idempotent. Writes are serialized within the bridge process; unrelated external graph writers are not coordinated. No delete, arbitrary property, relationship-write or Cypher tool is exposed. The voice prompt requires a successful `saved` result before acknowledging persistence. A timeout after a mutation reports `unknown`, never success, and must not trigger an automatic retry. Model compliance remains a limitation; tool results are the evidence of persistence.
 
 The running bridge needs a Neo4j account with create/update permission. Its legacy filename `reverie-readonly.cjs` is retained for compatibility with existing mounts; the bridge now permits the bounded save operation. Memory contents and tool arguments stay out of diagnostic logs. Clearing conversation history does not erase graph memories.
+
+== Name variants in streaming conversations
+
+The Unmute memory bridge first uses bounded keyword search. On a miss, it asks Reverie for hybrid keyword and local semantic candidates, sharing a four-second upstream search deadline. Exact names and known aliases retain the fast path. Semantic matches retain their score and match type; they are candidates for clarification, never permission to merge people or redirect a write. Saves still use exact name/alias lookup.
+
+Local CPU embeddings use Reverie's quantized MiniLM model and a persistent Compose cache volume. The first use can download model weights; slow or unavailable embeddings leave keyword retrieval available and mark an incomplete semantic search explicitly. No additional GPU model or cloud embedding provider is configured. Cold-start and CPU contention can still affect latency. `REVERIE_EMBEDDINGS=none` in the bridge process environment disables semantic fallback. Vector arrays are removed from returned memory context without discarding relationships or match metadata.
+
+This PR does not schedule the `dream` tool or expand transcript retention. Confirming ambiguous identities and organising daily conversations are separate workflows.
