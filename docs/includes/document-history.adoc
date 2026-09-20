@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|be9b16f |2026-09-18 |Manage learned people and merge duplicate voice profiles
 |9454d4f |2026-09-18 |Merge remote-tracking branch 'origin/master' into feat/speaker-diarization
 |74b9a61 |2026-09-17 |fix: isolate interrupted decoder output by response generation
 |11c751c |2026-09-17 |perf: exclude unused cached voices from TTS GPU loading
@@ -9,6 +10,5 @@
 |6e96e52 |2026-09-17 |fix: reconnect read-only Reverie recall to Unmute and protect memory logs
 |b126884 |2026-09-17 |fix: unblock speech with empty tools and remove duplicate mic notices
 |cd57d78 |2026-09-17 |fix: restore Unmute streaming voice trial and interruption handling
-|0b008cb |2026-09-17 |feat: add optional local speaker diarisation and conversational naming
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

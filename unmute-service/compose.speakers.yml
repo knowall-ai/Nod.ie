@@ -1,0 +1,7 @@
+# Apply after voice/memory overlays. Run prepare-backend.py then prepare-speakers.py.
+services:
+  unmute-backend:
+    volumes:
+      - ${NODIE_SPEAKERS_DIR:?}/generated/openai_realtime_api_events.py:/app/unmute/openai_realtime_api_events.py:ro
+      - ${NODIE_SPEAKERS_DIR:?}/generated/unmute_handler.py:/app/unmute/unmute_handler.py:ro
+      - ${NODIE_SPEAKERS_DIR:?}/generated/chatbot.py:/app/unmute/llm/chatbot.py:ro

@@ -61,7 +61,7 @@ load().catch(error);
 async function loadSpeakers() {
     const status = await api.speakerStatus();
     el('speaker-enabled').checked = status.enabled;
-    el('speaker-status').textContent = status.enabled ? 'Enabled for local voice mode. Speaker identification is not connected to Unmute yet.' : 'Disabled. Speaker identification is not connected to Unmute yet.';
+    el('speaker-status').textContent = status.enabled ? 'Enabled for local and Unmute voice modes (Unmute requires the recognition backend overlay).' : 'Disabled. No new voice profiles are collected.';
     el('speaker-profiles').replaceChildren();
     if (!status.profiles.length) el('speaker-profiles').textContent = 'No voice profiles learned yet.';
     const label = profile => `${profile.name || 'Unfamiliar speaker'} (${profile.id.slice(0, 8)})`;

@@ -6,6 +6,9 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
+    analyseSpeakers: audio => ipcRenderer.invoke('speaker-analyse', audio),
+    cancelSpeakers: () => ipcRenderer.invoke('speaker-cancel'),
+    liveSpeakerStatus: () => ipcRenderer.invoke('speaker-live-status'),
     speakerStatus: () => ipcRenderer.invoke('speaker-status'),
     speakerEnabled: enabled => ipcRenderer.invoke('speaker-enabled', enabled),
     speakerEdit: (id, name) => ipcRenderer.invoke('speaker-edit', id, name),
