@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|d92eb72 |2026-09-18 |fix: omit redundant AAC track from streamed lip-sync clips
 |6c66758 |2026-09-17 |Merge branch 'fix/unmute-streaming' into feat/unmute-neural-lip-sync
 |3cb3f19 |2026-09-17 |fix: keep streaming speech independent of neural rendering
 |74b9a61 |2026-09-17 |fix: isolate interrupted decoder output by response generation
@@ -9,6 +10,5 @@
 |11c751c |2026-09-17 |perf: exclude unused cached voices from TTS GPU loading
 |6e96e52 |2026-09-17 |fix: reconnect read-only Reverie recall to Unmute and protect memory logs
 |b126884 |2026-09-17 |fix: unblock speech with empty tools and remove duplicate mic notices
-|cd57d78 |2026-09-17 |fix: restore Unmute streaming voice trial and interruption handling
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===
