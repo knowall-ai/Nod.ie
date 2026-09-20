@@ -90,7 +90,7 @@ function createMemoryServer(connect, {searchTimeout = 4000, hybrid = true} = {})
                 const remaining = searchTimeout - (Date.now() - started);
                 try {
                     if (remaining <= 0) throw Error('Search deadline reached');
-                    const semantic = decode(await upstream.callTool({ name: 'search_memories', arguments: { ...args, search_mode: 'hybrid', similarity_threshold: 0.55 } }, undefined, { timeout: remaining }));
+                    const semantic = decode(await upstream.callTool({ name: 'search_memories', arguments: { ...args, search_mode: 'hybrid' } }, undefined, { timeout: remaining }));
                     output = { ...bounded(semantic), retrieval: 'hybrid' };
                 } catch { output.semanticUnavailable = true; }
             }
