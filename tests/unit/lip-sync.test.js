@@ -50,7 +50,7 @@ test('cancelling neural rendering does not return a stale audio fallback or save
 test('only separately scheduled streaming speech requests video-only encoding',async()=>{
  for(const videoOnly of [false,true]) {
   await renderSpeech(new Uint8Array(44),{url:'http://localhost',videoOnly,fetchImpl:async(_url,options)=>{
-   assert.equal(options.headers['X-Nodie-Video-Only'],videoOnly?'1':undefined);
+   assert.equal(options.headers[VIDEO_ONLY_HEADER],videoOnly?VIDEO_ONLY_VALUE:undefined);
    return new Response(video,{headers:{'Content-Type':'video/mp4'}});
   }});
  }
