@@ -66,3 +66,13 @@ test('analysis backpressure skips extra frames and stop aborts in-flight analysi
  f.camera.requestFrame();await f.camera.tick();assert.equal(delivered,1);
  f.camera.stop();assert.equal(signal.aborted,true);finish();await tick;
 });
+
+test('selected frames retain detail, preserve aspect ratio and never upscale',async t=>{
+ for(const [width,height,expected] of [[1280,720,[768,432]],[640,480,[640,480]],[1920,1080,[768,432]],[1080,1920,[324,576]]]) {
+  const f=fixture();t.after(()=>f.camera.stop());const start=f.camera.start();f.permit();await start;
+  f.camera.video.videoWidth=width;f.camera.video.videoHeight=height;
+  f.camera.requested=true;const tick=f.camera.tick();
+  assert.deepEqual([f.camera.full.width,f.camera.full.height],expected);
+  f.encode();await tick;f.camera.stop();
+ }
+});

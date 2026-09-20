@@ -25,7 +25,7 @@ function fixture(t){let now=Date.now(),calls=0,cancels=0;const sent=[];
  return {context,renderer,api,sent,advance:n=>{now+=n;},calls:()=>calls,cancels:()=>cancels,frame:()=>({image:new Blob([jpeg]),capturedAt:new Date(now).toISOString(),signal:new AbortController().signal})};
 }
 test('voice gets priority, selected scene is bounded context and off clears it',async t=>{
- const h=fixture(t);assert.equal(h.context.canAnalyse(),false);h.advance(2100);await h.context.analyse(h.frame());assert.equal(h.calls(),1);
+ const h=fixture(t);h.context.initialCapture=false;assert.equal(h.context.canAnalyse(),false);h.advance(2100);await h.context.analyse(h.frame());assert.equal(h.calls(),1);
  assert.match(h.sent.at(-1).session.instructions.text,/A cat/);assert.equal(h.sent.at(-1).session.allow_recording,false);
  assert.equal(h.context.canAnalyse(),false);h.advance(15000);assert.equal(h.context.canAnalyse(),true);
  h.context.voiceEvent({type:'response.audio.delta'});assert.equal(h.context.canAnalyse(),false);
@@ -36,4 +36,14 @@ test('camera off during analysis discards late scene, stale scenes expire',async
  const pending=h.context.analyse(h.frame());await new Promise(r=>setImmediate(r));h.context.setActive(false);finish({status:'ready',description:'old scene'});await pending;
  assert.equal(h.context.scene,null);assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/old scene/);
  h.context.active=true;h.context.scene={description:'stale',capturedAt:new Date(0).toISOString()};h.context.update();assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/stale/);
+});
+
+test('explicit camera enable gets a first snapshot despite voice activity; later work yields',async t=>{
+ const h=fixture(t);assert.equal(h.context.canAnalyse(),true);
+ let finish;h.api.analyseVision=()=>new Promise(r=>{finish=r;});const pending=h.context.analyse(h.frame());await new Promise(r=>setImmediate(r));
+ const before=h.cancels();h.context.voiceEvent({type:'response.created'});assert.equal(h.cancels(),before);
+ finish({status:'ready',description:'A chair.'});await pending;assert.equal(h.context.initialCapture,false);
+ assert.equal(h.context.status,'snapshot');h.context.setActive(false);assert.equal(h.context.status,'camera-off');
+ h.context.setActive(true);assert.equal(h.context.status,'camera-on-awaiting-analysis');assert.equal(h.context.canAnalyse(),true);
+ assert.match(h.sent.at(-1).session.instructions.text,/analysis is pending, not that you lack a camera connection/);
 });

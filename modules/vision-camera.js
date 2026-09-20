@@ -11,7 +11,7 @@ class VisionCamera {
         const generation = ++this.generation;
         let stream;
         try {
-            stream = await this.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 10, max: 10 } } });
+            stream = await this.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 10, max: 10 } } });
             if (generation !== this.generation) { stream.getTracks().forEach(t => t.stop()); return; }
             this.stream = stream;
             this.video = this.preview || this.document.createElement('video');
@@ -43,12 +43,12 @@ class VisionCamera {
             const choice = this.selector.select(this.smallContext.getImageData(0, 0, 64, 48).data, this.clock(), Boolean(this.requested));
             if (!choice) return;
             this.requested = false;
-            const scale = Math.min(1, 384 / this.video.videoWidth, 288 / this.video.videoHeight);
+            const scale = Math.min(1, 768 / this.video.videoWidth, 576 / this.video.videoHeight);
             if (!Number.isFinite(scale) || scale <= 0) return;
             this.full.width = Math.max(1, Math.round(this.video.videoWidth * scale));
             this.full.height = Math.max(1, Math.round(this.video.videoHeight * scale));
             this.fullContext.drawImage(this.video, 0, 0, this.full.width, this.full.height);
-            const blob = await new Promise(resolve => this.full.toBlob(resolve, 'image/jpeg', .75));
+            const blob = await new Promise(resolve => this.full.toBlob(resolve, 'image/jpeg', .85));
             if (!blob || blob.size > 512000) throw new Error('Frame could not be encoded');
             if (generation !== this.generation || !this.active) return;
             const result = await this.onFrame({ image: blob, reason: choice.reason, capturedAt: new Date().toISOString(), signal: this.controller.signal });

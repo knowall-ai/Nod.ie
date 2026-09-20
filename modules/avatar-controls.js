@@ -46,7 +46,7 @@ class AvatarControls {
         this.camera.setAttribute('aria-pressed', String(active));
         this.camera.setAttribute('aria-busy', String(starting));
         this.camera.setAttribute('aria-label', active ? 'Turn camera preview off' : starting ? 'Cancel opening camera' : 'Turn camera preview on');
-        this.camera.title = active ? (this.renderer.localVoice ? 'Camera preview on — scene analysis requires Unmute voice mode' : 'Camera on — selected frames analysed locally') : starting ? 'Opening camera — click to cancel' : 'Camera off';
+        this.camera.title = active ? (this.renderer.localVoice ? 'Camera preview on — scene analysis requires Unmute voice mode' : (this.renderer.visionContext?.status === 'snapshot' ? 'Camera on — a recent snapshot is available' : 'Camera on — awaiting scene analysis')) : starting ? 'Opening camera — click to cancel' : 'Camera off';
         this.preview.hidden = !active;
         this.camera.querySelector('img').hidden = active;
     }
