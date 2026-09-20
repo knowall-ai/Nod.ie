@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' ws: wss: http: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'none'">
-    <title>Nod.ie</title>
+    <title>Nodie</title>
     <link rel="stylesheet" href="renderer.css">
 </head>
 <body>
     <div id="app">
-        <div id="avatar-controls" role="group" aria-label="Nod.ie device controls">
+        <div id="avatar-controls" role="group" aria-label="Nodie device controls">
             <button id="control-mic" class="orbit-control" type="button" aria-label="Microphone" aria-pressed="false" disabled title="Microphone off"><img src="assets/icons/lucide/mic-off.svg" alt="" aria-hidden="true"></button>
             <button id="control-camera" class="orbit-control" type="button" aria-label="Camera off — vision not available" aria-pressed="false" aria-disabled="true" title="Camera off — vision is not connected yet"><img src="assets/icons/lucide/camera-off.svg" alt="" aria-hidden="true"></button>
             <button id="control-speaker" class="orbit-control" type="button" aria-label="Speaker" aria-pressed="true" title="Speaker on"><img src="assets/icons/lucide/volume-2.svg" alt="" aria-hidden="true"></button>
@@ -21,6 +21,7 @@
                 <video id="avatar-video" muted playsinline style="display: none;">
                     Your browser does not support the video tag.
                 </video>
+                <img id="avatar-shirt-brand" src="assets/avatars/nodie-getnodie-shirt.png" alt="" aria-hidden="true" draggable="false">
             </div>
             <div id="status-text" class="loading-text" style="display: none;"></div>
         </div>
