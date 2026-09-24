@@ -63,10 +63,10 @@ h=patch(h,'    async def update_session(self, session: ora.SessionConfig):\n',''
 h=patch(h,'        await stt.send_audio(array)','''        await stt.send_audio(array)
         if getattr(self,"_nodie_tracking",False):
             chunk=self._nodie_windows.audio(float_audio,sr,stt.sent_samples/sr)
-            if chunk and self.output_queue.qsize()<128:await self.output_queue.put(ora.NodieSpeakerAudio(**chunk))''')
+            if chunk and self.chatbot.conversation_state()!='bot_speaking' and any(chunk["start_time"]<=w["start"]<chunk["end_time"] for w in self._nodie_windows.words) and self.output_queue.qsize()<128:await self.output_queue.put(ora.NodieSpeakerAudio(**chunk))''')
 h=patch(h,'                for _ in range(num_frames):','''                if getattr(self,"_nodie_tracking",False):
                     chunk=self._nodie_windows.audio(np.empty(0,dtype=np.float32),sr,stt.sent_samples/sr,force=True)
-                    if chunk and self.output_queue.qsize()<128:await self.output_queue.put(ora.NodieSpeakerAudio(**chunk))
+                    if chunk and self.chatbot.conversation_state()!='bot_speaking' and any(chunk["start_time"]<=w["start"]<chunk["end_time"] for w in self._nodie_windows.words) and self.output_queue.qsize()<128:await self.output_queue.put(ora.NodieSpeakerAudio(**chunk))
                 for _ in range(num_frames):''')
 h=patch(h,'            async for data in stt:\n','''            async for data in stt:
                 if isinstance(data,STTEndWordMessage):

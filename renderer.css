@@ -351,7 +351,7 @@ body.fullscreen #circle,body.fullscreen #avatar-controls { pointer-events:auto; 
 
 #recognition-confirm { position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(240px,calc(100vw - 32px));box-sizing:border-box;z-index:130;padding:12px;border:1px solid #f5a623;border-radius:8px;background:#202a35;color:#fff;font:12px/1.5 system-ui,sans-serif;text-align:center; }
 #recognition-confirm[hidden] { display:none; }
-#recognition-confirm span { display:block;overflow-wrap:anywhere;margin:0 0 8px; }
+#recognition-confirm span { display:block;overflow-wrap:anywhere;margin:0 0 8px;max-height:72px;overflow:auto; }
 #recognition-confirm button,#debug-clear,#control-debug { box-sizing:border-box;min-height:32px;padding:4px 12px;border:1px solid #a97630;border-radius:8px;background:#202a35;color:#f5c77e;font:12px/1.5 system-ui,sans-serif;cursor:pointer; }
 #recognition-confirm button { min-width:80px;margin:0; }
 #recognition-confirm button+button { margin-left:8px; }

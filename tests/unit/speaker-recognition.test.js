@@ -107,3 +107,14 @@ test('unchanged background matches and status reads do not rewrite embeddings or
  assert.equal((await store.observe(result(vector(0)),epoch)).speakers[0].mayAskName,true);
  assert.equal(writes,1);
 });
+test('runtime unknown voices remain in memory until explicitly named',async t=>{
+ const store=await fixture(t);await store.configure(true);const service=new SpeakerRecognition({store,fetchImpl:async()=>Response.json(result(vector(0)))});
+ const first=await service.analyse(Buffer.alloc(200));assert.ok(first.speakers[0].id);assert.equal((await store.status()).profiles.length,0);
+ const again=await service.analyse(Buffer.alloc(200));assert.equal(again.speakers[0].id,first.speakers[0].id);assert.equal((await store.status()).profiles.length,0);
+ assert.equal(await service.name(first,first.speakers[0].id,'Example'),true);assert.equal((await store.status()).profiles.length,1);
+});
+test('disabled or expired temporary voices cannot become durable profiles',async t=>{
+ const store=await fixture(t);await store.configure(true);let d=await store.load();const first=await store.observe(result(vector(0)),d.epoch,undefined,{temporary:true});
+ store.candidates[0].lastSeen=Date.now()-91000;assert.equal(await store.nameObserved(first,first.speakers[0].id,'Example'),false);
+ const next=await store.observe(result(vector(1)),d.epoch,undefined,{temporary:true});await store.configure(false);assert.equal(await store.nameObserved(next,next.speakers[0].id,'Example'),false);assert.equal((await store.status()).profiles.length,0);
+});

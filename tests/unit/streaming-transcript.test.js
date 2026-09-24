@@ -81,3 +81,8 @@ test('Unmute word events match upstream STT and spoken TTS spacing',async t=>{
  await s.finish();
  assert.deepEqual((await store.load()).turns.map(x=>x.content),['Hello Nodie.','Hello Ben. How are you?']);
 });
+test('late attribution updates completed user words and survives restart',async t=>{
+ const {store,transcript:s}=await fixture(t,{wordDeltas:true});s.event({type:'conversation.item.input_audio_transcription.delta',delta:'Hello',start_time:1});s.event({type:'response.created'});await s.queue;
+ s.attribute([{text:'Hello',start:1,end:1.4,name:'Example',attribution:'possible-match'}]);await s.queue;
+ assert.deepEqual((await new ConversationHistory(store.file).load()).turns[0].words,[{text:'Hello',start:1,end:1.4,speaker:'Example',attribution:'possible-match'}]);
+});

@@ -104,7 +104,7 @@ function start() {
 
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
     const recognitionNames=new(require('./lib/recognition-names').RecognitionNames)({faces,voices:{store:speakerRecognition.store,forInterval:(start,end)=>liveSpeakers.forInterval(start,end)},classify:require('./lib/recognition-intent').recognitionIntent({url:env.getConfig('OLLAMA_URL'),model:env.LLM_MODEL||env.getConfig('LOCAL_LLM_MODEL')}),record:event=>recorder.record(event)});
-    voice.proposeSpeakerName=async(observation,text)=>{const proposal=await recognitionNames.proposeLocal(observation,text);if(proposal.status==='pending')mainWindow?.webContents.send('recognition-proposal',proposal);return proposal;};
+    voice.proposeSpeakerName=async(observation,text,previousAssistant)=>{const proposal=await recognitionNames.proposeLocal(observation,text,previousAssistant);if(proposal.status==='pending')mainWindow?.webContents.send('recognition-proposal',proposal);return proposal;};
     handle('recognition-propose',turn=>recognitionNames.propose(turn));
     handle('recognition-confirm',(token,accepted)=>recognitionNames.confirm(token,accepted));
     handle('recognition-cancel',()=>recognitionNames.cancel());
