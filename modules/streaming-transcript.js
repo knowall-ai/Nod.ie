@@ -1,7 +1,7 @@
 /** Bounded text-only transcript of received STT and spoken-text events. */
 class StreamingTranscript {
     constructor(api, onError = () => {}, { wordDeltas = false } = {}) {
-        this.wordDeltas = wordDeltas;
+        this.wordDeltas = wordDeltas;this.recentTurns=[];
         this.api = api; this.onError = onError; this.queue = Promise.resolve(); this.revision = 0;
     }
     async start() {
@@ -10,7 +10,11 @@ class StreamingTranscript {
         catch { this.epoch = null; this.onError(); }
     }
     reset({ epoch }) {
-        clearTimeout(this.timer); this.turn = null; this.epoch = epoch; ++this.revision;
+        clearTimeout(this.timer); this.turn = null; this.recentTurns=[]; this.epoch = epoch; ++this.revision;
+    }
+    attribute(words){
+        if(!Array.isArray(words))return;
+        for(const turn of this.recentTurns){let changed=false;for(const word of turn.words||[]){const match=words.find(w=>w.start===word.start&&w.text===word.text);if(!match||!Number.isFinite(match.end)||match.end<word.start||match.end-word.start>5)continue;word.end=match.end;word.speaker=match.name||null;word.attribution=match.attribution==='possible-match'?'possible-match':'unattributed';changed=true;}if(changed)this.save(turn);}
     }
     event(data) {
         if (['response.created', 'response.audio.done', 'response.done', 'unmute.interrupted_by_vad'].includes(data.type)) this.finish();
@@ -20,16 +24,17 @@ class StreamingTranscript {
         if (!role || typeof data.delta !== 'string' || !data.delta || !this.epoch) return;
         if (this.turn?.role !== role) this.finish();
         if (!this.turn && !data.delta.trim()) return;
-        if (!this.turn) this.turn = { id: crypto.randomUUID(), role, content: '' };
+        if(!this.turn){this.turn={id:crypto.randomUUID(),role,content:''};this.recentTurns.push(this.turn);this.recentTurns=this.recentTurns.slice(-12);}
+        if(role==='user'&&Number.isFinite(data.start_time)&&data.start_time>=0){this.turn.words ||= [];if(this.turn.words.length<100)this.turn.words.push({text:data.delta.slice(0,200),start:data.start_time,attribution:'unattributed'});}
         // Unmute emits words; generic streams emit literal fragments.
         // Match upstream Chatbot.add_chat_message_delta only for word events.
         const separator = this.wordDeltas && /\S$/.test(this.turn.content) && /^\S/.test(data.delta) ? ' ' : '';
         this.turn.content = (this.turn.content + separator + data.delta).slice(0, 2000);
         if (!this.timer) this.timer = setTimeout(() => { this.timer = null; this.save(); }, 500);
     }
-    save() {
-        if (!this.turn || !this.epoch) return this.queue;
-        const turn = { ...this.turn }, epoch = this.epoch, revision = this.revision;
+    save(target=this.turn) {
+        if (!target || !this.epoch) return this.queue;
+        const turn = { ...target, ...(target.words?{words:target.words.map(w=>({...w}))}:{}) }, epoch = this.epoch, revision = this.revision;
         this.queue = this.queue.then(async () => {
             if (revision !== this.revision) return;
             const result = await this.api.saveTranscript(epoch, turn);

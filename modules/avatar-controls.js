@@ -38,12 +38,12 @@ class AvatarControls {
                     const cancel = () => window.nodie.cancelFaces().catch(() => {});
                     frame.signal.addEventListener('abort', cancel, { once: true });
                     // Recognition shares selected frames but never delays scene description.
-                    void window.nodie.analyseFaces(image).catch(() => {}).finally(() => frame.signal.removeEventListener('abort', cancel));
+                    void window.nodie.analyseFaces(image).then(result=>{if(!frame.signal.aborted)renderer.recognition?.faces(result);}).catch(() => {}).finally(() => frame.signal.removeEventListener('abort', cancel));
                     })().catch(() => {});
                     return analysis;
                 },
                 onError: message => renderer.showNotification(message, 'error'),
-                onState: () => { if(!this.cameraSource?.active)window.nodie?.cancelJournal?.(true).catch(()=>{}); renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
+                onState: () => { if(!this.cameraSource?.active){window.nodie?.cancelJournal?.(true).catch(()=>{});renderer.recognition?.faces(null);window.nodie?.cancelFaces?.().catch(()=>{});} renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
             });
             window.addEventListener('pagehide', () => this.cameraSource.stop());
         }

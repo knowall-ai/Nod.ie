@@ -60,11 +60,12 @@ test('voice integration supplies named context without vectors and only exposes 
         if (url.includes('/api/chat')) {
             const request = JSON.parse(options.body);
             if (++chats === 1) { assert.ok(request.tools.some(t => t.function.name === 'name_current_speaker')); assert.ok(request.messages.some(m => m.content.includes('fallible matching'))); return Response.json({ message: { tool_calls: [{ function: { name: 'name_current_speaker', arguments: { id: 'current', name: 'Ben' } } }] } }); }
-            assert.deepEqual(JSON.parse(request.messages.at(-1).content), { applied: true }); return Response.json({ message: { content: 'Nice to meet you, Ben.' } });
+            assert.deepEqual(JSON.parse(request.messages.at(-1).content), { applied: false,status:'pending' }); return Response.json({ message: { content: 'Nice to meet you, Ben.' } });
         }
         return new Response(wav);
     } });
-    const reply = await voice.converse(new Uint8Array(200)); assert.equal(named, 1); assert.equal(reply.reply, 'Nice to meet you, Ben.'); assert.equal(reply.speakers.state, 'ready');
+    voice.proposeSpeakerName=async(o,text)=>{assert.equal(o,observation);assert.equal(text,'My name is Ben.');return {status:'pending'};};
+    const reply = await voice.converse(new Uint8Array(200)); assert.equal(named, 0); assert.equal(reply.reply, 'Nice to meet you, Ben.'); assert.equal(reply.speakers.state, 'ready');
 });
 test('merging retains both voices under the chosen person and invalidates old observations', async t => {
  const store=await fixture(t);await store.configure(true);const {epoch}=await store.load();

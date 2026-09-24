@@ -5,3 +5,5 @@ services:
       - ${NODIE_SPEAKERS_DIR:?}/generated/openai_realtime_api_events.py:/app/unmute/openai_realtime_api_events.py:ro
       - ${NODIE_SPEAKERS_DIR:?}/generated/unmute_handler.py:/app/unmute/unmute_handler.py:ro
       - ${NODIE_SPEAKERS_DIR:?}/generated/chatbot.py:/app/unmute/llm/chatbot.py:ro
+      - ${NODIE_SPEAKERS_DIR:?}/recognition_context.py:/app/unmute/recognition_context.py:ro
+      - ${NODIE_SPEAKERS_DIR:?}/generated/speech_to_text.py:/app/unmute/stt/speech_to_text.py:ro

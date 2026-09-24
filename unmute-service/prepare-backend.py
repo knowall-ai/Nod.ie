@@ -153,3 +153,5 @@ print('Prepared tool-independent speech startup.')
 if args.with_speakers or (output / 'chatbot.py').exists():
     import subprocess, sys
     subprocess.run([sys.executable, str(Path(__file__).with_name('prepare-speakers.py')), str(args.unmute_root)], check=True)
+
+    subprocess.run([sys.executable,str(Path(__file__).with_name('prepare-recognition.py')),str(args.unmute_root)],check=True)
