@@ -40,3 +40,8 @@ See `PERFORMANCE_REVIEW.adoc` for the dated application review, measured renderi
 == Recognition attribution regression checks
 
 Run `npm test` for proposal expiry, speaker switches, UI confirmation, cancelled inference and persistence. Run `.venv-recognition/bin/python tests/test_recognition_context.py` for audio-clock padding, per-word attribution, overlapping speech, stale observations and STT clock resets. Use synthetic audio and ephemeral profile stores for integration checks; do not enroll test fixtures in a real household store. Recognition accuracy still requires consenting household trials.
+
+
+== Visual curiosity regressions
+
+`tests/unit/curiosity.test.js` covers startup baselines, repeated evidence, people counts, held objects, screen exclusion, private durable budgets, concurrent claims, mute/quiet gates and cancellation races. `python3 tests/test_curiosity_context.py` covers single-use backend delivery, quiet requirements, expiry, exact-frame matching and history isolation with synthetic data. These are not measurements of household recognition accuracy or live response latency.
