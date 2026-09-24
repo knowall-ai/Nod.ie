@@ -15,12 +15,12 @@ async function fixture(t) {
 test('Unmute spoken text and user words survive restart; internal generation is excluded',async t=>{
  const {store,transcript:s}=await fixture(t);
  s.event({type:'conversation.item.input_audio_transcription.delta',delta:'Hello'});
- s.event({type:'conversation.item.input_audio_transcription.delta',delta:'Nodie'});
+ s.event({type:'conversation.item.input_audio_transcription.delta',delta:' Nodie'});
  s.event({type:'response.created'});
  s.event({type:'unmute.response.text.delta.ready',delta:'private thought'});
  s.event({type:'response.text.delta',delta:'Hello'});
  await s.save();
- s.event({type:'response.text.delta',delta:'Ben.'});
+ s.event({type:'response.text.delta',delta:' Ben.'});
  s.event({type:'response.audio.done'});await s.queue;
  assert.deepEqual((await new ConversationHistory(store.file).load()).turns.map(x=>[x.role,x.content]),[['user','Hello Nodie'],['assistant','Hello Ben.']]);
 });
@@ -52,5 +52,23 @@ test('browser transcript routes require same origin and clear works in Unmute mo
  assert.equal((await store.load()).turns.length,1);
  assert.equal((await post('/transcript/save',{epoch,turn:{id:'bad',role:'system',content:'not allowed'}})).status,400);
  assert.equal((await post('/transcript/clear')).status,200);
+ assert.deepEqual((await store.load()).turns,[]);
+});
+
+test('delta chunks preserve word boundaries, punctuation and whitespace',async t=>{
+ const {store,transcript:s}=await fixture(t);
+ for(const delta of ['  ','Hel','lo',',',' ','world','!']) s.event({type:'response.text.delta',delta});
+ await s.finish();assert.equal((await store.load()).turns[0].content,'Hello, world!');
+});
+test('unknown transcript fields are rejected at store and HTTP boundaries',async t=>{
+ const {store}=await fixture(t);const {epoch}=await store.load();const turn={id:'test',role:'user',content:'Hello'};
+ assert.throws(()=>store.upsert(epoch,{...turn,extra:true}),/Invalid transcript/);
+ const server=require('../../lib/web-server').createServer({config:{VOICE_MODE:'unmute'},historyStore:store});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>server.close(resolve)));
+ const base=`http://127.0.0.1:${server.address().port}`;
+ for(const body of [{epoch,turn,extra:true},{epoch,turn:{...turn,extra:true}},null,[]]) {
+  const response=await fetch(base+'/transcript/save',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify(body)});
+  assert.equal(response.status,400);
+ }
  assert.deepEqual((await store.load()).turns,[]);
 });

@@ -16,10 +16,11 @@ class StreamingTranscript {
         const role = data.type === 'conversation.item.input_audio_transcription.delta' ? 'user'
             : data.type === 'response.text.delta' ? 'assistant' : null;
         // Ignore internal LLM-ready events: they may never have been spoken.
-        if (!role || typeof data.delta !== 'string' || !data.delta.trim() || !this.epoch) return;
+        if (!role || typeof data.delta !== 'string' || !data.delta || !this.epoch) return;
         if (this.turn?.role !== role) this.finish();
+        if (!this.turn && !data.delta.trim()) return;
         if (!this.turn) this.turn = { id: crypto.randomUUID(), role, content: '' };
-        this.turn.content = (this.turn.content + (this.turn.content ? ' ' : '') + data.delta.trim()).slice(0, 2000);
+        this.turn.content = (this.turn.content + data.delta).slice(0, 2000);
         if (!this.timer) this.timer = setTimeout(() => { this.timer = null; this.save(); }, 500);
     }
     save() {
