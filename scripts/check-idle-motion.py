@@ -33,4 +33,4 @@ for name, frames in [('nodie-idle', 150), ('nodie-idle-blink', 150), ('nodie-loo
         reference = raw[start:size]
         body = [statistics.mean(abs(a-b) for a,b in zip(reference, raw[i*size+start:(i+1)*size])) for i in range(frames)]
         print(json.dumps({'clip': name, 'maximum_body_change': max(body)}))
-        assert max(body) < .2, name + ': blink moves neck/torso'
+        assert max(body) < .05, name + ': blink moves neck/torso'
