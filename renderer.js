@@ -247,6 +247,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
     },
 
     async handleRealtimeMessage(data) {
+                await this.playbackStopping;
                 // Log error details
                 if (data.type === 'error') {
                     console.error('Unmute reported a service error');
@@ -255,7 +256,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                 if (['input_audio_buffer.speech_started', 'unmute.interrupted_by_vad'].includes(data.type)) {
                     clearTimeout(this.avatarResetTimer);
                     this.state.audioPlayback?.interrupt();
-                    this.streamingLips?.cancel();
+                    await this.streamingLips?.cancel();
                     this.isAssistantSpeaking = false;
                     this.responseAudioStarted = false;
                     clearTimeout(this.pcmFlushTimeout);
@@ -377,12 +378,13 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
         this.controls?.update();
     },
     stopPlayback() {
-        this.streamingLips?.cancel();
+        const lipStop = this.streamingLips?.cancel();
         const playback = this.state.audioPlayback;
         this.state.audioPlayback = null;
-        playback?.stop().catch(console.error);
+        this.playbackStopping = Promise.all([lipStop, playback?.stop()]).catch(() => this.showNotification('Speech playback could not be stopped cleanly.', 'error'));
         clearTimeout(this.pcmFlushTimeout);
         this.pcmAudioAccumulator = [];
+        return this.playbackStopping;
     },
     toggleMute() {
         if (this.localVoice) { this.localVoice.toggle(); return; }

@@ -37,8 +37,28 @@ test('slow rendering cannot delay later PCM and expired videos are discarded',as
     h.queue.context.currentTime=3;h.sources[0].onended();h.sources[1].onended();
     finish(new Uint8Array(16));await tick();assert.equal(h.urls.length,0);assert.equal(h.sources.length,2);h.queue.cancel();
 });
-test('server rejects segments cancelled while their upload was in progress',async()=>{
+test('server rejects a render submitted with a pre-cancelled generation',async()=>{
     const {StreamingLipSync}=require('../../lib/streaming-lip-sync');const server=new StreamingLipSync({url:'http://127.0.0.1:1'});
     const generation=server.generation;server.cancel();
     await assert.rejects(server.render(new Uint8Array(44),generation),/cancelled/);
+});
+
+test('oversized PCM splits without losing samples and rejects invalid inputs', async()=>{
+ const h=harness(()=>new Promise(()=>{}));
+ h.queue.push(new Float32Array(70000),48000);
+ assert.equal(h.sources.length,2);assert.equal(h.queue.length,8560);
+ for(const [frame,rate] of [[new Float32Array(),48000],[[1],48000],[new Float32Array(1),48000.5]]) h.queue.push(frame,rate);
+ assert.equal(h.queue.length,8560);h.queue.flush();assert.equal(h.sources.length,3);await h.queue.cancel();
+});
+test('cancellation awaits context close and prevents premature replacement', async()=>{
+ const h=harness(()=>new Promise(()=>{}));h.queue.push(new Float32Array(30720),48000);
+ const old=h.queue.context;let finish;old.close=()=>new Promise(resolve=>{finish=resolve;});
+ let done=false;const close=h.queue.cancel().then(()=>{done=true;});await tick();
+ assert.equal(done,false);assert.equal(h.queue.context,old);
+ h.queue.push(new Float32Array(30720),48000);assert.equal(h.sources.length,1);
+ finish();await close;await tick();assert.equal(h.sources.length,2);assert.notEqual(h.queue.context,old);await h.queue.cancel();
+});
+test('context close cannot block cancellation indefinitely', async()=>{
+ const h=harness(()=>new Promise(()=>{}));h.queue.push(new Float32Array(30720),48000);h.queue.context.close=()=>new Promise(()=>{});
+ await h.queue.cancel();assert.equal(h.queue.context,null);assert.equal(h.queue.closing,null);
 });
