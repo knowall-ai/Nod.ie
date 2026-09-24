@@ -33,3 +33,9 @@ This PR does not schedule the `dream` tool or expand transcript retention. Confi
 Existing graphs need stored embeddings for semantic matching. Before first use, an administrator should back up the graph, inspect Reverie's `dream` dry-run report, and apply only an acceptable maintenance plan. This refreshes old embeddings outside a live speech turn. `dream` can also relabel and merge records, so do not run it blindly just to warm a model. Hybrid fallback uses Reverie's default similarity threshold (0.4); scores indicate similarity, not confirmed identity.
 
 Reverie 0.5.2 does not expose a completion flag for empty semantic searches. The bridge reports hybrid retrieval only when a returned row carries semantic-match metadata. Empty or keyword-only fallback results conservatively mark semantic recall incomplete, even when a semantic search may have succeeded without a match.
+
+== Managing recognised people
+
+Settings > People lists learned voice profiles with their name, last-heard time and retained sample count. Rename a profile, remove it, or explicitly merge a duplicate into a chosen destination. Merges keep the destination name and both sets of voice embeddings (up to eight per person, 64 overall); matching uses the best sample instead of averaging distinct embeddings. Removal and merging require confirmation and invalidate pending observations so old recognition results cannot restore deleted identities. These actions do not alter Reverie memories.
+
+Face profiles are shown as not connected until the face-recognition pipeline exists. No face records are invented from camera previews. Speaker identification currently applies to local voice mode, not the Unmute transport.
