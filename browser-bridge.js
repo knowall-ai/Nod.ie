@@ -1,5 +1,5 @@
 // Only voice operations are exposed by the loopback web app. No Docker/update API.
-if (!window.nodie && window.ENV_CONFIG?.VOICE_MODE === 'local') {
+if (!window.nodie && window.ENV_CONFIG) {
     const post = async (route, body, type = 'application/octet-stream') => {
         const response = await fetch(route, { method: 'POST', headers: { 'Content-Type': type }, body });
         const result = await response.json();
