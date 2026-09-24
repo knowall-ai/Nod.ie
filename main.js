@@ -69,6 +69,12 @@ function start() {
         mainWindow?.webContents.send('history-cleared', { epoch: (await historyStore.load()).epoch });
         return result;
     }, true);
+
+    const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
+    handle('speaker-analyse', audio => liveSpeakers.analyse(audio));
+    handle('speaker-cancel', () => liveSpeakers.cancel());
+    handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
+    app.on('before-quit', () => liveSpeakers.cancel());
     handle('speaker-status', () => speakerRecognition.store.status(), true);
     handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
     handle('speaker-edit', (id, name) => speakerRecognition.store.edit(id, name), true);

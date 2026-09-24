@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('nodie', {
     saveTranscript: (epoch, turn) => ipcRenderer.invoke('transcript-save', epoch, turn),
     onHistoryCleared: fn => subscribe('history-cleared', fn),
 
+
+    analyseSpeakers: audio => ipcRenderer.invoke('speaker-analyse', audio),
+    cancelSpeakers: () => ipcRenderer.invoke('speaker-cancel'),
+    liveSpeakerStatus: () => ipcRenderer.invoke('speaker-live-status'),
     speakerStatus: () => ipcRenderer.invoke('speaker-status'),
     speakerEnabled: enabled => ipcRenderer.invoke('speaker-enabled', enabled),
     speakerEdit: (id, name) => ipcRenderer.invoke('speaker-edit', id, name),

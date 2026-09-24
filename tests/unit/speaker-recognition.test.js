@@ -87,3 +87,11 @@ test('merge refuses capacity overflow without partially removing a person',async
  await assert.rejects(store.merge(second.speakers[1].id,target),/eight/);
  const status=await store.status();assert.equal(status.profiles.length,2);assert.equal(status.profiles.find(p=>p.id===target).voiceSamples,8);
 });
+test('background matching never enrols unfamiliar voices',async t=>{
+ const store=await fixture(t);await store.configure(true);
+ const service=new SpeakerRecognition({store,fetchImpl:async()=>Response.json(result(vector(0)))});
+ const unknown=await service.analyse(Buffer.alloc(200),undefined,{enrol:false});
+ assert.equal(unknown.speakers[0].uncertain,true);assert.equal((await store.status()).profiles.length,0);
+ const enrolled=await service.analyse(Buffer.alloc(200));await service.name(enrolled,enrolled.speakers[0].id,'Example');
+ assert.equal((await service.analyse(Buffer.alloc(200),undefined,{enrol:false})).speakers[0].name,'Example');
+});
