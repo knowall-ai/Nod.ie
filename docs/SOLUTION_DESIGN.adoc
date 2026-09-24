@@ -4,7 +4,7 @@ Nod.ie is a local voice assistant with an Electron overlay and a loopback browse
 
 === Voice modes
 
-* `local`: opt-in continuous conversation. Click the microphone to enable listening; recording submits after sustained voice energy followed by 900 ms of quiet. Click again to submit manually; recording stops after 30 seconds at most. Ten seconds without detected speech discards the quiet recording locally and starts a fresh bounded recording while listening remains enabled. The microphone is released before transcription and stays physically closed during replies, then resumes automatically while enabled. The microphone button or a spoken microphone-off action ends the loop. Existing Whisper, Ollama and TTS services process each turn. This avoids starting the dedicated Unmute STT/TTS models.
+* `local`: continuous conversation starts after a healthy connection on desktop; the browser requires clicking the microphone to enable listening; recording submits after sustained voice energy followed by 900 ms of quiet. Click again to submit manually; recording stops after 30 seconds at most. Ten seconds without detected speech discards the quiet recording locally and starts a fresh bounded recording while listening remains enabled. The microphone is released before transcription and stays physically closed during replies, then resumes automatically while enabled. The microphone button or a spoken microphone-off action ends the loop. Existing Whisper, Ollama and TTS services process each turn. This avoids starting the dedicated Unmute STT/TTS models.
 * `realtime`: the shared WebSocket connection sends Opus pages to Unmute, restores sessions with the system prompt after disconnects, and uses bounded reconnection backoff. Capture and playback implementations are shared between desktop and browser.
 
 Local mode uses the configured small transcription model on demand, the existing Ollama model and an already-running TTS service. It does not start containers, load embedding models, or schedule background inference. Availability probes check service reachability; a real recorded turn is the acceptance test.
@@ -29,7 +29,7 @@ Dragging uses native desktop-independent coordinates and the full display bounds
 
 Nod.ie chooses her own spoken wording. Application code supplies verified facts and structured events, controls timing and permissions, and selects the delivery channel. The language model composes the utterance within factual, length and tone constraints. Do not use fixed spoken scripts or a rotating list of prewritten announcements. If generation fails, show a factual status instead of silently substituting canned speech. Stable control labels, accessibility text and technical errors remain deterministic.
 
-The requested future unfamiliar-person notification is spoken, but its wording must be generated from an event describing an unmatched face and the recognition uncertainty. Recognition must never establish permission to perform privileged actions. Camera capture, family enrolment and speaker identification are not implemented by the current controls change.
+The requested future unfamiliar-person notification is spoken, but its wording must be generated from an event describing an unmatched face and the recognition uncertainty. Recognition must never establish permission to perform privileged actions. Camera capture, family enrolment and speaker identification are described in the optional recognition sections below.
 
 === Assistant implementation context
 
@@ -82,7 +82,7 @@ Automatic end-of-speech detection samples microphone energy every 50 ms while re
 
 Ollama chat requests retain the active model for 30 minutes after use. The previous default idle expiry unloaded Qwen between conversations; a measured first load added about 13 seconds before answer generation. The finite keep-alive avoids repeated loads during a session while allowing GPU memory to be reclaimed after longer inactivity. It does not perform inference while idle or remove cold-start delay after expiry.
 
-Continuous listening is opt-in for each application session and is not restored automatically after a restart. The microphone button reflects the enabled loop, with a tooltip explaining temporary capture pauses during replies. Cancelled generations cannot reopen capture. Empty transcriptions retry at most twice before disabling the loop with a clear error; other service failures stop the loop. Expected desktop voice errors cross IPC as safe structured failures rather than Electron transport exception text.
+Desktop listening starts automatically after a healthy connection. Browser listening is opt-in for each application session and is not restored after a restart. The microphone button reflects the enabled loop, with a tooltip explaining temporary capture pauses during replies. Cancelled generations cannot reopen capture. Empty transcriptions retry at most twice before disabling the loop with a clear error; other service failures stop the loop. Expected desktop voice errors cross IPC as safe structured failures rather than Electron transport exception text.
 
 === Streaming Unmute avatar playback
 
@@ -95,3 +95,29 @@ The assistant's spoken name is Nodie. `GetNod.ie` is the planned domain and T-sh
 A static, masked garment layer displays the generated lettering over the original portrait and all video states. It changes only the shirt region, preserving the established face, idle movement and speech animation without regenerating neural videos or adding inference work. This layer is aligned to the bundled portrait; custom avatars require their own branding layout. The layer is decorative and cannot intercept drag or button input.
 
 The built-in image generation tool produced `assets/avatars/nodie-getnodie-shirt.png`. Edit prompt: change only the white T-shirt lettering from “Nod.ie” to “GetNod.ie”, preserving the face, hair, pose, background, fabric and Bitcoin symbol. The original portrait remains the animation source; the UI masks the generated image to the lettering region to avoid identity drift.
+
+=== Transparent overlay input
+
+Only the circular avatar and visible circular buttons intercept desktop mouse input. Transparent corners pass clicks and scrolling to the underlying application. The renderer supplies measured circle bounds; the main process maps native cursor coordinates into that viewport, so desktop scaling and monitors with negative coordinates are supported. On Linux/X11, a small Python standard-library helper applies an input-only XShape region using the actual native pixel dimensions; this needs Python 3, libX11 and libXext. It includes only exclusive same-size KWin wrapper frames, never the root/shared windows. A 50 ms native check repairs input masks reset by window movement; unchanged masks are not rewritten. Other desktop platforms use native cursor polling with mouse-move forwarding. Input remains captured throughout an avatar drag. The waveform and glow remain visually unclipped; they do not add an input surface. Before geometry arrives or after a renderer failure, the window accepts input so it remains recoverable.
+
+=== Idle portrait and speech transitions
+
+A local silent idle clip supplies blinks and subtle pose movement without a resident neural animation model. The idle controller respects Settings and reduced-motion preferences, settles a blink before the initial speech buffer expires, and holds the previous decoded frame across speech segment changes. The static portrait remains beneath all media layers.
+
+== Optional local speaker recognition
+
+Home-testing diarisation runs on CPU in a separate loopback service, using sherpa-onnx, Reverb segmentation and CAM++ embeddings. It starts after successful transcription and has a 1.8-second HTTP deadline. Failure leaves ordinary conversation available. Recognition is off by default; the desktop settings toggle applies immediately and is shared with the local browser backend.
+
+Diarisation distinguishes speaker intervals; speaker matching compares those voices with local profiles. At least 1.5 seconds of non-overlapping speech is required. Cosine similarity must exceed 0.8 with a 0.1 margin over the next candidate. Scores from 0.65 to 0.8 remain uncertain rather than creating another profile. These conservative experimental thresholds need household testing and are not calibrated probabilities. Profiles are not authentication and never authorize node actions.
+
+There are at most 32 profiles. Unnamed profiles expire after seven days without a match. Named profiles persist until forgotten. Embeddings and names live in a private, atomically replaced file under `~/.config/nodie/recognition/`; recordings are never retained by recognition. Clearing conversation history does not erase recognition profiles; Settings has separate rename, forget and forget-all controls. Forget-all also disables recognition and invalidates pending results. No recognition data is written to Reverie.
+
+Nod.ie receives only speaker labels and time intervals, never embeddings. Multi-speaker transcripts remain unattributed because the transcription text is not word-aligned with diarisation. A sole unfamiliar speaker may introduce themselves conversationally; the model can name only that currently observed anonymous profile. Names are untrusted data. Nod.ie may ask who is speaking in her own words, no more than once per profile every five minutes. Short, ambiguous and overlapping audio can remain unidentified. Voice identities are not automatically linked to faces.
+
+=== Unmute speaker observations
+
+The desktop optionally records four-second, standalone WebM samples from the existing microphone stream. Recognition runs independently of the Opus speech transport, with one request in flight and no backlog. Microphone stop cancels pending results; disabling recognition invalidates the profile epoch. Names, ambiguity and an attribution hint cross the session boundary; embeddings and persistent IDs do not.
+
+The backend accepts a typed `speaker_observation` field. It expires after eight seconds and is inserted as untrusted user-level reference data into a copy of the model messages, never into system instructions or durable conversation history. An audio window may span multiple turns; identification is advisory and is not authentication or authorization. Speaker capture does not open another microphone or wait before sending speech.
+
+Local voice mode supports conversational naming and enrolment. Unmute matches existing profiles and uses names assigned in Settings > People. Conversational naming through Unmute and real household accuracy/calibration remain follow-up work.

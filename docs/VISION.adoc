@@ -1,0 +1,53 @@
+= Camera Preview and Selective Frames
+
+== Current scope
+
+The camera button is an opt-in live preview. It starts off on each launch and shows the camera feed inside its amber circular border while enabled. Clicking it again stops the tracks, clears the preview and discards the retained frame. Microphone capture remains independent; this camera stream requests no audio.
+
+In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. A short description and capture timestamp are supplied through a validated `scene_data` session field and a separate user-data message without clearing conversation history. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
+
+Face identities are not supplied to voice conversation; unsolicited spoken observations and Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
+
+== Selection policy
+
+Every 250 ms, compare a 64 by 48 pixel image locally on the CPU. Compare against the last selected frame so gradual changes can accumulate. Compensate for a median luminance shift to suppress near-uniform exposure changes; ignore small channel differences. An initial threshold requires at least 8% of pixels to change substantially, with a minimum average difference.
+
+Wait 500 ms for the scene to settle, or at most 2.5 seconds during continuous movement. Automatic selections have a five-second cooldown. Refresh an unchanged scene every 60 seconds. The `requestFrame()` API selects immediately when the camera is already enabled; it never turns on an off camera. Spoken requests will need a separate tool integration.
+
+Capture requests 1280 by 720 pixels at at most 10 fps, with camera-supported fallback. The change detector still uses only 64 by 48 pixels. Only selected frames are encoded as JPEG, bounded to 768 by 576 pixels and 512 KB. The current UI retains only the latest description in memory. The analysis callback permits one in-flight request, dropping intermediate frames rather than growing a queue. The consumer honors its abort signal and discards results after camera shutdown. Explicitly enabling the camera prioritises one initial analysis so conversation cannot indefinitely starve the first snapshot. That first request may briefly compete with voice inference. Subsequent analysis waits for two seconds without voice events, is limited to one attempt per 15 seconds, and is cancelled when a response or new user transcription starts. Camera-on with no current snapshot is reported as awaiting analysis, distinct from camera-off. Requests have a 12-second deadline, a 140-token generation limit and a 32 KB response-body limit. Vision shares the voice model and can still add contention; these limits do not guarantee latency.
+
+Pixel changes are triggers, not a judgement of interest or danger. Small or brief events can be missed; illumination changes and camera movement can still cause false triggers. Any home-awareness notifications need separate validation, repeated confirmation and notification cooldowns. This is not an alarm system.
+
+== Validation
+
+Unit tests cover unchanged scenes, sensor noise, brightness shifts, object arrivals, transient movement, continuous motion, cumulative changes, cooldowns, refreshes, explicit requests, camera permission races, late JPEG completion and analysis backpressure. A Chromium fake-camera check verifies the button preview, selected JPEG generation, absent camera audio and stopped tracks when disabled.
+
+== Scene-data transport and tool isolation
+
+Re-run `python3 unmute-service/prepare-backend.py /path/to/unmute` and recreate the backend with `compose.override.yml` to install the extended session schema and handler. Older backends ignore the new field and cannot describe snapshots; they do not receive scene text as policy.
+
+Scene text never enters the system instructions. Once a session receives a snapshot, its tool advertisement and execution are disabled for the rest of that connection, including after the camera is switched off, because earlier replies may retain visual content. Start a fresh voice connection with the camera off to restore memory tools. This deliberately limits camera-assisted conversation to spoken answers; visual content cannot authorize memory queries or writes.
+
+Camera startup, including an unanswered permission request or stalled video playback, has a ten-second deadline. Cancelling startup settles immediately and stops any stream that arrives later.
+
+== Local face recognition
+
+Face recognition is separate from Qwen scene descriptions. The desktop sends selected JPEG frames to a short-lived, single-threaded CPU worker using OpenCV YuNet (2023 model) and SFace. Models are pinned to OpenCV Zoo revision `47534e27c9851bb1128ccc0102f1145e27f23f98`, with SHA-256 and byte-size verification. YuNet is MIT licensed; SFace is Apache-2.0 licensed. Upstream sources: https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet[YuNet] and https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface[SFace].
+
+Recognition is disabled by default and requires the camera to be on. Frames reuse the current vision selection and quiet-period policy. No additional camera is opened. Input is capped at 512 KB and 1280 by 960 pixels, inference at three seconds, output at 64 KB, and processing at one request with no backlog. At most eight sufficiently large and sharp faces are analysed per frame; small/blurry faces are skipped. The worker uses no GPU. Images are never written to disk or sent to an external recognition provider.
+
+Settings > People — faces supports enable, rename, forget and merge. Local embeddings are kept in `~/.config/nodie/recognition/faces.json`, with owner-only file permissions, atomic writes and locking. At most 32 profiles and four samples per profile are retained. Unnamed profiles expire after seven days; named profiles remain until removed. Disabling stops collection but preserves profiles; Forget all deletes profiles and disables recognition. Clear conversation history does not delete these profiles. Disabling, editing or deleting invalidates in-flight matches.
+
+The initial thresholds are conservative engineering defaults, not calibrated household accuracy guarantees. Ambiguous matches remain unnamed. A face match does not establish who is speaking, grant device access, or authenticate a person. Photos and screens may also match; no liveness detection is provided.
+
+=== Installation and validation
+
+[source,bash]
+----
+python3 -m venv .venv-face
+.venv-face/bin/pip install -r recognition/requirements-face.txt
+python3 scripts/setup-face-models.py
+node --test tests/unit/face-recognition.test.js
+----
+
+The current implementation provides local extraction, matching, selected-frame collection and profile management. Pending before user acceptance: typed face observations into Unmute (separate from system instructions), conversational naming with an unambiguous current face, model-worded unknown-person notifications, thumbnail-based disambiguation in Settings, household matching calibration and end-to-end camera/voice load testing. Until those are complete, Nodie does not receive these face identities in her spoken conversation. The settings panel states that limitation explicitly.

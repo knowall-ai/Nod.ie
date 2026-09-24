@@ -11,3 +11,31 @@ A memory failure does not prevent conversation: the UI and model receive an expl
 The latest six conversation turns are saved at `~/.config/nodie/conversations/local.json`, separately from Reverie and diagnostic logs. Desktop and browser share this file. It is plaintext with owner-only file permissions, written atomically, and limited to twelve messages of at most 2,000 characters each. It survives application restarts. Older turns are discarded; this is not a full conversation archive.
 
 Use *Clear saved conversation history* in desktop Settings or the browser to erase the stored turns. Clearing also invalidates pending writes so an older in-flight turn cannot restore deleted history. Clearing this file does not delete Reverie memories. New conversations after clearing are retained normally. Nod.ie must distinguish the supplied recent history, recalled Reverie records and unavailable older conversations.
+
+== Unmute memory writing
+
+The streaming voice bridge exposes bounded `search_memories` and `save_memory` tools. The latter stores a concise user-supplied fact under a person or topic name. An exact-name/alias search precedes each save: a unique existing memory receives appended notes, while a missing name creates a memory. Multiple matches require clarification. Existing properties and relationships remain intact; corrections are appended and do not erase older statements.
+
+Names are limited to 160 characters, facts to 1,500 characters and accumulated notes to 12,000 characters. Identical fact lines are idempotent. Writes are serialized within the bridge process; unrelated external graph writers are not coordinated. No delete, arbitrary property, relationship-write or Cypher tool is exposed. The voice prompt requires a successful `saved` result before acknowledging persistence. A timeout after a mutation reports `unknown`, never success, and must not trigger an automatic retry. Model compliance remains a limitation; tool results are the evidence of persistence.
+
+The running bridge needs a Neo4j account with create/update permission. Its legacy filename `reverie-readonly.cjs` is retained for compatibility with existing mounts; the bridge now permits the bounded save operation. Memory contents and tool arguments stay out of diagnostic logs. Clearing conversation history does not erase graph memories.
+
+An unconfirmed mutation pauses further saves in that bridge process, preventing another read-modify-write from racing a possibly running request. Check stored notes and restart the bridge only after the upstream operation has settled. Mutation requests have a seven-second deadline to accommodate local embedding work; this is not proof of database cancellation.
+
+== Name variants in streaming conversations
+
+The Unmute memory bridge first uses bounded keyword search. On a miss, it asks Reverie for hybrid keyword and local semantic candidates, sharing a four-second upstream search deadline. Exact names and known aliases retain the fast path. Semantic matches retain their score and match type; they are candidates for clarification, never permission to merge people or redirect a write. Saves still use exact name/alias lookup.
+
+Local CPU embeddings use Reverie's quantized MiniLM model and a persistent Compose cache volume. The first use can download model weights; slow or unavailable embeddings leave keyword retrieval available and mark an incomplete semantic search explicitly. No additional GPU model or cloud embedding provider is configured. Cold-start and CPU contention can still affect latency. `REVERIE_EMBEDDINGS=none` in the bridge process environment disables semantic fallback. Vector arrays are removed from returned memory context without discarding relationships or match metadata.
+
+This PR does not schedule the `dream` tool or expand transcript retention. Confirming ambiguous identities and organising daily conversations are separate workflows.
+
+Existing graphs need stored embeddings for semantic matching. Before first use, an administrator should back up the graph, inspect Reverie's `dream` dry-run report, and apply only an acceptable maintenance plan. This refreshes old embeddings outside a live speech turn. `dream` can also relabel and merge records, so do not run it blindly just to warm a model. Hybrid fallback uses Reverie's default similarity threshold (0.4); scores indicate similarity, not confirmed identity.
+
+Reverie 0.5.2 does not expose a completion flag for empty semantic searches. The bridge reports hybrid retrieval only when a returned row carries semantic-match metadata. Empty or keyword-only fallback results conservatively mark semantic recall incomplete, even when a semantic search may have succeeded without a match.
+
+== Managing recognised people
+
+Settings > People lists learned voice profiles with their name, last-heard time and retained sample count. Rename a profile, remove it, or explicitly merge a duplicate into a chosen destination. Merges keep the destination name and both sets of voice embeddings (up to eight per person, 64 overall); matching uses the best sample instead of averaging distinct embeddings. Removal and merging require confirmation and invalidate pending observations so old recognition results cannot restore deleted identities. These actions do not alter Reverie memories.
+
+Face profiles have a separate Settings panel and are not linked to voice identities. Local voice turns can enrol speakers; background Unmute sampling matches existing profiles when the recognition backend overlay is installed.

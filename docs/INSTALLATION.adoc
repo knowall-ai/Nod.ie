@@ -34,3 +34,27 @@ Install the Ruby gems listed in `docs/Gemfile`, then run `npm run docs`. The bui
 Run `bash scripts/setup-cpu-voice.sh` to install the pinned Python runtime and verify the downloaded model checksums. Run `bash scripts/start-voice-service.sh` on Linux with a user systemd session. The service binds to loopback port 8104, uses four CPU inference threads, and is limited to 1 GB of memory and four CPU cores. Configure `LOCAL_TTS_URL=http://127.0.0.1:8104`, `LOCAL_TTS_VOICE=af_heart`, and `LOCAL_TTS_SPEED=1.06`. Other supported voices are `af_bella`, `bf_emma` and `bf_isabella`.
 
 Run `bash scripts/start-web-service.sh` for a browser server that survives closing the launching terminal. These transient user services last for the current user session; they do not install a boot service. Stop them with `systemctl --user stop nodie-web nodie-voice`. Restart the browser server after changing `.env`.
+
+== Optional speaker recognition (home testing)
+
+Install Python 3 with venv support and FFmpeg, then from the repository root:
+
+[source,bash]
+----
+python3 -m venv .venv-recognition
+.venv-recognition/bin/pip install -r recognition/requirements-speaker.txt
+python3 scripts/setup-speaker-models.py
+bash scripts/start-speaker-service.sh
+----
+
+The service binds only `127.0.0.1:8106`, uses two CPU threads, and verifies model checksums at startup. It does not enable the microphone. In desktop Settings, enable _Recognise speakers during conversations_, then enable the mic normally. Recognition settings apply immediately. Rename or forget profiles in the same panel. The browser uses the same local profiles; manage them through desktop Settings.
+
+Model downloads are separate from Nod.ie's MIT source. The Reverb segmentation weights use the https://github.com/revdotcom/reverb[Rev Model Non-Production License], permitting personal testing/research/evaluation in nonproduction environments. The downloader saves its full license and attribution beside the weights. CAM++ comes from https://github.com/modelscope/3D-Speaker[3D-Speaker], with ONNX exports distributed by https://github.com/k2-fsa/sherpa-onnx/releases[sherpa-onnx]. Review model terms before deployment beyond home testing. No model binaries or personal profiles belong in Git.
+
+=== Unmute speaker integration
+
+Install and start the speaker service from the speaker-diarization instructions first. Enable recognition in Settings > People; it is disabled by default.
+
+Run `python3 unmute-service/prepare-backend.py /path/to/unmute`, followed by `python3 unmute-service/prepare-speakers.py /path/to/unmute`. When stacking memory overrides, apply the speaker preparer to their generated handler so their privacy and memory changes are retained. Set `NODIE_SPEAKERS_DIR` to this branch's `unmute-service` directory and append `compose.speakers.yml` after the other backend Compose overlays. Recreate only `unmute-backend`.
+
+Without this backend overlay, older Unmute ignores the new field; speech continues but identity hints do not reach the model. Browser-only recognition is not exposed by this change. Raw audio remains in memory and is not retained.

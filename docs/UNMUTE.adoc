@@ -47,7 +47,7 @@ To roll back, restore `VOICE_MODE=local`, stop the two Unmute speech containers,
 The legacy Unmute tool configuration is separate from the current local voice adapter.
 Speaker recognition PR #29, bounded local history, Reverie integration and voice-controlled device actions must be verified separately; changing the speech transport does not automatically connect them.
 
-The voice trial mounts only the read-only Reverie bridge instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands remain disconnected; Reverie recall is supplied through the bounded read-only bridge. Microphone capture starts off after restart.
+The voice trial mounts only the bounded Reverie bridge instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands remain disconnected; Reverie recall is supplied through the bounded memory bridge. Desktop microphone capture starts after a healthy connection; browser capture starts off and requires its visible control.
 
 Warm synthetic testing on this host produced first audio approximately 1–1.5 seconds after the utterance and interruption detection in 0.5–0.6 seconds. These are server packet timings, not a physical speaker/microphone latency guarantee.
 
@@ -60,22 +60,49 @@ Routine microphone state is shown by its button, without repeated status popups.
 
 == Reverie recall
 
-The streaming backend can use a narrow stdio bridge exposing only `reverie.search_memories`.
+The streaming backend can use a narrow stdio bridge exposing `reverie.search_memories` and `reverie.save_memory`.
 It launches the installed Reverie package with allowlisted Neo4j connection variables, restricts searches to five records and one relationship hop, and bounds the returned reference data.
-Memory writes and arbitrary database queries are not exposed.
+Writes are limited to named facts; deletion and arbitrary database queries are not exposed.
 Qwen chooses search terms from the conversation; use names or relevant keywords rather than assuming a failed literal search proves nothing is stored.
 
 Run `node unmute-service/prepare-memory.cjs /absolute/path/to/Nod.ie/config.js neo4j` to reuse the existing configured connection.
 The optional final hostname is used only to replace a loopback Neo4j address inside Docker.
 The generated MCP file is private, ignored by Git and mode 0600. Never print or publish it.
 Set `NODIE_NODE_MODULES` to the absolute path of the installed Nod.ie `node_modules` directory before applying the Compose override.
-The dependency directory and read-only bridge are mounted read-only; no additional credentials are embedded in committed Compose files.
+The dependency directory and memory bridge are mounted read-only; no additional credentials are embedded in committed Compose files.
 
 Memory results are supplied as untrusted reference data instead of system instructions, without the legacy 100-character truncation.
 The generated handler and MCP-manager overrides omit variable data from diagnostic log messages, including transcripts, tool arguments, memory contents and subprocess environments.
 A memory outage must be reported as unavailable, not as proof that no memories exist.
-Recognition and persistent conversation-history integration remain separate work.
+Speaker observations and local transcripts are described below; saved transcripts are not automatically replayed into model context.
 
-The TTS startup stages only the nine demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
+The bridge also exposes `reverie.save_memory`; see the memory chapter for limits, persistence confirmation and failure behavior.
+The TTS startup stages only the selected demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
 
 Decoded audio carries a response generation. Interruptions invalidate queued output, and the decoder clears partial PCM buffers at generation changes while retaining its continuous Opus state. Late frames cannot restart animation, microphone ducking or playback in a later response.
+
+== Local streaming transcripts
+
+Unmute saves received user speech text and the speech generator's `response.text.delta` events in `~/.config/nodie/conversations/local.json`.
+The private, mode-0600 file keeps at most 12 messages, each limited to 2,000 UTF-16 code units, with message timestamps and a 60 KB serialized bound for streaming writes.
+The Unmute adapter joins its word-level STT/TTS events using the upstream whitespace rules; generic text-fragment streams remain literal. Partial turns are checkpointed every 500 ms; turn boundaries and disconnects flush pending text. An abrupt crash may lose the final checkpoint interval.
+The settings Clear History control clears these transcripts too; stale pending writes cannot restore erased text.
+Only text is retained: no microphone audio, generated audio, internal reasoning, tool results or transcript text in diagnostic logs.
+This records recognized/generated text, not proof of every sound played: voice-model noises may have no corresponding word.
+Saved transcripts are available for local diagnosis; this change does not inject previous sessions into the Unmute model or enable speaker identification.
+
+The desktop microphone starts enabled and begins capture after the voice connection is ready. A manual mute is respected across connection retries. The browser interface still requires its listening control.
+
+=== Avoiding cold model reloads
+
+For the local Ollama deployment, prepare the adapter with `python3 unmute-service/prepare-backend.py /path/to/unmute`, then apply `unmute-service/compose.warmup.yml` after the existing voice and optional memory overrides. Set `NODIE_WARMUP_DIR` to the absolute path of its `unmute-service` directory. This opt-in override keeps other Ollama users and their server defaults unchanged.
+
+The adapter preloads the configured model when a voice client is created and awaits the shared load before a turn. Speech interruptions cannot cancel that load and trigger repeated model startups. A native, empty `/api/generate` request requests 30 minutes of residency; it sends no conversation text and generates no spoken reply. A post-turn refresh restores that period because OpenAI-compatible requests use the server's default residency. There is no periodic generation job. The model can expire after inactivity and Ollama may still evict it under memory pressure. Disabling `NODIE_OLLAMA_WARMUP` restores the prior behavior.
+
+Warm-up has a 90-second HTTP timeout and failures permit the normal completion path to attempt recovery. Logs contain only fixed success/failure events and elapsed milliseconds. A failed warm-up is retried on a subsequent call; a recently successful pre-turn warm-up is cached for 60 seconds. Retaining Qwen uses GPU memory but does not continuously generate tokens. Tests exercise interruption shielding, shared loading, cache/refresh behavior and retry after failure.
+
+Background speaker samples match existing profiles without enrolling unfamiliar voices. Enrol a profile through a deliberate local voice turn. The complete background analysis has a 1.8-second caller deadline; a still-settling storage operation retains its slot so later samples cannot overlap it. Disabled recognition publishes its cleared observation once, and recording durations cannot exceed four seconds.
+
+Prepare all backend overlays from the same checkout and generated directory using `python3 unmute-service/prepare-backend.py /path/to/unmute --with-speakers`. Regenerating the base preserves an already-installed speaker adapter; rerunning the speaker patch is idempotent.
+
+Memory saves have a 20-second outer tool deadline, exceeding the bridge’s 5-second connection, 2.5-second lookup and 7-second write budgets. Unknown results, process errors and cancellation pause further saves in the backend as well as the bridge; search remains available. Check stored notes and wait for upstream work to settle before restarting the backend to clear that latch.

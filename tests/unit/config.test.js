@@ -20,3 +20,11 @@ test('settings IPC accepts only plain objects with approved keys', () => {
     assert.doesNotThrow(() => validateSettingsPatch({ AVATAR_ENABLED: false, ASSISTANT_NAME: 'Nod.ie' }));
     assert.throws(() => validateSettingsPatch({ AVATAR_ENABLED: 'false' }), /Invalid avatar setting/);
 });
+
+test('public lip-sync capability reflects configuration without exposing its URL',()=>{
+ assert.equal(normalize({}).LIP_SYNC_CONFIGURED,false);
+ assert.equal(normalize({LOCAL_LIP_SYNC_URL:''}).LIP_SYNC_CONFIGURED,false);
+ const config=normalize({LOCAL_LIP_SYNC_URL:'http://localhost:8768'});
+ assert.equal(config.LIP_SYNC_CONFIGURED,true);assert.equal(config.LOCAL_LIP_SYNC_URL,undefined);
+ assert.equal(normalize(config).LIP_SYNC_CONFIGURED,true);
+});

@@ -82,3 +82,8 @@ docs/.asciidoctor/
 voice-models/
 
 __pycache__/
+
+.venv-recognition/
+
+.venv-face/
+recognition-models/

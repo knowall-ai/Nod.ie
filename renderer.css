@@ -295,7 +295,7 @@ body[data-platform="electron"] #circle { touch-action: none; user-select: none; 
 #control-mic { left: 17px; top: 183px; }
 #control-camera { left: 42px; top: 218px; }
 #control-speaker { left: 77px; top: 243px; }
-#control-settings { left: 119px; top: 254px; }
+#control-settings { left: 2px; top: 138px; }
 .orbit-control[hidden] { display: none; }
 
 /* Keep interaction hints below the face so they do not cover the moving lips. */
@@ -313,3 +313,16 @@ body[data-platform="electron"] #circle { touch-action: none; user-select: none; 
                 linear-gradient(to bottom, transparent 78%, black 79%, black 86.5%, transparent 87.5%);
     mask-composite: intersect;
 }
+
+/* The neutral canvas stays beneath both decoded video layers; never expose a blank face. */
+#avatar-idle, #avatar-handoff { position:absolute; width:250px; height:250px; object-fit:cover; border-radius:50%; pointer-events:none; opacity:0; }
+#avatar-idle { z-index:11; transition:opacity 160ms linear; }
+#avatar-handoff { z-index:13; }
+.avatar-active.avatar-speaking #avatar-canvas { display:block !important; }
+#avatar-video { z-index:12; transition:opacity 120ms linear; }
+
+/* The live preview fills the camera control, inside its amber border. */
+#control-camera { overflow: hidden; isolation: isolate; }
+#control-camera .camera-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; pointer-events: none; }
+#control-camera .camera-preview[hidden], #control-camera img[hidden] { display: none; }
+#control-camera[data-on="true"] { background: #291507; border-color: #f5a623; }

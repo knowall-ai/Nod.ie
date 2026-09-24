@@ -25,6 +25,10 @@
         </div>
         
         <div class="setting-row">
+            <div class="setting-label"><h3><label for="avatarIdleEnabled">Idle motion</label></h3><p>Gentle blinks and small movements while she is quiet. Respects reduced-motion preferences.</p></div>
+            <input type="checkbox" id="avatarIdleEnabled">
+        </div>
+        <div class="setting-row">
             <div class="setting-label">
                 <h3>Avatar Quality</h3>
                 <p>Rendering quality is managed by the avatar service.</p>
@@ -97,10 +101,26 @@
         <pre id="diagnostics-status" style="white-space: pre-wrap"></pre>
     </div>
     <div class="section">
+        <h2>People</h2>
+        <h3>Voice profiles</h3>
+        <p>Optional home experiment. Learns recurring voices locally; Nod.ie can ask an unfamiliar speaker their name. Matching can be wrong, especially with noise or overlapping voices.</p>
+        <label><input type="checkbox" id="speaker-enabled"> Recognise speakers locally</label>
+        <p id="speaker-status" role="status"></p>
+        <div id="speaker-profiles"></div>
+        <button id="speaker-forget">Forget voice profiles and disable recognition</button>
         <h2>Conversation history</h2>
         <p>The latest six local voice turns are saved privately on this computer and shared between desktop and browser. Clearing them does not delete Reverie memories.</p>
         <button id="clear-history">Clear saved conversation history</button>
         <p id="history-status" role="status"></p>
+    </div>
+    <div class="section">
+        <h2>People — faces</h2>
+        <label><input type="checkbox" id="face-enabled"> Learn and recognise faces locally</label>
+        <p>Uses selected frames only while the camera is on. Unknown profiles expire after seven days. Names are labels, not verified identities.</p>
+        <p id="face-status" role="status"></p>
+        <button id="face-refresh">Refresh faces</button>
+        <div id="face-profiles"></div>
+        <button id="face-forget">Forget all face profiles</button>
     </div>
     <p id="settings-error" role="alert"></p>
     <div class="button-row">

@@ -16,8 +16,9 @@ function start() {
     const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
-    const voice = new LocalVoice({ logger, historyStore, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
-    let mainWindow, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
+    const speakerRecognition = new (require('./lib/speaker-recognition').SpeakerRecognition)();
+    const voice = new LocalVoice({ logger, historyStore, speakerRecognition, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
+    let mainWindow, pointerTracker, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
     const stopDrag = () => { updateDrag?.(); clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; updateDrag = null; return dragMoved; };
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
     const isLocalFrame = (event, file) => event.senderFrame === event.sender.mainFrame && event.senderFrame.url === pathToFileURL(path.join(__dirname, file)).href;
@@ -27,7 +28,7 @@ function start() {
         return callback(...args);
     });
     function secureWindow(options, file) {
-        const win = new BrowserWindow({ ...options, webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, autoplayPolicy: 'no-user-gesture-required' } });
+        const win = new BrowserWindow({ ...options, webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, backgroundThrottling: file !== 'index.html', autoplayPolicy: 'no-user-gesture-required' } });
         win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
         win.webContents.on('will-navigate', event => event.preventDefault());
         win.webContents.on('will-attach-webview', event => event.preventDefault());
@@ -53,15 +54,46 @@ function start() {
     handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
     const streamLips = new (require('./lib/streaming-lip-sync').StreamingLipSync)({ url: env.getConfig('LOCAL_LIP_SYNC_URL'), enabled: () => config().AVATAR_ENABLED });
-    handle('lip-segment', audio => streamLips.render(audio));
+    handle('lip-segment', (audio, trim) => streamLips.render(audio, undefined, trim));
     handle('lip-cancel', () => streamLips.cancel());
     app.on('before-quit', () => streamLips.cancel());
+
+    const vision = new (require('./lib/vision-analysis').VisionAnalysis)({ url: env.getConfig('OLLAMA_URL', 'http://127.0.0.1:11434'), model: env.getConfig('LOCAL_VISION_MODEL', env.LLM_MODEL || 'nodie-qwen3.5:9b') });
+    const faces = new (require('./lib/face-recognition').FaceRecognition)();
+    handle('face-analyse', image => faces.analyse(image));
+    handle('face-cancel', () => faces.cancel());
+    handle('face-status', () => faces.store.status(), true);
+    handle('face-enabled', enabled => { faces.cancel(); return faces.store.configure(enabled); }, true);
+    handle('face-edit', (id, name) => faces.store.edit(id, name), true);
+    handle('face-merge', (source, target) => faces.store.merge(source, target), true);
+    handle('face-forget', () => { faces.cancel(); return faces.store.forget(); }, true);
+    app.on('before-quit', () => faces.cancel());
+    handle('vision-analyse' , image => vision.analyse(image));
+    handle('vision-cancel', () => vision.cancel());
+    app.on('before-quit', () => vision.cancel());
     handle('voice-health', () => voice.health());
     handle('voice-turn', async audio => {
         try { return await voice.converse(audio); }
         catch (error) { return { failure: require('./lib/voice-error').publicError(error) }; }
     });
-    handle('clear-history', () => voice.clearHistory(), true);
+    handle('transcript-session', async () => ({ epoch: (await historyStore.load()).epoch }));
+    handle('transcript-save', (epoch, turn) => historyStore.upsert(epoch, turn));
+    handle('clear-history', async () => {
+        const result = await voice.clearHistory();
+        mainWindow?.webContents.send('history-cleared', { epoch: (await historyStore.load()).epoch });
+        return result;
+    }, true);
+
+    const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
+    handle('speaker-analyse', audio => liveSpeakers.analyse(audio));
+    handle('speaker-cancel', () => liveSpeakers.cancel());
+    handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
+    app.on('before-quit', () => liveSpeakers.cancel());
+    handle('speaker-status', () => speakerRecognition.store.status(), true);
+    handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
+    handle('speaker-edit', (id, name) => speakerRecognition.store.edit(id, name), true);
+    handle('speaker-merge', (source, target) => speakerRecognition.store.merge(source, target), true);
+    handle('speaker-forget', () => speakerRecognition.store.forget(), true);
     handle('voice-cancel', () => voice.cancel());
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
@@ -81,6 +113,10 @@ function start() {
             throw error;
         }
     }, true);
+    ipcMain.on('overlay-hit-regions', (event, value) => {
+        if (!trusted(event) || event.sender !== mainWindow?.webContents) return;
+        try { pointerTracker?.setRegions(value); } catch { logger.write('warn', 'overlay.invalid-hit-regions'); }
+    });
     ipcMain.on('begin-drag', event => {
         if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
         const { screen } = require('electron');
@@ -119,12 +155,14 @@ function start() {
     }, true);
     app.whenReady().then(() => {
         session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => {
-            callback(contents === mainWindow?.webContents && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href && permission === 'media' && !details.mediaTypes?.includes('video'));
+            callback(contents === mainWindow?.webContents && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href && permission === 'media');
         });
-        session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === mainWindow?.webContents && permission === 'media' && details.mediaType !== 'video');
+        session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => contents === mainWindow?.webContents && permission === 'media' && contents.getURL() === pathToFileURL(path.join(__dirname, 'index.html')).href);
         mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true, ...(process.platform === 'linux' ? { type: 'dock' } : {}) }, 'index.html');
         // A Linux dock overlay avoids KWin's normal-window panel avoidance and resize drift.
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        const input = require('./lib/window-hit-test');
+        pointerTracker = process.platform === 'linux' && process.env.DISPLAY ? input.nativeInputRegion(mainWindow, logger) : input.trackPointer(mainWindow, require('electron').screen, () => Boolean(dragTimer));
         const position = store.get('position');
         const { screen } = require('electron');
         const area = screen.getPrimaryDisplay().workArea;
@@ -134,14 +172,27 @@ function start() {
         mainWindow.on('close', event => { if (!app.isQuitting) { event.preventDefault(); mainWindow.hide(); } });
         const menu = Menu.buildFromTemplate([{ label: 'Show Nod.ie', click: () => mainWindow.show() }, { label: 'Settings and security updates', click: showSettings }, { label: 'Reload', click: () => mainWindow.reload() }, { label: 'Developer tools', click: () => mainWindow.webContents.openDevTools({ mode: 'detach' }) }, { type: 'separator' }, { label: 'Quit', click: () => app.quit() }]);
         mainWindow.webContents.on('context-menu', () => menu.popup());
-        if (fs.existsSync(path.join(__dirname, 'icon.png'))) { tray = new Tray(path.join(__dirname, 'icon.png')); tray.setToolTip('Nod.ie'); tray.setContextMenu(menu); tray.on('click', () => mainWindow.show()); }
+        const trayIcon = path.join(__dirname, 'assets/icons/tray.png');
+        if (fs.existsSync(trayIcon)) { tray = new Tray(trayIcon); tray.setToolTip('Nod.ie'); tray.setContextMenu(menu); tray.on('click', () => mainWindow.show()); }
         shortcuts();
         monitor = new SecurityMonitor({ stateDir: path.join(app.getPath('userData'), 'security'), onChange: status => { if (settingsWindow && !settingsWindow.isDestroyed()) settingsWindow.webContents.send('security-status-changed', status); }, notify: count => { if (Notification.isSupported()) { const notice = new Notification({ title: 'Nod.ie: updates recommended', body: `${count} container update recommendation(s). Open Settings to review before applying.` }); notice.on('click', showSettings); notice.show(); } } });
         diagnostics.start();
         monitor.start().catch(() => logger.write('error', 'updates.monitor-failed'));
         logger.write('info', 'desktop.started');
     }).catch(error => { logger.write('error', 'desktop.start-failed', { code: error.code || 'unknown' }); app.quit(); });
-    app.on('before-quit', () => { app.isQuitting = true; stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
+    let quitCleanup = false;
+    app.on('before-quit', event => {
+        if (quitCleanup) return;
+        event.preventDefault();
+        if (app.isQuitting) return;
+        app.isQuitting = true;
+        stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {});
+        mainWindow?.webContents.send('app-will-quit');
+        (async () => {
+            try { await pointerTracker?.stop(); }
+            finally { quitCleanup = true; app.quit(); }
+        })().catch(() => {});
+    });
     app.on('will-quit', () => globalShortcut.unregisterAll());
     app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus(); });
 }

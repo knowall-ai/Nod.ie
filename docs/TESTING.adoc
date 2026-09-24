@@ -13,3 +13,26 @@ Control acceptance uses synthetic microphone input and a real generated video to
 Spoken-control checks cover silent mute without TTS/MuseTalk work, rejection of microphone-on/camera/arbitrary actions, idempotent speaker state and invalid-action atomicity. Stage diagnostics are checked for successful and failed requests and exclusion of transcript/reply/error text. A hidden-browser waveform check samples the band at five-degree intervals and radii 125–137 pixels: alpha remains 255, the portrait centre stays transparent and microphone-off motion settles.
 
 Continuous conversation checks cover resume after playback, cancellation invalidating queued microphone starts, spoken microphone-off preventing resumption, and generated-audio browser capture across successive turns. Desktop bridge checks preserve the public no-speech message without Electron exception wrappers. The independent model intent gate is tested for current-utterance isolation, rejected proposals and malformed decisions.
+
+=== Native desktop input region
+
+On Linux/X11 with Python 3, libX11 and libXext installed, run:
+
+[source,bash]
+----
+node_modules/.bin/electron tests/desktop-input-region.cjs
+----
+
+This creates an invisible isolated Electron window, waits for its first paint, and queries its native XShape regions. It verifies corner pass-through, avatar/button input, unchanged visual bounds, recovery after movement and repeated external input-mask resets, and restoration when the helper stops. It does not move the pointer, click, open a microphone or access the camera. The development machine's native 900-pixel window at 300% scale passed this check; the running overlay's native region was also inspected. Unit tests additionally cover viewport mapping, geometry validation and drag retention for the polling fallback.
+
+The X11 overlay test checks every eligible exclusive ancestor frame as well as the client window. It verifies corner pass-through, avatar/control capture, empty masks, movement, repeated external resets and cleanup. Native helper shutdown is bounded by a 500 ms kill backstop and a 750 ms absolute wait.
+
+== Speaker recognition experiment
+
+Unit tests cover disabled-mode no-capture forwarding, profile persistence/private permissions, ambiguity, multi-speaker naming rejection, per-profile question cooldown, malformed embeddings and clear/disable invalidating in-flight results. Run `npm test`.
+
+The CPU service was smoke-tested using generated speech: one interval, one 512-dimensional embedding, approximately 133 ms analysis after a 472 ms model load on the development workstation. This establishes pipeline functionality only; it does not measure recognition accuracy. For household testing, try one voice across several turns, two alternating speakers, background television, overlapping speech and deleting a profile during an active turn. A false match must be corrected in Settings. Do not infer identity from a short one-word answer or expect diarisation to label each transcribed word.
+
+Run `python3 recognition/test_deadline_worker.py` to verify that a timed-out analysis terminates its worker and decoder process group, and that the next request succeeds within the caller's deadline. Request-body reading, decoding and inference share a 1.6-second deadline. Replacement workers start independently and return busy until ready; busy inference is rejected instead of queued. A real-model synthetic check completed in 126 ms through the isolated worker on the development host.
+
+See `PERFORMANCE_REVIEW.adoc` for the dated application review, measured rendering/decoding results and prioritized runtime acceptance work. Static performance estimates are explicitly labelled and are not physical end-to-end latency measurements.

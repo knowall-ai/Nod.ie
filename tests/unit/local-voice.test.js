@@ -203,3 +203,18 @@ test('the semantic intent check has only current utterance and proposed controls
     output = { allowed: true }; assert.equal(await voice.checkControlIntent('Hey Nodey, stop listening', { microphoneEnabled: false }), true);
     output = { allowed: 'true' }; await assert.rejects(voice.checkControlIntent('Hey Nodey, stop listening', { microphoneEnabled: false }), /Invalid device-intent/);
 });
+
+test('real speaker result states do not break local playback and ready results retain their array shape',async()=>{
+ for(const state of ['disabled','unavailable','ready']){
+  const observation={state,speakers:state==='ready'?[{id:'profile',name:'Ben'}]:[],segments:[],transcriptAttribution:'single-speaker'};
+  const wav=Buffer.alloc(44);wav.write('RIFF');let messages;
+  const voice=new LocalVoice({config,speakerRecognition:{analyse:async()=>observation},fetchImpl:async(url,options)=>{
+   if(url.includes('transcriptions'))return Response.json({text:'Hello Nodie'});
+   if(url.includes('/api/chat')){messages=JSON.parse(options.body).messages;return Response.json({message:{content:'Hello there.'}});}
+   return new Response(wav);
+  }});
+  const result=await voice.converse(new Uint8Array(200));assert.equal(result.reply,'Hello there.');assert.ok(result.audio.length);
+  if(state==='ready'){assert.deepEqual(result.speakers.speakers,observation.speakers);assert.ok(messages.some(m=>m.content.includes('Optional voice observation')));}
+  else {assert.equal(result.speakers,undefined);assert.ok(!messages.some(m=>m.content.includes('Optional voice observation')));}
+ }
+});

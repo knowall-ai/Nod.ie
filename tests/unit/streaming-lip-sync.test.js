@@ -43,6 +43,41 @@ test('server rejects a render submitted with a pre-cancelled generation',async()
     await assert.rejects(server.render(new Uint8Array(44),generation),/cancelled/);
 });
 
+test('video catches up with audio after asynchronous decoder startup',async()=>{
+    const h=harness(async()=>new Uint8Array(16));
+    h.video.play=async()=>{h.queue.context.currentTime=1.03;};
+    h.queue.push(new Float32Array(30720),48000);
+    await new Promise(r=>setTimeout(r,800));
+    assert.equal(h.video.currentTime,0);
+    assert.equal(h.video.playbackRate,1.3);
+    h.video.currentTime=.29;await new Promise(r=>setTimeout(r,50));
+    assert.ok(h.video.playbackRate<1 && h.video.playbackRate>=.9);
+    h.queue.cancel();
+});
+
+test('the final audio restores idle even when its video never arrives',async()=>{
+    const pending=[];const held=[];
+    const h=harness(()=>new Promise(resolve=>pending.push(resolve)));
+    h.video.style={};
+    h.queue.renderer.state.avatarManager.idle={prepareSpeech(){},holdSpeech(_video,continuing){held.push(continuing)}};
+    h.queue.push(new Float32Array(30720),48000);h.queue.push(new Float32Array(30720),48000);
+    pending[0](new Uint8Array(16));await tick();
+    h.queue.context.currentTime=h.sources[1].at;h.sources[0].onended();
+    assert.equal(held.at(-1),true);
+    h.queue.context.currentTime=3;h.sources[1].onended();
+    assert.equal(held.at(-1),false);
+    assert.equal(h.queue.activeJob,null);
+    pending[1](new Uint8Array(16));await tick();assert.equal(h.queue.activeJob,null);
+    h.queue.cancel();
+});
+
+test('expiring final video does not count its own source as continuing speech',async()=>{
+ const h=harness(()=>new Promise(()=>{}));const held=[];
+ h.queue.renderer.state.avatarManager.idle={prepareSpeech(){},holdSpeech(_v,c){held.push(c)}};
+ h.queue.push(new Float32Array(30720),48000);
+ h.queue.activeJob={source:h.sources[0]};h.queue.release();
+ assert.equal(held.at(-1),false);h.queue.cancel();
+});
 test('oversized PCM splits without losing samples and rejects invalid inputs', async()=>{
  const h=harness(()=>new Promise(()=>{}));
  h.queue.push(new Float32Array(70000),48000);
@@ -61,4 +96,65 @@ test('cancellation awaits context close and prevents premature replacement', asy
 test('context close cannot block cancellation indefinitely', async()=>{
  const h=harness(()=>new Promise(()=>{}));h.queue.push(new Float32Array(30720),48000);h.queue.context.close=()=>new Promise(()=>{});
  await h.queue.cancel();assert.equal(h.queue.context,null);assert.equal(h.queue.closing,null);
+});
+
+test('neural clips carry past and queued future speech without replaying context audio',async t=>{
+ const pending=[];const h=harness((audio,trim)=>new Promise(resolve=>pending.push({audio,trim,resolve})));t.after(()=>h.queue.cancel());
+ h.queue.push(new Float32Array(30720).fill(.1),48000);
+ h.queue.push(new Float32Array(30720).fill(.2),48000);
+ h.queue.push(new Float32Array(30720).fill(.3),48000);
+ assert.equal(h.sources.length,3);
+ pending[0].resolve(new Uint8Array(16));await tick();
+ const p=pending[1],wav=Buffer.from(p.audio);
+ assert.equal(p.trim.startFrame,8);assert.equal(p.trim.frameCount,16);
+ assert.equal(wav.readUInt32LE(40),Math.round(48000*1.12*2));
+ assert.equal(wav.readInt16LE(44),Math.round(.1*32767));
+ assert.equal(wav.readInt16LE(44+15360*2),Math.round(.2*32767));
+ assert.equal(wav.readInt16LE(44+46080*2),Math.round(.3*32767));
+ assert.ok(Math.abs(h.sources[1].buffer.duration-.64)<1e-9);
+ h.queue.cancel();pending[1].resolve(new Uint8Array(16));await tick();
+ assert.equal(h.queue.pastPCM,null);
+ h.queue.pastPCM=new Uint8Array(8);h.queue.beginResponse();assert.equal(h.queue.pastPCM,null);
+});
+
+test('frame ranges are bounded before a render request can start',async()=>{
+ let audio;const h=harness(async wav=>{audio=wav;return new Uint8Array(16)});
+ h.queue.push(new Float32Array(30720),48000);await tick();h.queue.cancel();
+ const {StreamingLipSync}=require('../../lib/streaming-lip-sync');const server=new StreamingLipSync({url:'http://127.0.0.1:1'});
+ for(const trim of [{startFrame:-1,frameCount:16},{startFrame:9,frameCount:1},{startFrame:0,frameCount:99},{startFrame:0,frameCount:16,path:'/tmp/x'},{startFrame:NaN,frameCount:16}])
+  await assert.rejects(server.render(audio,undefined,trim),/Invalid lip-sync frame range/);
+});
+
+
+test('short final clips pad complete frames without lengthening audible speech',async t=>{
+ for(const length of [1,480,3168,10000]) {
+  let request;const h=harness(async(audio,trim)=>{request={audio:Buffer.from(audio),trim};return new Uint8Array(16)});
+  t.after(()=>h.queue.cancel());h.queue.push(new Float32Array(length),48000);h.queue.flush();await tick();
+  assert.equal(h.sources[0].buffer.duration,length/48000);
+  assert.ok(request.trim.frameCount>=3);
+  const duration=request.audio.readUInt32LE(40)/2/48000;
+  assert.ok((request.trim.startFrame+request.trim.frameCount)/25<=duration);
+ }
+});
+test('non-frame-divisible sample rates keep whole PCM samples and omit context trimming',async t=>{
+ let request;const h=harness(async(audio,trim)=>{request={audio:Buffer.from(audio),trim};return new Uint8Array(16)});
+ t.after(()=>h.queue.cancel());h.queue.push(new Float32Array(28160),44101);h.queue.flush();await tick();
+ assert.equal(request.trim,undefined);assert.equal(request.audio.readUInt32LE(40)%2,0);
+ assert.equal(request.audio.readUInt32LE(24),44101);
+});
+
+test('a decoded batch supplies future context before its first render starts',async t=>{
+ let request;const h=harness((audio,trim)=>{request={audio:Buffer.from(audio),trim};return new Promise(()=>{})});t.after(()=>h.queue.cancel());
+ h.queue.push(new Float32Array(70000),48000);
+ assert.equal(h.sources.length,2);assert.equal(request.trim.frameCount,16);
+ assert.equal(request.audio.readUInt32LE(40),48000*.8*2);
+});
+
+test('24 kHz trailing 5500 samples are padded before frame trimming, including past context',async t=>{
+ const pending=[];const h=harness((audio,trim)=>new Promise(resolve=>pending.push({audio:Buffer.from(audio),trim,resolve})));t.after(()=>h.queue.cancel());
+ h.queue.push(new Float32Array(15360),24000);
+ h.queue.push(new Float32Array(5500),24000);h.queue.flush();pending[0].resolve(new Uint8Array(16));await tick();
+ const {audio,trim}=pending[1];assert.equal(trim.startFrame,8);assert.equal(trim.frameCount,6);
+ assert.equal(audio.readUInt32LE(40)/2/24000,(trim.startFrame+trim.frameCount)/25);
+ pending[1].resolve(new Uint8Array(16));await tick();assert.equal(h.errors.length,0);
 });

@@ -23,6 +23,8 @@ include::SECURITY_UPDATES.adoc[]
 include::MEMORY.adoc[]
 include::LIP_SYNC.adoc[]
 include::UNMUTE.adoc[]
+
+include::VISION.adoc[]
 include::TESTING.adoc[]
 
 include::DIAGNOSTICS.adoc[]
@@ -32,3 +34,5 @@ include::TROUBLESHOOTING.adoc[]
 include::FAQS.adoc[]
 include::TERMS.adoc[]
 include::CONTACTS.adoc[]
+
+include::IDLE_MOTION.adoc[]
