@@ -19,3 +19,13 @@ test('actual voice payload and saved history exclude emoji names and symbols', a
     assert.equal((await voice.converse(new Uint8Array(200))).reply, 'Good to hear from you!');
     assert.equal(speech, 'Good to hear from you!'); assert.equal(voice.history.at(-1).content, speech);
 });
+
+test('punctuation-only replies never reach TTS or conversation history',async()=>{
+ const {LocalVoice}=require('../../lib/local-voice');let tts=0;
+ const voice=new LocalVoice({config:k=>({LOCAL_STT_URL:'http://stt',LOCAL_TTS_URL:'http://tts',OLLAMA_URL:'http://llm'})[k],fetchImpl:async url=>{
+  if(url.includes('transcriptions'))return Response.json({text:'Hello'});
+  if(url.includes('/api/chat'))return Response.json({message:{content:'😊!'}});
+  tts++;throw Error('Unexpected TTS');
+ }});
+ await assert.rejects(voice.converse(new Uint8Array(200)));assert.equal(tts,0);assert.equal(voice.history.length,0);
+});
