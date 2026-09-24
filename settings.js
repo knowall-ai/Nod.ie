@@ -98,3 +98,28 @@ async function loadSpeakers() {
 }
 el('speaker-enabled').onchange = () => api.speakerEnabled(el('speaker-enabled').checked).then(loadSpeakers).catch(error);
 el('speaker-forget').onclick = () => { if (window.confirm('Remove all voice profiles and disable recognition? Reverie memories will remain.')) api.speakerForget().then(loadSpeakers).catch(error); };
+
+async function loadFaces() {
+    const status = await api.faceStatus();
+    el('face-enabled').checked = status.enabled;
+    el('face-status').textContent = status.enabled ? 'Learning selected camera frames. Voice notifications and conversational naming are not connected yet.' : 'Disabled. No faces are collected.';
+    el('face-profiles').replaceChildren();
+    if (!status.profiles.length) el('face-profiles').textContent = 'No face profiles learned yet.';
+    for (const profile of status.profiles) {
+        const row = document.createElement('div');
+        const label = document.createElement('p'); label.textContent = `${profile.name || 'Unfamiliar face'} (${profile.id.slice(0, 8)}) — last seen ${new Date(profile.lastSeen).toLocaleString()}`;
+        const input = document.createElement('input'); input.type = 'text'; input.value = profile.name || ''; input.maxLength = 80; input.setAttribute('aria-label', 'Face profile name');
+        const save = document.createElement('button'); save.textContent = 'Save name'; save.onclick = () => api.faceEdit(profile.id, input.value).then(loadFaces).catch(error);
+        const remove = document.createElement('button'); remove.textContent = 'Forget'; remove.onclick = () => { if (confirm('Forget this face profile?')) api.faceEdit(profile.id, null).then(loadFaces).catch(error); };
+        const targets = document.createElement('select'); targets.setAttribute('aria-label', 'Merge face into');
+        const placeholder = document.createElement('option'); placeholder.value = ''; placeholder.textContent = 'Merge into…'; targets.append(placeholder);
+        for (const other of status.profiles.filter(p => p.id !== profile.id)) { const option = document.createElement('option'); option.value = other.id; option.textContent = `${other.name || 'Unfamiliar face'} (${other.id.slice(0, 8)})`; targets.append(option); }
+        const merge = document.createElement('button'); merge.textContent = 'Merge'; merge.disabled = true; targets.onchange = () => { merge.disabled = !targets.value; };
+        merge.onclick = () => { if (confirm('Merge these face profiles, retaining the target name?')) api.faceMerge(profile.id, targets.value).then(loadFaces).catch(error); };
+        row.append(label, input, save, remove, targets, merge); el('face-profiles').append(row);
+    }
+}
+el('face-enabled').onchange = () => api.faceEnabled(el('face-enabled').checked).then(loadFaces).catch(error);
+el('face-refresh').onclick = () => loadFaces().catch(error);
+el('face-forget').onclick = () => { if (confirm('Delete every face profile and disable recognition?')) api.faceForget().then(loadFaces).catch(error); };
+loadFaces().catch(error);

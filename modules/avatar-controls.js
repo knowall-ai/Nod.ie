@@ -26,7 +26,18 @@ class AvatarControls {
             this.cameraSource = new window.VisionCamera({
                 preview: this.preview,
                 canAnalyse: () => renderer.visionContext.canAnalyse(),
-                onFrame: frame => renderer.visionContext.analyse(frame),
+                onFrame: async frame => {
+                    const analysis = renderer.visionContext.analyse(frame);
+                    void (async () => {
+                    const image = new Uint8Array(await frame.image.arrayBuffer());
+                    if (frame.signal.aborted) return;
+                    const cancel = () => window.nodie.cancelFaces().catch(() => {});
+                    frame.signal.addEventListener('abort', cancel, { once: true });
+                    // Recognition shares selected frames but never delays scene description.
+                    void window.nodie.analyseFaces(image).catch(() => {}).finally(() => frame.signal.removeEventListener('abort', cancel));
+                    })().catch(() => {});
+                    return analysis;
+                },
                 onError: message => renderer.showNotification(message, 'error'),
                 onState: () => { renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
             });
