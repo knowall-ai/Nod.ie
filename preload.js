@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('nodie', {
     journalFrame:image=>ipcRenderer.invoke('journal-frame',image),
     cancelJournal:reset=>ipcRenderer.invoke('journal-cancel',reset),
     listJournal:()=>ipcRenderer.invoke('journal-list'),
+    journalEnabled:value=>ipcRenderer.invoke('journal-enabled',value),
     journalRetention:days=>ipcRenderer.invoke('journal-retention',days),
     clearJournal:()=>ipcRenderer.invoke('journal-clear'),
     windowAction: action => ipcRenderer.invoke('window-action',action),

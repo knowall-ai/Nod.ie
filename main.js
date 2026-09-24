@@ -20,6 +20,8 @@ function start() {
     const debug=(source,text)=>mainWindow?.webContents.send('debug-event',{source,text});
     journal.onEvent=event=>debug('Journal',`${event.source}: ${event.subject} — ${event.kind}${event.uncertain?' (uncertain)':''}`);
     void journal.load().catch(()=>console.warn('Event journal unavailable'));
+    const nodePublisher=new(require('./lib/node-status-publisher').NodeStatusPublisher)(path.join(require('node:os').homedir(),'.config/nodie/events/node-status.json'));
+    nodePublisher.start();app.on('before-quit',()=>nodePublisher.stop());
     const speakerRecognition = new (require('./lib/speaker-recognition').SpeakerRecognition)();
     const voice = new LocalVoice({ logger, historyStore, journal, speakerRecognition, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
     let windowMode;
@@ -67,11 +69,12 @@ function start() {
 
     const vision = new (require('./lib/vision-analysis').VisionAnalysis)({ url: env.getConfig('OLLAMA_URL', 'http://127.0.0.1:11434'), model: env.getConfig('LOCAL_VISION_MODEL', env.LLM_MODEL || 'nodie-qwen3.5:9b') });
     const faces = new (require('./lib/face-recognition').FaceRecognition)();
-    handle('face-analyse', async image => {const epoch=(await journal.load()).epoch;const result=await faces.analyse(image);debug('Face',result.state==='ready'?result.faces.map(f=>f.name?`Possible match: ${f.name}`:'Unknown person').join('; ')||'No usable face':result.state);if(result.state==='ready')for(const face of result.faces)await journal.append({source:'face',kind:face.name?'recognised':'observed',subject:face.name||'Unknown person',uncertain:true},epoch);return result;});
+    const recorder=new(require('./lib/journal-recorder').JournalRecorder)(journal,debug);
+    handle('face-analyse',image=>recorder.capture(()=>faces.analyse(image),result=>{debug('Face',result.state==='ready'?result.faces.map(f=>f.name?`Possible match: ${f.name}`:'Unknown person').join('; ')||'No usable face':result.state);return result.state==='ready'?result.faces.map(f=>({source:'face',kind:f.name?'recognised':'observed',subject:f.name||'Unknown person',uncertain:true})):[];}));
     handle('face-cancel', () => faces.cancel());
     handle('face-status', () => faces.store.status(), true);
     handle('face-enabled', enabled => { faces.cancel(); return faces.store.configure(enabled); }, true);
-    handle('face-edit', async (id, name) => {await faces.store.edit(id,name);if(name)await journal.append({source:'face',kind:'name-confirmed',subject:name,uncertain:false});}, true);
+    handle('face-edit', async (id, name) => {await faces.store.edit(id,name);if(name)recorder.record({source:'face',kind:'name-confirmed',subject:name,uncertain:false});}, true);
     handle('face-merge', (source, target) => faces.store.merge(source, target), true);
     handle('face-forget', () => { faces.cancel(); return faces.store.forget(); }, true);
     app.on('before-quit', () => faces.cancel());
@@ -79,6 +82,7 @@ function start() {
     handle('journal-frame',image=>journalVision.analyse(image));
     handle('journal-cancel',reset=>journalVision.cancel(reset===true));
     handle('journal-list',()=>journal.load(),true);
+    handle('journal-enabled',value=>{journalVision.cancel(true);return journal.enabled(value);},true);
     handle('journal-retention',days=>journal.configure(days),true);
     handle('journal-clear',async()=>{journalVision.cancel(true);return journal.clear();},true);
     app.on('before-quit',()=>journalVision.cancel());
@@ -99,13 +103,13 @@ function start() {
     }, true);
 
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
-    handle('speaker-analyse', async audio => {const epoch=(await journal.load()).epoch;const result=await liveSpeakers.analyse(audio);if(result)debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));if(result)for(const speaker of result.speakers)await journal.append({source:'voice',kind:speaker.name&&!speaker.uncertain?'recognised':'observed',subject:speaker.name&&!speaker.uncertain?speaker.name:'Unknown speaker',uncertain:true},epoch);return result;});
+    handle('speaker-analyse',audio=>recorder.capture(()=>liveSpeakers.analyse(audio),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
     handle('speaker-cancel', () => liveSpeakers.cancel());
     handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
     app.on('before-quit', () => liveSpeakers.cancel());
     handle('speaker-status', () => speakerRecognition.store.status(), true);
     handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
-    handle('speaker-edit', async (id, name) => {await speakerRecognition.store.edit(id,name);if(name)await journal.append({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}, true);
+    handle('speaker-edit', async (id, name) => {await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}, true);
     handle('speaker-merge', (source, target) => speakerRecognition.store.merge(source, target), true);
     handle('speaker-forget', () => speakerRecognition.store.forget(), true);
     handle('voice-cancel', () => voice.cancel());

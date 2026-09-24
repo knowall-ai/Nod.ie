@@ -2,13 +2,13 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|d3a72af |2026-09-24 |Add a bounded daily event journal and fullscreen observation debug stream
+|3b702bc |2026-09-24 |Align window controls and restore fullscreen camera preview and pointer input
 |75e6072 |2026-09-24 |Separate included documentation sections cleanly
 |1e57374 |2026-09-24 |Fix direct camera vision and lip playback recovery; add addressed window controls
 |65f9d27 |2026-09-24 |fix: align idle animation poses and remove head jolts
 |73e60dc |2026-09-24 |test: verify final reviewer edge cases and record review disposition
 |8229370 |2026-09-24 |fix: preserve local replies and memory uncertainty across reconnects
 |eb8ee4b |2026-09-24 |fix: address integration reviews and reduce animation and recognition overhead
-|5bdb1a0 |2026-09-24 |fix: integrate reviewed voice vision and sharper avatar rendering
-|2f6091d |2026-09-24 |Merge remote-tracking branch 'origin/feat/local-face-recognition' into integrate/reviewed-voice-vision
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

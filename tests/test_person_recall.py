@@ -28,4 +28,12 @@ class RecallTests(unittest.IsolatedAsyncioTestCase):
    messages=[raw[0],{'role':'user','content':merged}]
    await m.person_messages(messages,manager,raw)
    self.assertEqual(calls[-1],{'transcript':'Do you know Zephy?'})
+ async def test_pet_failure_does_not_remove_person_recall(self):
+  async def execute(name,args):
+   if name=='reverie.recall_animals':raise RuntimeError('pets offline')
+   return json.dumps({'people':[{'name':'Edi','match':'exact'}]})
+  manager=types.SimpleNamespace(available_tools={'reverie.resolve_people':{},'reverie.recall_animals':{}},execute_tool=execute)
+  messages=[{'role':'system','content':'Policy'},{'role':'user','content':'What is Edi holding?'}]
+  output=await m.person_messages(messages,manager,include_animals=True)
+  self.assertIn('Edi',output[-2]['content'])
 if __name__=='__main__':unittest.main()
