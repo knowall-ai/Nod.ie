@@ -33,7 +33,7 @@ class StreamingLipSync {
         history.set(past);history.set(audio.subarray(44,44+length*2),past.length);
         // Keep eight complete video frames of past speech, never another response.
         const frameBytes=rate/25*2;
-        const keep=Math.floor(Math.min(history.length,rate*.32*2)/frameBytes)*frameBytes;
+        const keep=rate%25===0?Math.floor(Math.min(history.length,rate*.32*2)/frameBytes)*frameBytes:0;
         this.pastPCM=history.slice(history.length-keep);
         try { this.scheduleAudio(job, this.generation); }
         catch { this.cancel(); this.renderer.showNotification('Speech playback failed.', 'error'); return; }
@@ -61,6 +61,7 @@ class StreamingLipSync {
     /** Preserve neighbouring phonemes while rendering only this clip's frames. */
     contextAudio(job) {
         const rate=new DataView(job.audio.buffer).getUint32(24,true);
+        if (rate % 25 !== 0) return {audio:job.audio};
         const next=this.jobs[0];
         let future;
         if(next) future=next.audio.subarray(44,44+rate*.16*2);
