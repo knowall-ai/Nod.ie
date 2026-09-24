@@ -136,8 +136,11 @@ def main():
                 if len(pending) > 8192:
                     raise ValueError('Input region message too large')
             if data is None:
-                for target in frames() if shaped else []:
-                    if target in shaped:
+                for target in frames():
+                    # KWin may resize/reparent after fullscreen was requested.
+                    # Keep new exclusive frames fully interactive as well.
+                    width, height = geometry(target)[2:]
+                    if signature(target) != ((0, 0, width, height),):
                         shape.XShapeCombineMask(display, target, 2, 0, 0, 0, 0)
                 shaped.clear()
             else:

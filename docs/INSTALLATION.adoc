@@ -61,7 +61,7 @@ Without this backend overlay, older Unmute ignores the new field; speech continu
 
 == Window and directly addressed voice controls
 
-The desktop has Full screen / Restore and Minimize to system tray controls. Full screen presents the enlarged avatar with a dark background and bottom controls; Escape restores the previous compact position and size. Hiding does not end the conversation. Tray click or the existing show shortcut reopens it.
+The desktop has small Full screen / Restore and Minimize to system tray controls centred on the upper-right arc of the avatar boundary. The fullscreen camera preview remains clipped and positioned inside its own control. Full screen presents the enlarged avatar with a dark background and bottom controls; Escape restores the previous compact position and size. Hiding does not end the conversation. Tray click or the existing show shortcut reopens it.
 
 Directly address Nodie's name for voice controls: natural variants of fullscreen, restore, hide/minimize, show/open, speaker mute/unmute and microphone stop are supported. Overheard keywords, quoted commands, hypothetical discussion and negated window commands do not activate them. This is a bounded intention parser, not unrestricted voice automation. Stop talking means persistent speaker mute, as requested; it does not stop microphone capture. A hidden app can hear an addressed open request while the microphone remains enabled. Once listening is stopped, use the tray or hotkey to enable it again. No secondary always-listening wake-word microphone is opened.
 
