@@ -79,3 +79,5 @@ Recognition and persistent conversation-history integration remain separate work
 The TTS startup stages only the nine demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
 
 Decoded audio carries a response generation. Interruptions invalidate queued output, and the decoder clears partial PCM buffers at generation changes while retaining its continuous Opus state. Late frames cannot restart animation, microphone ducking or playback in a later response.
+
+Background speaker samples match existing profiles without enrolling unfamiliar voices. Enrol a profile through a deliberate local voice turn. The complete background analysis has a 1.8-second caller deadline; a still-settling storage operation retains its slot so later samples cannot overlap it. Disabled recognition publishes its cleared observation once, and recording durations cannot exceed four seconds.

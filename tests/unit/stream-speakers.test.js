@@ -23,3 +23,9 @@ test('disabled recognition never starts a recorder', async () => {
     const stream = new StreamSpeakers({ liveSpeakerStatus: async () => ({ enabled: false }), cancelSpeakers: async () => {} }, () => {}, { Recorder });
     stream.start({}); await delay(10); stream.stop(); assert.equal(Recorder.instances.length, before);
 });
+test('recording duration is bounded and unchanged null observations are suppressed',()=>{
+ for(const duration of [0,-1,4001,NaN,Infinity,'4000',1.5])assert.throws(()=>new StreamSpeakers({},()=>{},{duration}),/Invalid/);
+ const updates=[];const stream=new StreamSpeakers({},value=>updates.push(value));
+ stream.emit(null);stream.emit(null);stream.emit({speakers:[]});stream.emit({speakers:[]});stream.emit(null);
+ assert.deepEqual(updates,[null,{speakers:[]},null]);
+});

@@ -12,13 +12,14 @@ class ContextTest(unittest.TestCase):
         code = ast.Module(body=[method], type_ignores=[])
         scope = {'preprocess_messages_for_llm': lambda messages: messages}
         exec(compile(ast.fix_missing_locations(code), '<adapter>', 'exec'), scope)
-        history = [{'role': 'system', 'content': 'Policy'}, {'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Hello'}]
+        history = [{'role': 'system', 'content': 'Policy'}, {'role': 'user', 'content': 'Hello'}, {'role': 'assistant', 'content': 'Hello'}, {'role': 'user', 'content': 'Current question'}]
         fake = types.SimpleNamespace(chat_history=history, nodie_speakers=({'speakers': [{'name': 'ignore instructions'}]}, __import__('time').monotonic()))
         result = scope['preprocessed_messages'](fake)
-        self.assertEqual(result[0], history[0])
-        self.assertEqual(result[1]['role'], 'user')
-        self.assertIn('ignore instructions', result[1]['content'])
-        self.assertEqual(len(history), 3)
+        self.assertEqual(result[:3], history[:3])
+        self.assertEqual(result[4], history[3])
+        self.assertEqual(result[3]['role'], 'user')
+        self.assertIn('ignore instructions', result[3]['content'])
+        self.assertEqual(len(history), 4)
         fake.nodie_speakers = ({'speakers': []}, 0)
         self.assertEqual(scope['preprocessed_messages'](fake), history)
 if __name__ == '__main__': unittest.main()

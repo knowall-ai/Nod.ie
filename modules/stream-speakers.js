@@ -1,7 +1,13 @@
 /** Independent bounded recordings; never delay the Unmute audio transport. */
 class StreamSpeakers {
     constructor(api, publish, { Recorder = globalThis.MediaRecorder, duration = 4000 } = {}) {
+        if (!Number.isInteger(duration) || duration < 1 || duration > 4000) throw new Error('Invalid speaker recording duration');
         Object.assign(this, { api, publish, Recorder, duration }); this.generation = 0;
+    }
+    emit(observation) {
+        const encoded = JSON.stringify(observation);
+        if (encoded === this.lastObservation) return;
+        this.lastObservation = encoded; this.publish(observation);
     }
     start(stream) { this.stop(); this.stream = stream; const generation = this.generation; void this.cycle(generation); }
     async cycle(generation) {
@@ -12,9 +18,9 @@ class StreamSpeakers {
                 const audio = await this.record(generation);
                 if (generation !== this.generation) return;
                 const result = await this.api.analyseSpeakers(new Uint8Array(await audio.arrayBuffer()));
-                if (generation === this.generation) this.publish(result);
-            } else this.publish(null);
-        } catch { if (generation === this.generation) this.publish(null); }
+                if (generation === this.generation) this.emit(result);
+            } else this.emit(null);
+        } catch { if (generation === this.generation) this.emit(null); }
         finally { if (generation === this.generation) this.retry = setTimeout(() => this.cycle(generation), 500); }
     }
     record(generation) {
@@ -31,7 +37,7 @@ class StreamSpeakers {
         ++this.generation; clearTimeout(this.timer); clearTimeout(this.retry);
         if (this.recorder?.state !== 'inactive') { try { this.recorder?.stop(); } catch {} }
         this.recorder = null; this.stream = null;
-        this.api.cancelSpeakers().catch(() => {}); this.publish(null);
+        this.api.cancelSpeakers().catch(() => {}); this.emit(null);
     }
 }
 if (typeof module !== 'undefined') module.exports = StreamSpeakers;

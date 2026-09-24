@@ -10,10 +10,17 @@ test('cancel discards late identity and concurrent requests do not queue', async
     const live = new LiveSpeakers({ analyse: () => new Promise(resolve => { finish = resolve; }) });
     const pending = live.analyse(new Uint8Array(100));
     assert.equal(await live.analyse(new Uint8Array(100)), null);
-    live.cancel(); finish({ state: 'ready', speakers: [{ name: 'Example' }] });
+    await Promise.resolve();live.cancel(); finish({ state: 'ready', speakers: [{ name: 'Example' }] });
     assert.equal(await pending, null);
 });
 test('only public identity hints leave main process', async () => {
     const live = new LiveSpeakers({ analyse: async () => ({ state: 'ready', epoch: 'private', speakers: [{ id: 'private', name: 'Example', embedding: [1] }], transcriptAttribution: 'single-speaker' }) });
     assert.deepEqual(await live.analyse(new Uint8Array(100)), { speakers: [{ name: 'Example', uncertain: false }], attribution: 'single-speaker' });
+});
+
+test('whole-operation timeout settles caller without overlapping unfinished storage',async()=>{
+ let finish,calls=0;const live=new LiveSpeakers({analyse:()=>{calls++;return new Promise(resolve=>{finish=resolve;});}},{timeoutMs:5});
+ assert.equal(await live.analyse(new Uint8Array(100)),null);
+ assert.equal(await live.analyse(new Uint8Array(100)),null);assert.equal(calls,1);
+ finish({state:'disabled'});await new Promise(r=>setImmediate(r));assert.equal(live.controller,null);
 });
