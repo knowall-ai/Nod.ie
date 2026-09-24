@@ -33,6 +33,7 @@ def method(name):
 method('__init__').body[:0] = ast.parse('from unmute.curiosity_context import CuriosityState\nself._curiosity = CuriosityState()').body
 method('update_session').body += ast.parse('''
 if hasattr(self, '_curiosity'):
+    if session.curiosity_scene and session.curiosity_scene.status == 'snapshot': self._scene_tools_blocked = True
     if session.scene_data and session.scene_data.status == 'camera-off': self._curiosity.update(False,None,None)
     self._curiosity.update(session.curiosity_allowed, session.curiosity_event.model_dump(exclude_none=True) if session.curiosity_event else None, session.curiosity_scene.model_dump(exclude_none=True) if session.curiosity_scene else None)
 ''').body

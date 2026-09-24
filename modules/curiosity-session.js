@@ -5,7 +5,7 @@ class CuriositySession {
         this.timer = setInterval(() => void this.tick(), 1000);
     }
     send(session) { this.renderer.state.wsHandler?.send({ type: 'session.update', session: { allow_recording: false, ...session } }); }
-    reset() { if(this.active)void this.finish(this.active.delivered?'interrupted':'cancelled');clearTimeout(this.answerTimer);++this.generation; this.candidate = null; this.active = null; this.blockedUntilReply = false; this.started = this.now(); this.lastActivity = this.now(); this.send({ curiosity_allowed: false, curiosity_event: null }); }
+    reset() { if(this.active)void this.finish(this.active.delivered?(this.active.done?'unanswered':'interrupted'):'cancelled');clearTimeout(this.answerTimer);++this.generation; this.candidate = null; this.active = null; this.blockedUntilReply = false; this.started = this.now(); this.lastActivity = this.now(); this.send({ curiosity_allowed: false, curiosity_event: null }); }
     async consider(candidate, frame) {
         if (!candidate?.token || !frame || frame.capturedAt!==candidate.capturedAt || frame.signal.aborted) return;
         const generation=this.generation;
@@ -37,7 +37,7 @@ class CuriositySession {
             const result = await window.nodie.claimCuriosity(c.token);
             if (generation !== this.generation || this.reason()) {if(result?.event)await window.nodie.curiosityOutcome(result.event.token,'cancelled');return;}
             if (!result?.event) { this.debug(result?.reason || 'No eligible observation'); return; }
-            this.active = { token: result.event.token, started: this.now(), deadline:Date.parse(c.capturedAt)+20000, delivered:false, accepted:false };
+            this.active = { token: result.event.token, started: this.now(), deadline:Date.parse(c.capturedAt)+23000, delivered:false, accepted:false };
             this.blockedUntilReply = true; this.allowed = true;
             this.send({ curiosity_allowed: true, curiosity_event: result.event, curiosity_scene: c.scene });
             this.debug('Requested: ' + result.event.key);
@@ -51,7 +51,7 @@ class CuriositySession {
             if (this.active) void this.finish(!this.active.delivered?'cancelled':this.active.done?'answered':'interrupted');
         }
         if (data.type === 'nodie.curiosity_started' && this.active?.token === data.token) {this.active.accepted=true;this.debug('Accepted: ' + data.key);}
-        if (data.type === 'response.audio.delta' && this.active?.accepted) this.active.delivered = true;
+        if (data.type === 'response.text.delta' && data.delta?.trim() && this.active?.accepted) this.active.delivered = true;
         if (data.type === 'response.audio.done' && this.active?.accepted) {
             if(!this.active.delivered){void this.finish('cancelled');this.blockedUntilReply=false;return;}
             this.active.done = true;

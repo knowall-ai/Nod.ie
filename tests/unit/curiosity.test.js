@@ -41,7 +41,7 @@ test('renderer quiet, muted, playback, reset races and exact image gates',async 
  now+=61000;r.visionContext.scene.capturedAt=new Date(now).toISOString();await s.consider({token:'candidate',capturedAt:r.visionContext.scene.capturedAt},{capturedAt:r.visionContext.scene.capturedAt,image:new Blob(['image']),signal:new AbortController().signal});
  r.state.isMuted=true;await s.tick();assert.equal(calls,0);r.state.isMuted=false;
  await s.tick();assert.equal(calls,1);assert.equal(sent.at(-1).session.curiosity_scene.imageJpeg,btoa('image'));assert.equal(s.blockedUntilReply,true);
- s.event({type:'nodie.curiosity_started',token:'claim',key:'held-object:cup'});s.event({type:'response.audio.delta'});s.event({type:'response.audio.done'});s.event({type:'conversation.item.input_audio_transcription.delta',delta:'Yes'});assert.equal(s.blockedUntilReply,false);
+ s.event({type:'nodie.curiosity_started',token:'claim',key:'held-object:cup'});s.event({type:'response.text.delta',delta:'A question'});s.event({type:'response.audio.done'});s.event({type:'conversation.item.input_audio_transcription.delta',delta:'Yes'});assert.equal(s.blockedUntilReply,false);
  let done;global.window.nodie.claimCuriosity=()=>new Promise(resolve=>done=resolve);now+=61000;await s.consider({token:'next',capturedAt:new Date(now).toISOString()},{capturedAt:new Date(now).toISOString(),image:new Blob(['image']),signal:new AbortController().signal});r.visionContext.scene.capturedAt=new Date(now).toISOString();await s.consider({token:'next',capturedAt:r.visionContext.scene.capturedAt},{capturedAt:r.visionContext.scene.capturedAt,image:new Blob(['image']),signal:new AbortController().signal});
  const pending=s.tick();s.reset();done({event:{token:'stale'}});await pending;assert.equal(sent.at(-1).session.curiosity_allowed,false);
 });
@@ -53,7 +53,7 @@ test('undelivered claims stay permitted until deadline and cancel without interr
  const s=new Session(r,{now:()=>now});t.after(()=>{s.dispose();global.window=old;});now+=61000;
  const capturedAt=new Date(now).toISOString();await s.consider({token:'c',capturedAt},{capturedAt,image:new Blob(['image']),signal:new AbortController().signal});
  await s.tick();now+=1000;await s.tick();assert.equal(sent.at(-1).session.curiosity_allowed,true);
- now+=20000;await s.tick();assert.deepEqual(outcomes,['cancelled']);assert.equal(s.blockedUntilReply,false);assert.equal(sent.at(-1).session.curiosity_allowed,false);
+ now+=24000;await s.tick();assert.deepEqual(outcomes,['cancelled']);assert.equal(s.blockedUntilReply,false);assert.equal(sent.at(-1).session.curiosity_allowed,false);
 });
 test('cancelled reservation does not count as a question or exhaust the budget',async t=>{
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),'nodie-cancelled-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
