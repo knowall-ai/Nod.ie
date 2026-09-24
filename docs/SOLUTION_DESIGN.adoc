@@ -87,3 +87,11 @@ Continuous listening is opt-in for each application session and is not restored 
 === Streaming Unmute avatar playback
 
 MuseTalk also supports Unmute: decoded PCM is queued independently of GPU rendering, and short video segments follow the audio clock. Local voice retains complete-response rendering; Unmute uses a fixed initial buffer and discards video that misses its playback window. Both paths support cancellation.
+
+== Spoken identity and avatar branding
+
+The assistant's spoken name is Nodie. `GetNod.ie` is the planned domain and T-shirt wordmark; it is not a claim of domain ownership or a deployed website. The system prompt asks for calm, brief replies and natural handling of transcription variants. Tone instructions do not impose an audio loudness limit.
+
+A static, masked garment layer displays the generated lettering over the original portrait and all video states. It changes only the shirt region, preserving the established face, idle movement and speech animation without regenerating neural videos or adding inference work. This layer is aligned to the bundled portrait; custom avatars require their own branding layout. The layer is decorative and cannot intercept drag or button input.
+
+The built-in image generation tool produced `assets/avatars/nodie-getnodie-shirt.png`. Edit prompt: change only the white T-shirt lettering from “Nod.ie” to “GetNod.ie”, preserving the face, hair, pose, background, fabric and Bitcoin symbol. The original portrait remains the animation source; the UI masks the generated image to the lettering region to avoid identity drift.
