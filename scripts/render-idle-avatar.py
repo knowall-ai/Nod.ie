@@ -28,6 +28,10 @@ with torch.inference_mode():
  eye_mask=np.zeros((size,size),np.float32)
  for cx in [.365,.605]: cv2.ellipse(eye_mask,(int(size*cx),int(size*.44)),(int(size*.105),int(size*.055)),0,0,360,1,-1)
  eye_mask=cv2.GaussianBlur(eye_mask,(31,31),0)[...,None]
+ baseline_gray=cv2.cvtColor(baseline.astype(np.uint8),cv2.COLOR_RGB2GRAY)
+ flow_estimator=cv2.DISOpticalFlow_create(cv2.DISOPTICAL_FLOW_PRESET_MEDIUM)
+ flow_estimator.setUseSpatialPropagation(True)
+ grid_x,grid_y=np.meshgrid(np.arange(size,dtype=np.float32),np.arange(size,dtype=np.float32))
  baseline_large=cv2.resize(baseline,(size,size),interpolation=cv2.INTER_CUBIC)[:,:,::-1]
  eye_colour=cv2.GaussianBlur(source[y:y+size,x:x+size].astype(np.float32)-baseline_large,(0,0),8)
  mask=np.zeros((size,size),np.float32);cv2.ellipse(mask,(size//2,int(size*.48)),(int(size*.48),int(size*.48)),0,0,360,1,-1);mask=cv2.GaussianBlur(mask,(81,81),0)[...,None]
@@ -42,6 +46,17 @@ with torch.inference_mode():
  # Render every output frame. Crossfading sparse poses ghosts eyes and hair.
  times=([0.,1.8,4.2] if '--motion-preview' in sys.argv else [0.,3.,6.]) if preview else np.linspace(0,duration,frame_count).tolist()
  count=len(times)
+ flow_cache={}
+ def gesture_flow(index):
+  if index not in flow_cache:
+   at=times[index];envelope=math.sin(math.pi*at/duration)**2
+   yaw=(-3.5 if gesture=='left' else 3.5 if gesture=='right' else 0)*envelope
+   roll=(2.2 if gesture=='tilt' else 0)*envelope
+   rotation=get_rotation_matrix(info['pitch'],info['yaw']+yaw,info['roll']+roll)
+   target=info['scale'][...,None]*(info['kp']@rotation+info['exp']);target[:,:,:2]+=info['t'][:,None,:2]
+   rendered=w.parse_output(w.warp_decode(features,kp,w.stitching(kp,target))['out'])[0]
+   flow_cache[index]=flow_estimator.calc(cv2.cvtColor(rendered,cv2.COLOR_RGB2GRAY),baseline_gray,None)
+  return flow_cache[index]
  started=time.monotonic()
  for i in range(count):
   t=times[i]
@@ -51,24 +66,36 @@ with torch.inference_mode():
    # A stationary open-eye frame is the original portrait, not a neural rerender.
    if not cv2.imwrite(str(output/f'frame-{i:04d}.png'),source): raise RuntimeError('Could not write neutral frame')
    continue
-  amplitude=0 if blink_only else math.sin(math.pi*t/6)**2
-  # Small but visible pose changes; the wider feathered mask includes the hair.
-  rotation=get_rotation_matrix(info['pitch']+amplitude*1.2*math.sin(t*.7),info['yaw']+amplitude*4.0*math.sin(t),info['roll']+amplitude*1.8*math.sin(t*.8))
-  if gesture:
+  if gesture and not preview:
    blink=0
-   envelope=math.sin(math.pi*t/duration)**2
-   yaw=(-3.5 if gesture=='left' else 3.5 if gesture=='right' else 0)*envelope
-   roll=(2.2 if gesture=='tilt' else 0)*envelope
-   rotation=get_rotation_matrix(info['pitch'],info['yaw']+yaw,info['roll']+roll)
-  target=info['scale'][...,None]*(info['kp']@rotation+info['exp']);target[:,:,:2]+=info['t'][:,None,:2]
-  target+= (closed-opened)*min(1,blink)
-  target=w.stitching(kp,target)
-  rendered=w.parse_output(w.warp_decode(features,kp,target)['out'])[0].astype(np.float32)
-  delta=cv2.resize(rendered-baseline,(size,size),interpolation=cv2.INTER_CUBIC)[:,:,::-1]
+   lo=(i//3)*3;hi=min(count-1,lo+3);fraction=(i-lo)/max(1,hi-lo)
+   # Interpolate motion vectors, never pixel images, then warp the original once.
+   flow=gesture_flow(lo)*(1-fraction)+gesture_flow(hi)*fraction
+   for stale in list(flow_cache):
+    if stale<lo:del flow_cache[stale]
+  else:
+   amplitude=0 if blink_only else math.sin(math.pi*t/6)**2
+   # Small but visible pose changes; the wider feathered mask includes the hair.
+   rotation=get_rotation_matrix(info['pitch']+amplitude*1.2*math.sin(t*.7),info['yaw']+amplitude*4.0*math.sin(t),info['roll']+amplitude*1.8*math.sin(t*.8))
+   if gesture:
+    blink=0
+    envelope=math.sin(math.pi*t/duration)**2
+    yaw=(-3.5 if gesture=='left' else 3.5 if gesture=='right' else 0)*envelope
+    roll=(2.2 if gesture=='tilt' else 0)*envelope
+    rotation=get_rotation_matrix(info['pitch'],info['yaw']+yaw,info['roll']+roll)
+   target=info['scale'][...,None]*(info['kp']@rotation+info['exp']);target[:,:,:2]+=info['t'][:,None,:2]
+   target+= (closed-opened)*min(1,blink)
+   target=w.stitching(kp,target)
+   rendered=w.parse_output(w.warp_decode(features,kp,target)['out'])[0].astype(np.float32)
+   flow=flow_estimator.calc(cv2.cvtColor(rendered.astype(np.uint8),cv2.COLOR_RGB2GRAY),baseline_gray,None) if not blink_only else None
   frame=source.copy()
   # Blink-only clips change the eyes, not a retargeted neck or jaw.
   if not blink_only:
-   frame[y:y+size,x:x+size]=np.clip(source[y:y+size,x:x+size].astype(np.float32)+delta*mask,0,255).astype(np.uint8)
+   # Backward flow moves the original portrait detail with the generated pose.
+   # Adding a pose residual to stationary detail leaves doubled eyes and hair.
+   flow=cv2.resize(flow,(size,size),interpolation=cv2.INTER_CUBIC)*(size/baseline.shape[0])
+   moved=cv2.remap(source[y:y+size,x:x+size],grid_x+flow[:,:,0],grid_y+flow[:,:,1],cv2.INTER_CUBIC,borderMode=cv2.BORDER_REFLECT_101)
+   frame[y:y+size,x:x+size]=np.clip(source[y:y+size,x:x+size]*(1-mask)+moved*mask,0,255).astype(np.uint8)
   if blink>0:
    # Replace eye detail during closure: adding a residual retains the original iris.
    eyes=cv2.resize(rendered,(size,size),interpolation=cv2.INTER_CUBIC)[:,:,::-1]+eye_colour
