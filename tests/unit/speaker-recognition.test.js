@@ -95,3 +95,14 @@ test('background matching never enrols unfamiliar voices',async t=>{
  const enrolled=await service.analyse(Buffer.alloc(200));await service.name(enrolled,enrolled.speakers[0].id,'Example');
  assert.equal((await service.analyse(Buffer.alloc(200),undefined,{enrol:false})).speakers[0].name,'Example');
 });
+
+test('unchanged background matches and status reads do not rewrite embeddings or consume naming prompts',async t=>{
+ const store=await fixture(t);await store.configure(true);const {epoch}=await store.load();
+ await store.observe(result(vector(0)),epoch);
+ const d=await store.read();d.profiles[0].lastAsked=0;await store.write(d);
+ let writes=0;const write=store.write.bind(store);store.write=async data=>{writes++;return write(data)};
+ for(let i=0;i<10;i++){await store.load();await store.status();await store.observe(result(vector(0)),epoch,undefined,{enrol:false});}
+ assert.equal(writes,0);assert.equal((await store.read()).profiles[0].lastAsked,0);
+ assert.equal((await store.observe(result(vector(0)),epoch)).speakers[0].mayAskName,true);
+ assert.equal(writes,1);
+});

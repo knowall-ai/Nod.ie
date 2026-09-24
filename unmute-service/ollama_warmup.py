@@ -4,7 +4,9 @@ import json
 import logging
 import os
 import time
-import urllib.request
+from urllib.parse import urlsplit
+
+LOAD_DEADLINE = 90
 
 LOG = logging.getLogger(__name__)
 _task = None
@@ -12,21 +14,38 @@ _key = None
 _ready_until = 0.0
 
 
-def _load(url, model):
-    body = json.dumps({'model': model, 'stream': False, 'keep_alive': '30m'}).encode()
-    request = urllib.request.Request(url.rstrip('/') + '/api/generate', data=body,
-                                     headers={'Content-Type': 'application/json'})
-    with urllib.request.urlopen(request, timeout=90) as response:
-        result = json.loads(response.read(65536))
-    if not result.get('done'):
-        raise RuntimeError('Model warm-up did not complete')
+async def _load(url, model):
+    # HTTPX is already a dependency of the installed OpenAI client.
+    import httpx
+    if urlsplit(url).scheme not in {'http', 'https'}:
+        raise ValueError('Unsupported warm-up URL')
+    client = httpx.AsyncClient(timeout=LOAD_DEADLINE, follow_redirects=False)
+    response = None
+    try:
+        request = client.build_request('POST', url.rstrip('/') + '/api/generate',
+                                       json={'model': model, 'stream': False, 'keep_alive': '30m'})
+        response = await client.send(request, stream=True)
+        response.raise_for_status()
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) > 65536:
+                raise RuntimeError('Oversized warm-up response')
+        if not json.loads(body).get('done'):
+            raise RuntimeError('Model warm-up did not complete')
+    finally:
+        try:
+            if response is not None:
+                await asyncio.wait_for(response.aclose(), timeout=2)
+        finally:
+            await asyncio.wait_for(client.aclose(), timeout=2)
 
 
 async def _refresh(url, model):
     global _ready_until
     started = time.monotonic()
     try:
-        await asyncio.to_thread(_load, url, model)
+        await asyncio.wait_for(_load(url, model), timeout=LOAD_DEADLINE)
     except Exception:
         _ready_until = 0.0
         LOG.warning('ollama_warmup_failed')
@@ -60,4 +79,4 @@ def start_warmup(url, model, force=False):
 async def ensure_warm(url, model):
     task = start_warmup(url, model)
     if task is not None:
-        await asyncio.shield(task)
+        await asyncio.wait_for(asyncio.shield(task), timeout=LOAD_DEADLINE + 5)

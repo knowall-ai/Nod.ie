@@ -3,7 +3,7 @@ class IdleAvatar {
     constructor({enabled=true, avatarEnabled=true}={}) {
         this.video=document.getElementById('avatar-idle');
         this.cover=document.getElementById('avatar-handoff');
-        if (this.cover) this.cover.width=this.cover.height=Math.min(1024,Math.ceil(250*(window.devicePixelRatio||1)));
+        this.resizeCanvas();
         this.lastTilt=-Infinity;
         this.clip={name:'nodie-idle',duration:6,blinks:[2.25,4.7]};
         this.enabled=enabled;this.avatarEnabled=avatarEnabled;this.speaking=false;this.generation=0;
@@ -12,6 +12,18 @@ class IdleAvatar {
         this.video?.addEventListener('ended',()=>this.scheduleNext());
         this.video?.addEventListener('error',()=>{this.available=false;this.hideIdle();});
         this.available=true;this.refresh();
+    }
+    resizeCanvas() {
+        if (!this.cover) return;
+        const pixels=Math.min(1024,Math.ceil(250*(window.devicePixelRatio||1)));
+        if (this.cover.width===pixels && this.cover.height===pixels) return;
+        let saved;
+        if (this.cover.style.opacity==='1') {
+            saved=document.createElement('canvas');saved.width=this.cover.width;saved.height=this.cover.height;
+            saved.getContext('2d').drawImage(this.cover,0,0);
+        }
+        this.cover.width=this.cover.height=pixels;
+        if(saved)this.cover.getContext('2d').drawImage(saved,0,0,pixels,pixels);
     }
     /** Start the bundled, silent idle clip only when motion and avatar are enabled. */
     refresh() {
@@ -33,7 +45,7 @@ class IdleAvatar {
         this.motionTimer=setTimeout(()=>{
             if(generation!==this.generation || this.speaking || this.disposed)return;
             const blink={name:'nodie-idle-blink',duration:6,blinks:[2.25,4.7]};
-            const choices=[blink,blink,blink,blink,blink,{name:'nodie-look-left',duration:3,blinks:[2.25]},{name:'nodie-look-right',duration:3,blinks:[1.7]}];
+            const choices=[blink,blink,blink,blink,blink,{name:'nodie-look-left',duration:3,blinks:[]},{name:'nodie-look-right',duration:3,blinks:[]}];
             if(Date.now()-this.lastTilt>=60000)choices.push({name:'nodie-head-tilt',duration:2.8,blinks:[]});
             const options=choices.filter(clip=>clip.name!==this.clip.name || clip.name===blink.name);
             this.clip=options[Math.floor(Math.random()*options.length)];
@@ -59,6 +71,7 @@ class IdleAvatar {
     }
     /** Preserve a decoded frame while the shared speech element loads its next segment. */
     holdSpeech(video, continuing=false) {
+        if (!continuing && !this.speaking && !this.continuingSpeech) return;
         this.continuingSpeech=continuing;
         if(this.cover && video?.readyState>=2) {
             try {const ctx=this.cover.getContext('2d');ctx.drawImage(video,0,0,this.cover.width,this.cover.height);this.cover.style.transition='none';this.cover.style.opacity='1';}catch{}

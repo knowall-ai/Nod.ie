@@ -213,7 +213,7 @@ class AudioOutputProcessor extends AudioWorkletProcessor {
       anyAudio =
         anyAudio ||
         output.some(function (x) {
-          x > 1e-4 || x < -1e-4;
+          return x > 1e-4 || x < -1e-4;
         });
       this.offsetInFirstBuffer += to_copy;
       out_idx += to_copy;
@@ -228,7 +228,7 @@ class AudioOutputProcessor extends AudioWorkletProcessor {
         output[i] *= i / out_idx;
       }
     }
-    if (out_idx < output.length && !anyAudio) {
+    if (out_idx < output.length && anyAudio) {
       // At the end of a turn, we will get some padding of 0, so we only
       // incease the buffer if we got some audio, e.g. we truly lagged in the middle of something.
       debug(this.timestamp(), "Missed some audio", output.length - out_idx);

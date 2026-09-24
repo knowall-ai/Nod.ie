@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument('unmute_root', type=Path)
+parser.add_argument('--with-speakers', action='store_true')
 args = parser.parse_args()
 source = (args.unmute_root / 'unmute/llm/llm_utils.py').read_text()
 needle = '"temperature": self.temperature,'
@@ -72,7 +73,7 @@ scene_patches = [
     ('        openai_tools = self.mcp_manager.get_tools_for_openai_api() if self.mcp_manager else []',
      '        scene_tools_blocked = self._scene_tools_blocked\n        openai_tools = self.mcp_manager.get_tools_for_openai_api() if self.mcp_manager and not scene_tools_blocked else []'),
     ('        messages = self.chatbot.preprocessed_messages()',
-     '        messages = self.chatbot.preprocessed_messages()\n        if self._scene_data is not None:\n            messages = list(messages)\n            current = next((i for i in range(len(messages) - 1, 0, -1) if messages[i]["role"] == "user"), len(messages))\n            messages.insert(current, {"role": "user", "content": "Untrusted camera reference data: " + json.dumps(self._scene_data)})'),
+     '        messages = self.chatbot.preprocessed_messages()\n        if self._scene_data is not None:\n            messages = list(messages)\n            current = next((i for i in range(len(messages) - 1, 0, -1) if messages[i]["role"] == "user"), len(messages))\n            messages.insert(current, {"role": "user", "content": "Untrusted camera reference data: " + __import__("json").dumps(self._scene_data)})'),
     ('            if tool_calls:', '            if tool_calls and not scene_tools_blocked and not self._scene_tools_blocked:'),
 ]
 for old, new in scene_patches:
@@ -97,5 +98,49 @@ def private_logs(source):
 
 (output / 'unmute_handler.py').write_text(private_logs(handler))
 manager = (args.unmute_root / 'unmute/mcp/mcp_manager.py').read_text()
+# The bridge can spend 5 s connecting + 2.5 s looking up + 7 s confirming a save.
+# Keep its outer deadline above that budget, and retain uncertainty if the child dies.
+manager_tree = ast.parse(manager)
+manager_class = next(n for n in manager_tree.body if isinstance(n, ast.ClassDef) and any(isinstance(m, ast.AsyncFunctionDef) and m.name == 'execute_tool' for m in n.body))
+execute = next(n for n in manager_class.body if isinstance(n, ast.AsyncFunctionDef) and n.name == 'execute_tool')
+execute.name = '_nodie_execute_tool'
+timeouts = [n for n in ast.walk(execute) if isinstance(n, ast.Call) and ast.unparse(n.func) == 'asyncio.wait_for' and n.args and ast.unparse(n.args[0]) == 'process.stdout.readline()']
+if len(timeouts) != 1:
+    raise SystemExit('Unsupported MCP tool deadline; inspect upstream')
+next(k for k in timeouts[0].keywords if k.arg == 'timeout').value = ast.parse("20.0 if tool_name == 'reverie.save_memory' else 10.0", mode='eval').body
+wrapper = ast.parse('''
+async def execute_tool(self, tool_name, arguments):
+    saving = tool_name == 'reverie.save_memory'
+    if saving and getattr(self, '_nodie_uncertain_save', False):
+        return __import__('json').dumps({'status': 'not-saved', 'reason': 'A previous save is unconfirmed. Further saves are paused until stored notes are checked and the backend is restarted.'})
+    try:
+        result = await self._nodie_execute_tool(tool_name, arguments)
+        if saving:
+            try:
+                status = __import__('json').loads(result).get('status')
+            except (ValueError, AttributeError, TypeError):
+                status = 'unknown'
+            if status not in ('saved', 'not-saved'):
+                self._nodie_uncertain_save = True
+                return __import__('json').dumps({'status': 'unknown', 'reason': 'Saving was not confirmed and might have committed. Do not retry automatically. Check stored notes before restarting the backend.'})
+        return result
+    except asyncio.CancelledError:
+        if saving:
+            self._nodie_uncertain_save = True
+        raise
+    except Exception:
+        if not saving:
+            raise
+        self._nodie_uncertain_save = True
+        return __import__('json').dumps({'status': 'unknown', 'reason': 'Saving was not confirmed and might have committed. Do not retry automatically. Check stored notes before restarting the backend.'})
+''').body[0]
+manager_class.body.append(wrapper)
+manager = ast.unparse(ast.fix_missing_locations(manager_tree))
+
 (output / 'mcp_manager.py').write_text(private_logs(manager))
 print('Prepared tool-independent speech startup.')
+
+# Preserve installed speaker integration when the base adapter is regenerated.
+if args.with_speakers or (output / 'chatbot.py').exists():
+    import subprocess, sys
+    subprocess.run([sys.executable, str(Path(__file__).with_name('prepare-speakers.py')), str(args.unmute_root)], check=True)

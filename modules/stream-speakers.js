@@ -1,13 +1,13 @@
 /** Independent bounded recordings; never delay the Unmute audio transport. */
 class StreamSpeakers {
-    constructor(api, publish, { Recorder = globalThis.MediaRecorder, duration = 4000 } = {}) {
+    constructor(api, publish, { Recorder = globalThis.MediaRecorder, duration = 4000, now = () => Date.now() } = {}) {
         if (!Number.isInteger(duration) || duration < 1 || duration > 4000) throw new Error('Invalid speaker recording duration');
-        Object.assign(this, { api, publish, Recorder, duration }); this.generation = 0;
+        Object.assign(this, { api, publish, Recorder, duration, now }); this.generation = 0;
     }
     emit(observation) {
         const encoded = JSON.stringify(observation);
-        if (encoded === this.lastObservation) return;
-        this.lastObservation = encoded; this.publish(observation);
+        if (encoded === this.lastObservation && (observation === null || this.now() - this.lastPublished < 5000)) return;
+        this.lastObservation = encoded; this.lastPublished = this.now(); this.publish(observation);
     }
     start(stream) { this.stop(); this.stream = stream; const generation = this.generation; void this.cycle(generation); }
     async cycle(generation) {

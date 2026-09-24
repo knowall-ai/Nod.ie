@@ -5,9 +5,14 @@ const { chromium } = require('playwright');
 (async () => {
     const root = path.join(__dirname, '..');
     const source = 'data:image/png;base64,' + (await fs.readFile(path.join(root, 'icon.png'))).toString('base64');
-    const browser = await chromium.launch({ headless: true });
+    const server = await chromium.launchServer({ headless: true });
+    const browser = await chromium.connect(server.wsEndpoint());
+    const shutdown = async () => {
+        const kill = setTimeout(() => { server.process().kill('SIGKILL'); }, 2000);
+        try { await server.close(); } finally { clearTimeout(kill); }
+    };
     let expired = false;
-    const deadline = setTimeout(() => { expired = true; void browser.close().catch(() => {}); }, 10000);
+    const deadline = setTimeout(() => { expired = true; void shutdown().catch(() => {}); }, 10000);
     try {
         const page = await browser.newPage();
         for (const scale of [1, 2, 3]) {
@@ -25,5 +30,5 @@ const { chromium } = require('playwright');
             if (expired) throw new Error('Tray image generation timed out');
             await fs.writeFile(path.join(root, 'assets/icons', `tray${scale === 1 ? '' : '@' + scale + 'x'}.png`), Buffer.from(png, 'base64'));
         }
-    } finally { clearTimeout(deadline); await browser.close(); }
+    } finally { clearTimeout(deadline); await shutdown(); }
 })().catch(error => { console.error(error.message); process.exitCode = 1; });

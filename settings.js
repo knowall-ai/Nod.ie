@@ -62,7 +62,7 @@ load().catch(error);
 async function loadSpeakers() {
     const status = await api.speakerStatus();
     el('speaker-enabled').checked = status.enabled;
-    el('speaker-status').textContent = status.enabled ? 'Enabled for local and Unmute voice modes (Unmute requires the recognition backend overlay).' : 'Disabled. No new voice profiles are collected.';
+    el('speaker-status').textContent = status.enabled ? 'Enabled. Learn voice profiles in local voice mode first; Unmute matches existing profiles only and requires its backend overlay.' : 'Disabled. No new voice profiles are collected.';
     el('speaker-profiles').replaceChildren();
     if (!status.profiles.length) el('speaker-profiles').textContent = 'No voice profiles learned yet.';
     const label = profile => `${profile.name || 'Unfamiliar speaker'} (${profile.id.slice(0, 8)})`;
@@ -96,7 +96,12 @@ async function loadSpeakers() {
         el('speaker-profiles').append(row);
     }
 }
-el('speaker-enabled').onchange = () => api.speakerEnabled(el('speaker-enabled').checked).then(loadSpeakers).catch(error);
+el('speaker-enabled').onchange = async () => {
+    const input=el('speaker-enabled'), previous=!input.checked;input.disabled=true;
+    try {await api.speakerEnabled(input.checked);await loadSpeakers();}
+    catch(err) {input.checked=previous;error(err);try {await loadSpeakers();}catch {el('speaker-status').textContent='Recognition status could not be confirmed.';}}
+    finally {input.disabled=false;}
+};
 el('speaker-forget').onclick = () => { if (window.confirm('Remove all voice profiles and disable recognition? Reverie memories will remain.')) api.speakerForget().then(loadSpeakers).catch(error); };
 
 async function loadFaces() {
@@ -119,7 +124,12 @@ async function loadFaces() {
         row.append(label, input, save, remove, targets, merge); el('face-profiles').append(row);
     }
 }
-el('face-enabled').onchange = () => api.faceEnabled(el('face-enabled').checked).then(loadFaces).catch(error);
+el('face-enabled').onchange = async () => {
+    const input=el('face-enabled'), previous=!input.checked;input.disabled=true;
+    try {await api.faceEnabled(input.checked);await loadFaces();}
+    catch(err) {input.checked=previous;error(err);try {await loadFaces();}catch {el('face-status').textContent='Recognition status could not be confirmed.';}}
+    finally {input.disabled=false;}
+};
 el('face-refresh').onclick = () => loadFaces().catch(error);
 el('face-forget').onclick = () => { if (confirm('Delete every face profile and disable recognition?')) api.faceForget().then(loadFaces).catch(error); };
 loadFaces().catch(error);

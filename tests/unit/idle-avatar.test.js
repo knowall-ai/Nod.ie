@@ -35,7 +35,7 @@ test('idle gestures leave bounded quiet pauses and speech cancels the next gestu
 
 test('a head tilt cannot be selected again within one minute',()=>{
  const h=harness();h.idle.scheduleNext();h.run();assert.equal(h.idle.clip.name,'nodie-head-tilt');
- h.idle.scheduleNext();h.run();assert.notEqual(h.idle.clip.name,'nodie-head-tilt');h.idle.dispose();
+ h.idle.scheduleNext();h.run();assert.notEqual(h.idle.clip.name,'nodie-head-tilt');h.idle.scheduleNext();h.run();assert.notEqual(h.idle.clip.name,'nodie-head-tilt');h.idle.dispose();
 });
 
 test('a stale play rejection cannot hide a newer motion-preference playback',async()=>{

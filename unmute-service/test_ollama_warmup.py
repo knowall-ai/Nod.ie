@@ -30,15 +30,18 @@ class WarmupTests(unittest.IsolatedAsyncioTestCase):
             return True
         with patch.object(warmup, '_refresh', refresh):
             caller = asyncio.create_task(warmup.ensure_warm('http://localhost:11434', 'test'))
-            await entered.wait()
-            task = warmup._task
-            caller.cancel()
-            with self.assertRaises(asyncio.CancelledError):
-                await caller
-            self.assertFalse(task.cancelled())
-            self.assertIs(warmup.start_warmup('http://localhost:11434', 'test'), task)
-            release.set()
-            await task
+            try:
+                await asyncio.wait_for(entered.wait(), timeout=5)
+                task = warmup._task
+                caller.cancel()
+                with self.assertRaises(asyncio.CancelledError):
+                    await caller
+                self.assertFalse(task.cancelled())
+                self.assertIs(warmup.start_warmup('http://localhost:11434', 'test'), task)
+            finally:
+                release.set()
+                if warmup._task is not None:
+                    await asyncio.wait_for(warmup._task, timeout=5)
 
     async def test_residency_cache_and_post_turn_refresh(self):
         with patch.object(warmup, '_load') as load:
@@ -55,6 +58,17 @@ class WarmupTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(load.call_count, 2)
             os.environ['NODIE_OLLAMA_WARMUP'] = '0'
             self.assertIsNone(warmup.start_warmup('http://localhost:11434', 'test'))
+
+    async def test_total_deadline_cancels_slow_load_and_releases_resources(self):
+        released = asyncio.Event()
+        async def slow(*args):
+            try:
+                while True: await asyncio.sleep(.005)
+            finally: released.set()
+        with patch.object(warmup, '_load', slow), patch.object(warmup, 'LOAD_DEADLINE', .03):
+            self.assertFalse(await warmup._refresh('http://localhost:11434', 'test'))
+            self.assertTrue(released.is_set())
+            self.assertEqual(warmup._ready_until, 0)
 
 if __name__ == '__main__':
     unittest.main()

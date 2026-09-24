@@ -39,3 +39,20 @@ for captured,current,expected in [(False,False,True),(True,False,False),(False,T
  result=eval(compile(ast.Expression(conditions[0]),'guard','eval'),dict(tool_calls=[{}],scene_tools_blocked=captured,self=h))
  assert result==expected
 print('Scene schema, policy separation, persistent tool isolation and in-flight guard: PASS')
+
+# Run the real insertion code with the rest of the function retained after a return.
+# Keeping unreachable code preserves Python local-name binding (including inner imports).
+import copy, types
+method=copy.deepcopy(next(n for n in ast.walk(tree) if isinstance(n,ast.AsyncFunctionDef) and n.name=='_generate_response_task'))
+start=next(i for i,n in enumerate(method.body) if isinstance(n,ast.Assign) and ast.unparse(n.targets[0])=='messages')
+method.body=method.body[start:start+2]+[ast.Return(value=ast.Name(id='messages',ctx=ast.Load()))]+method.body[start+2:]
+ast.fix_missing_locations(method)
+exec(compile(ast.Module(body=[method],type_ignores=[]),'response-entry','exec'),ns)
+history=[{'role':'system','content':'Policy'},{'role':'user','content':'Current question'}]
+for scene in [{'status':'camera-off'},{'status':'snapshot','description':'A chair'}]:
+ fake=types.SimpleNamespace(chatbot=types.SimpleNamespace(preprocessed_messages=lambda:history),_scene_data=scene)
+ result=asyncio.run(ns['_generate_response_task'](fake,2))
+ assert result[0]==history[0] and result[-1]==history[-1]
+ assert result[1]['role']=='user' and scene['status'] in result[1]['content']
+ assert len(history)==2
+print('Actual response entry with camera off and snapshot: PASS')

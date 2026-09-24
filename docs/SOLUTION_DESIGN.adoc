@@ -4,7 +4,7 @@ Nod.ie is a local voice assistant with an Electron overlay and a loopback browse
 
 === Voice modes
 
-* `local`: opt-in continuous conversation. Click the microphone to enable listening; recording submits after sustained voice energy followed by 900 ms of quiet. Click again to submit manually; recording stops after 30 seconds at most. Ten seconds without detected speech discards the quiet recording locally and starts a fresh bounded recording while listening remains enabled. The microphone is released before transcription and stays physically closed during replies, then resumes automatically while enabled. The microphone button or a spoken microphone-off action ends the loop. Existing Whisper, Ollama and TTS services process each turn. This avoids starting the dedicated Unmute STT/TTS models.
+* `local`: continuous conversation starts after a healthy connection on desktop; the browser requires clicking the microphone to enable listening; recording submits after sustained voice energy followed by 900 ms of quiet. Click again to submit manually; recording stops after 30 seconds at most. Ten seconds without detected speech discards the quiet recording locally and starts a fresh bounded recording while listening remains enabled. The microphone is released before transcription and stays physically closed during replies, then resumes automatically while enabled. The microphone button or a spoken microphone-off action ends the loop. Existing Whisper, Ollama and TTS services process each turn. This avoids starting the dedicated Unmute STT/TTS models.
 * `realtime`: the shared WebSocket connection sends Opus pages to Unmute, restores sessions with the system prompt after disconnects, and uses bounded reconnection backoff. Capture and playback implementations are shared between desktop and browser.
 
 Local mode uses the configured small transcription model on demand, the existing Ollama model and an already-running TTS service. It does not start containers, load embedding models, or schedule background inference. Availability probes check service reachability; a real recorded turn is the acceptance test.
@@ -29,7 +29,7 @@ Dragging uses native desktop-independent coordinates and the full display bounds
 
 Nod.ie chooses her own spoken wording. Application code supplies verified facts and structured events, controls timing and permissions, and selects the delivery channel. The language model composes the utterance within factual, length and tone constraints. Do not use fixed spoken scripts or a rotating list of prewritten announcements. If generation fails, show a factual status instead of silently substituting canned speech. Stable control labels, accessibility text and technical errors remain deterministic.
 
-The requested future unfamiliar-person notification is spoken, but its wording must be generated from an event describing an unmatched face and the recognition uncertainty. Recognition must never establish permission to perform privileged actions. Camera capture, family enrolment and speaker identification are not implemented by the current controls change.
+The requested future unfamiliar-person notification is spoken, but its wording must be generated from an event describing an unmatched face and the recognition uncertainty. Recognition must never establish permission to perform privileged actions. Camera capture, family enrolment and speaker identification are described in the optional recognition sections below.
 
 === Assistant implementation context
 
@@ -120,4 +120,4 @@ The desktop optionally records four-second, standalone WebM samples from the exi
 
 The backend accepts a typed `speaker_observation` field. It expires after eight seconds and is inserted as untrusted user-level reference data into a copy of the model messages, never into system instructions or durable conversation history. An audio window may span multiple turns; identification is advisory and is not authentication or authorization. Speaker capture does not open another microphone or wait before sending speech.
 
-This extends PR #29. Its local voice mode supports conversational naming; the Unmute integration currently uses names assigned in Settings > People. Conversational naming through an Unmute tool and real household accuracy/calibration remain follow-up work. This branch is a draft until those and live duplex validation are complete.
+Local voice mode supports conversational naming and enrolment. Unmute matches existing profiles and uses names assigned in Settings > People. Conversational naming through Unmute and real household accuracy/calibration remain follow-up work.

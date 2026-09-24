@@ -103,4 +103,6 @@ Warm-up has a 90-second HTTP timeout and failures permit the normal completion p
 
 Background speaker samples match existing profiles without enrolling unfamiliar voices. Enrol a profile through a deliberate local voice turn. The complete background analysis has a 1.8-second caller deadline; a still-settling storage operation retains its slot so later samples cannot overlap it. Disabled recognition publishes its cleared observation once, and recording durations cannot exceed four seconds.
 
-Prepare all backend overlays from the same checkout and generated directory: run `prepare-backend.py` before `prepare-speakers.py`. The latter retains the scene and memory patches. Regenerating the base requires rerunning the speaker adapter.
+Prepare all backend overlays from the same checkout and generated directory using `python3 unmute-service/prepare-backend.py /path/to/unmute --with-speakers`. Regenerating the base preserves an already-installed speaker adapter; rerunning the speaker patch is idempotent.
+
+Memory saves have a 20-second outer tool deadline, exceeding the bridge’s 5-second connection, 2.5-second lookup and 7-second write budgets. Unknown results, process errors and cancellation pause further saves in the backend as well as the bridge; search remains available. Check stored notes and wait for upstream work to settle before restarting the backend to clear that latch.

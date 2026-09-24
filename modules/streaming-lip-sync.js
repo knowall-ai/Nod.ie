@@ -13,16 +13,18 @@ class StreamingLipSync {
             this.closing.then(() => { if (generation === this.generation) this.push(frame, rate); });
             return;
         }
-        if (this.length && this.rate !== rate) this.flush();
+        if (this.rate !== rate) { if(this.length)this.flush(); this.pastPCM=null; }
         this.rate = rate;
         this.renderer.state.avatarManager?.idle?.prepareSpeech();
         clearTimeout(this.flushTimer);
         const generation = this.generation, limit = Math.floor(rate * .64);
+        this.collecting=true;
         for (let offset = 0; offset < frame.length && generation === this.generation;) {
             const count = Math.min(limit - this.length, frame.length - offset);
             this.samples.push(frame.slice(offset, offset + count)); this.length += count; offset += count;
             if (this.length === limit) this.flush();
         }
+        this.collecting=false;this.renderNext();
         if (this.length) this.flushTimer = setTimeout(() => this.flush(), 150);
     }
     /** Queue PCM immediately and prepare the corresponding video job. */
@@ -47,7 +49,7 @@ class StreamingLipSync {
         this.pastPCM=history.slice(history.length-keep);
         try { this.scheduleAudio(job, this.generation); }
         catch { this.cancel(); this.renderer.showNotification('Speech playback failed.', 'error'); return; }
-        this.jobs.push(job); this.renderNext();
+        this.jobs.push(job); if(!this.collecting)this.renderNext();
     }
     /** Render video serially without blocking audio scheduling. */
     async renderNext() {
@@ -74,7 +76,8 @@ class StreamingLipSync {
         if (rate % 25 !== 0) return {audio:job.audio};
         const next=this.jobs[0];
         let future;
-        if(next) future=next.audio.subarray(44,44+rate*.16*2);
+        if(next) future=new DataView(next.audio.buffer).getUint32(24,true)===rate ? next.audio.subarray(44,44+rate*.16*2) : new Uint8Array();
+        else if(this.rate!==rate) future=new Uint8Array();
         else {
             const length=Math.min(this.length,Math.floor(rate*.16));
             future=new Uint8Array(length*2);const view=new DataView(future.buffer);let at=0;

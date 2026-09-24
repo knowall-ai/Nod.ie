@@ -41,3 +41,14 @@ test('native helper shutdown waits for close and kills a stuck child within the 
     await closeHelper(child,10);assert.equal(ended,true);assert.equal(killed,true);
     const normal=new EventEmitter();normal.stdin={end(){setImmediate(()=>normal.emit('close'))}};normal.kill=()=>assert.fail('should close without killing');await closeHelper(normal,100);
 });
+
+test('helper exit does not finish cleanup before its pipes close',async()=>{
+ const {closeHelper}=require('../../lib/window-hit-test');const child=new EventEmitter();child.exitCode=1;child.stdin={end(){}};child.kill=()=>{};
+ let done=false;const closing=closeHelper(child,100).then(()=>{done=true});await new Promise(r=>setImmediate(r));assert.equal(done,false);child.emit('close');await closing;
+});
+test('native input helper restarts after failure and republishes current geometry',async()=>{
+ const {nativeInputRegion}=require('../../lib/window-hit-test');const children=[];const win=new EventEmitter();win.webContents=new EventEmitter();win.isDestroyed=()=>false;win.getNativeWindowHandle=()=>Buffer.alloc(4);
+ const spawn=()=>{const child=new EventEmitter();child.writes=[];child.stdin=Object.assign(new EventEmitter(),{writable:true,write:x=>child.writes.push(x),end:()=>setImmediate(()=>child.emit('close'))});child.stdout=new EventEmitter();child.stderr=new EventEmitter();child.kill=()=>child.emit('close');children.push(child);return child};
+ const tracker=nativeInputRegion(win,null,{spawn});tracker.setRegions(geometry);win.emit('ready-to-show');children[0].emit('close',1);
+ await new Promise(r=>setTimeout(r,280));assert.equal(children.length,2);assert.equal(JSON.parse(children[1].writes[0]).width,300);await tracker.stop();
+});

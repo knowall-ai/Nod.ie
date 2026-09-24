@@ -34,8 +34,8 @@ test('voice gets priority, selected scene is bounded context and off clears it',
 test('camera off during analysis discards late scene, stale scenes expire',async t=>{
  const h=fixture(t);h.advance(2100);let finish;h.api.analyseVision=()=>new Promise(r=>{finish=r;});
  const pending=h.context.analyse(h.frame());await new Promise(r=>setImmediate(r));h.context.setActive(false);finish({status:'ready',description:'old scene'});await pending;
- assert.equal(h.context.scene,null);assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/old scene/);
- h.context.active=true;h.context.scene={description:'stale',capturedAt:new Date(0).toISOString()};h.context.update();assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/stale/);
+ assert.equal(h.context.scene,null);assert.equal(h.sent.at(-1).session.scene_data.status,'camera-off');
+ h.context.active=true;h.context.scene={description:'stale',capturedAt:new Date(0).toISOString()};h.context.update();assert.equal(h.sent.at(-1).session.scene_data.status,'camera-on-awaiting-analysis');
 });
 
 test('explicit camera enable gets a first snapshot despite voice activity; later work yields',async t=>{
@@ -43,7 +43,7 @@ test('explicit camera enable gets a first snapshot despite voice activity; later
  let finish;h.api.analyseVision=()=>new Promise(r=>{finish=r;});const pending=h.context.analyse(h.frame());await new Promise(r=>setImmediate(r));
  const before=h.cancels();h.context.voiceEvent({type:'response.created'});assert.equal(h.cancels(),before);
  finish({status:'ready',description:'A chair.'});await pending;assert.equal(h.context.initialCapture,false);
- assert.equal(h.context.status,'snapshot');h.context.setActive(false);assert.equal(h.context.status,'camera-off');
+ assert.equal(h.context.status,'snapshot');assert.ok(!h.sent.at(-1).session.instructions.text.includes(Context.PENDING_ANALYSIS_MESSAGE));h.context.setActive(false);assert.equal(h.context.status,'camera-off');assert.ok(!h.sent.at(-1).session.instructions.text.includes(Context.PENDING_ANALYSIS_MESSAGE));
  h.context.setActive(true);assert.equal(h.context.status,'camera-on-awaiting-analysis');assert.equal(h.context.canAnalyse(),true);
  assert.ok(h.sent.at(-1).session.instructions.text.includes(Context.PENDING_ANALYSIS_MESSAGE));
 });

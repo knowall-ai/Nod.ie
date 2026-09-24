@@ -77,6 +77,11 @@ class AvatarManager {
     }
 
     initializeCanvas() {
+        if (this.disposed) return;
+        this.scaleQuery?.removeEventListener('change', this.onScale);
+        this.onScale = () => { this.initializeCanvas(); this.idle?.resizeCanvas(); };
+        this.scaleQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+        this.scaleQuery.addEventListener('change', this.onScale);
         console.log('🎭 initializeCanvas called');
         const canvasEl = document.getElementById('avatar-canvas');
         if (!canvasEl) {
@@ -416,6 +421,7 @@ class AvatarManager {
     cleanup() {
         this.setSpeechVideo(false);
         this.disposed = true;
+        this.scaleQuery?.removeEventListener('change', this.onScale);
         this.idle?.dispose();
         this.musetalkWsClient?.disconnect();
         this.clearFrameQueue();

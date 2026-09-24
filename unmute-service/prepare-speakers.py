@@ -14,6 +14,11 @@ def replace_once(source, old, new):
     return source.replace(old, new)
 schema_path = output / 'openai_realtime_api_events.py'
 schema = (schema_path if schema_path.exists() else args.unmute_root / 'unmute/openai_realtime_api_events.py').read_text()
+if 'class SpeakerObservation(BaseModel):' in schema:
+    if 'nodie_speakers' not in (output / 'unmute_handler.py').read_text() or 'nodie_speakers' not in (output / 'chatbot.py').read_text():
+        raise SystemExit('Incomplete speaker adapter; rerun prepare-backend.py --with-speakers')
+    print('Speaker observations already prepared.')
+    raise SystemExit(0)
 schema = replace_once(schema, 'class SessionConfig(BaseModel):', '''class SpeakerObservationItem(BaseModel):
     name: str | None = Field(default=None, max_length=80)
     uncertain: bool = True

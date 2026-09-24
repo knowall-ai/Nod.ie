@@ -142,3 +142,10 @@ test('non-frame-divisible sample rates keep whole PCM samples and omit context t
  assert.equal(request.trim,undefined);assert.equal(request.audio.readUInt32LE(40)%2,0);
  assert.equal(request.audio.readUInt32LE(24),44101);
 });
+
+test('a decoded batch supplies future context before its first render starts',async t=>{
+ let request;const h=harness((audio,trim)=>{request={audio:Buffer.from(audio),trim};return new Promise(()=>{})});t.after(()=>h.queue.cancel());
+ h.queue.push(new Float32Array(70000),48000);
+ assert.equal(h.sources.length,2);assert.equal(request.trim.frameCount,16);
+ assert.equal(request.audio.readUInt32LE(40),48000*.8*2);
+});
