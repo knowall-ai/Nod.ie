@@ -5,11 +5,11 @@ const os = require('node:os');
 const path = require('node:path');
 const Transcript = require('../../modules/streaming-transcript');
 const { ConversationHistory } = require('../../lib/conversation-history');
-async function fixture(t) {
+async function fixture(t, options) {
  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nodie-transcript-'));
  t.after(() => fs.rm(dir, {recursive:true,force:true}));
  const store = new ConversationHistory(path.join(dir,'local.json'));
- const transcript = new Transcript({transcriptSession:()=>store.load(),saveTranscript:(epoch,turn)=>store.upsert(epoch,turn)},()=>assert.fail('save failed'));
+ const transcript = new Transcript({transcriptSession:()=>store.load(),saveTranscript:(epoch,turn)=>store.upsert(epoch,turn)},()=>assert.fail('save failed'),options);
  await transcript.start(); t.after(()=>transcript.finish()); return {store,transcript};
 }
 test('Unmute spoken text and user words survive restart; internal generation is excluded',async t=>{
@@ -71,4 +71,13 @@ test('unknown transcript fields are rejected at store and HTTP boundaries',async
   assert.equal(response.status,400);
  }
  assert.deepEqual((await store.load()).turns,[]);
+});
+
+test('Unmute word events match upstream STT and spoken TTS spacing',async t=>{
+ const {store,transcript:s}=await fixture(t,{wordDeltas:true});
+ for(const delta of ['Hello','Nodie.']) s.event({type:'conversation.item.input_audio_transcription.delta',delta});
+ s.event({type:'response.created'});
+ for(const delta of ['Hello',' Ben.',' How','are','you?']) s.event({type:'response.text.delta',delta});
+ await s.finish();
+ assert.deepEqual((await store.load()).turns.map(x=>x.content),['Hello Nodie.','Hello Ben. How are you?']);
 });

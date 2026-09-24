@@ -38,4 +38,4 @@ Reverie 0.5.2 does not expose a completion flag for empty semantic searches. The
 
 Settings > People lists learned voice profiles with their name, last-heard time and retained sample count. Rename a profile, remove it, or explicitly merge a duplicate into a chosen destination. Merges keep the destination name and both sets of voice embeddings (up to eight per person, 64 overall); matching uses the best sample instead of averaging distinct embeddings. Removal and merging require confirmation and invalidate pending observations so old recognition results cannot restore deleted identities. These actions do not alter Reverie memories.
 
-Face profiles are shown as not connected until the face-recognition pipeline exists. No face records are invented from camera previews. Speaker identification currently applies to local voice mode, not the Unmute transport.
+Face profiles have a separate Settings panel and are not linked to voice identities. Local voice turns can enrol speakers; background Unmute sampling matches existing profiles when the recognition backend overlay is installed.

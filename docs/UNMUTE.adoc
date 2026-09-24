@@ -74,7 +74,7 @@ The dependency directory and memory bridge are mounted read-only; no additional 
 Memory results are supplied as untrusted reference data instead of system instructions, without the legacy 100-character truncation.
 The generated handler and MCP-manager overrides omit variable data from diagnostic log messages, including transcripts, tool arguments, memory contents and subprocess environments.
 A memory outage must be reported as unavailable, not as proof that no memories exist.
-Recognition and persistent conversation-history integration remain separate work.
+Speaker observations and local transcripts are described below; saved transcripts are not automatically replayed into model context.
 
 The bridge also exposes `reverie.save_memory`; see the memory chapter for limits, persistence confirmation and failure behavior.
 The TTS startup stages only the selected demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
@@ -85,7 +85,7 @@ Decoded audio carries a response generation. Interruptions invalidate queued out
 
 Unmute saves received user speech text and the speech generator's `response.text.delta` events in `~/.config/nodie/conversations/local.json`.
 The private, mode-0600 file keeps at most 12 messages, each limited to 2,000 UTF-16 code units, with message timestamps and a 60 KB serialized bound for streaming writes.
-Partial turns are checkpointed every 500 ms; turn boundaries and disconnects flush pending text. An abrupt crash may lose the final checkpoint interval.
+The Unmute adapter joins its word-level STT/TTS events using the upstream whitespace rules; generic text-fragment streams remain literal. Partial turns are checkpointed every 500 ms; turn boundaries and disconnects flush pending text. An abrupt crash may lose the final checkpoint interval.
 The settings Clear History control clears these transcripts too; stale pending writes cannot restore erased text.
 Only text is retained: no microphone audio, generated audio, internal reasoning, tool results or transcript text in diagnostic logs.
 This records recognized/generated text, not proof of every sound played: voice-model noises may have no corresponding word.
@@ -102,3 +102,5 @@ The adapter preloads the configured model when a voice client is created and awa
 Warm-up has a 90-second HTTP timeout and failures permit the normal completion path to attempt recovery. Logs contain only fixed success/failure events and elapsed milliseconds. A failed warm-up is retried on a subsequent call; a recently successful pre-turn warm-up is cached for 60 seconds. Retaining Qwen uses GPU memory but does not continuously generate tokens. Tests exercise interruption shielding, shared loading, cache/refresh behavior and retry after failure.
 
 Background speaker samples match existing profiles without enrolling unfamiliar voices. Enrol a profile through a deliberate local voice turn. The complete background analysis has a 1.8-second caller deadline; a still-settling storage operation retains its slot so later samples cannot overlap it. Disabled recognition publishes its cleared observation once, and recording durations cannot exceed four seconds.
+
+Prepare all backend overlays from the same checkout and generated directory: run `prepare-backend.py` before `prepare-speakers.py`. The latter retains the scene and memory patches. Regenerating the base requires rerunning the speaker adapter.

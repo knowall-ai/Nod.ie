@@ -1,6 +1,7 @@
 /** Bounded text-only transcript of received STT and spoken-text events. */
 class StreamingTranscript {
-    constructor(api, onError = () => {}) {
+    constructor(api, onError = () => {}, { wordDeltas = false } = {}) {
+        this.wordDeltas = wordDeltas;
         this.api = api; this.onError = onError; this.queue = Promise.resolve(); this.revision = 0;
     }
     async start() {
@@ -20,7 +21,10 @@ class StreamingTranscript {
         if (this.turn?.role !== role) this.finish();
         if (!this.turn && !data.delta.trim()) return;
         if (!this.turn) this.turn = { id: crypto.randomUUID(), role, content: '' };
-        this.turn.content = (this.turn.content + data.delta).slice(0, 2000);
+        // Unmute emits words; generic streams emit literal fragments.
+        // Match upstream Chatbot.add_chat_message_delta only for word events.
+        const separator = this.wordDeltas && /\S$/.test(this.turn.content) && /^\S/.test(data.delta) ? ' ' : '';
+        this.turn.content = (this.turn.content + separator + data.delta).slice(0, 2000);
         if (!this.timer) this.timer = setTimeout(() => { this.timer = null; this.save(); }, 500);
     }
     save() {

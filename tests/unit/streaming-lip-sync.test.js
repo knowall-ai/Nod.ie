@@ -124,3 +124,21 @@ test('frame ranges are bounded before a render request can start',async()=>{
  for(const trim of [{startFrame:-1,frameCount:16},{startFrame:9,frameCount:1},{startFrame:0,frameCount:99},{startFrame:0,frameCount:16,path:'/tmp/x'},{startFrame:NaN,frameCount:16}])
   await assert.rejects(server.render(audio,undefined,trim),/Invalid lip-sync frame range/);
 });
+
+
+test('short final clips pad complete frames without lengthening audible speech',async t=>{
+ for(const length of [1,480,3168,10000]) {
+  let request;const h=harness(async(audio,trim)=>{request={audio:Buffer.from(audio),trim};return new Uint8Array(16)});
+  t.after(()=>h.queue.cancel());h.queue.push(new Float32Array(length),48000);h.queue.flush();await tick();
+  assert.equal(h.sources[0].buffer.duration,length/48000);
+  assert.ok(request.trim.frameCount>=3);
+  const duration=request.audio.readUInt32LE(40)/2/48000;
+  assert.ok((request.trim.startFrame+request.trim.frameCount)/25<=duration);
+ }
+});
+test('non-frame-divisible sample rates keep whole PCM samples and omit context trimming',async t=>{
+ let request;const h=harness(async(audio,trim)=>{request={audio:Buffer.from(audio),trim};return new Uint8Array(16)});
+ t.after(()=>h.queue.cancel());h.queue.push(new Float32Array(28160),44101);h.queue.flush();await tick();
+ assert.equal(request.trim,undefined);assert.equal(request.audio.readUInt32LE(40)%2,0);
+ assert.equal(request.audio.readUInt32LE(24),44101);
+});

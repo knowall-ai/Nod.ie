@@ -2,7 +2,7 @@
 
 [![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/knowall-ai/Nod.ie?label=CodeRabbit+Reviews&labelColor=171717&color=FF570A)](https://coderabbit.ai)
 
-Nod.ie is KnowAll AI's local voice assistant. It offers an Electron overlay and a loopback browser interface, with either an Unmute realtime backend or push-to-talk transcription, Ollama and speech synthesis. Optional Reverie integration provides read-only memory recall.
+Nod.ie is KnowAll AI's local voice assistant. It offers an Electron overlay and a loopback browser interface, with either an Unmute realtime backend or push-to-talk transcription, Ollama and speech synthesis. Optional Reverie integration provides memory recall; the Unmute bridge also supports bounded, confirmed memory saves.
 
 ## Get started
 

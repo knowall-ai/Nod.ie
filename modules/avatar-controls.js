@@ -28,6 +28,7 @@ class AvatarControls {
                 canAnalyse: () => renderer.visionContext.canAnalyse(),
                 onFrame: async frame => {
                     const analysis = renderer.visionContext.analyse(frame);
+                    if (typeof window.nodie?.analyseFaces !== 'function') return analysis;
                     void (async () => {
                     const image = new Uint8Array(await frame.image.arrayBuffer());
                     if (frame.signal.aborted) return;

@@ -3,6 +3,7 @@ class IdleAvatar {
     constructor({enabled=true, avatarEnabled=true}={}) {
         this.video=document.getElementById('avatar-idle');
         this.cover=document.getElementById('avatar-handoff');
+        if (this.cover) this.cover.width=this.cover.height=Math.min(1024,Math.ceil(250*(window.devicePixelRatio||1)));
         this.lastTilt=-Infinity;
         this.clip={name:'nodie-idle',duration:6,blinks:[2.25,4.7]};
         this.enabled=enabled;this.avatarEnabled=avatarEnabled;this.speaking=false;this.generation=0;

@@ -6,7 +6,7 @@ The camera button is an opt-in live preview. It starts off on each launch and sh
 
 In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. A short description and capture timestamp are supplied through a validated `scene_data` session field and a separate user-data message without clearing conversation history. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
 
-Face identification, unsolicited spoken observations and Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
+Face identities are not supplied to voice conversation; unsolicited spoken observations and Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
 
 == Selection policy
 
@@ -30,7 +30,7 @@ Scene text never enters the system instructions. Once a session receives a snaps
 
 Camera startup, including an unanswered permission request or stalled video playback, has a ten-second deadline. Cancelling startup settles immediately and stops any stream that arrives later.
 
-== Local face recognition (separate draft PR)
+== Local face recognition
 
 Face recognition is separate from Qwen scene descriptions. The desktop sends selected JPEG frames to a short-lived, single-threaded CPU worker using OpenCV YuNet (2023 model) and SFace. Models are pinned to OpenCV Zoo revision `47534e27c9851bb1128ccc0102f1145e27f23f98`, with SHA-256 and byte-size verification. YuNet is MIT licensed; SFace is Apache-2.0 licensed. Upstream sources: https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_detection_yunet[YuNet] and https://github.com/opencv/opencv_zoo/tree/47534e27c9851bb1128ccc0102f1145e27f23f98/models/face_recognition_sface[SFace].
 
@@ -50,4 +50,4 @@ python3 scripts/setup-face-models.py
 node --test tests/unit/face-recognition.test.js
 ----
 
-This draft implements local extraction, matching, selected-frame collection and profile management. Pending before user acceptance: typed face observations into Unmute (separate from system instructions), conversational naming with an unambiguous current face, model-worded unknown-person notifications, thumbnail-based disambiguation in Settings, household matching calibration and end-to-end camera/voice load testing. Until those are complete, Nodie does not receive these face identities in her spoken conversation. The settings panel states that limitation explicitly.
+The current implementation provides local extraction, matching, selected-frame collection and profile management. Pending before user acceptance: typed face observations into Unmute (separate from system instructions), conversational naming with an unambiguous current face, model-worded unknown-person notifications, thumbnail-based disambiguation in Settings, household matching calibration and end-to-end camera/voice load testing. Until those are complete, Nodie does not receive these face identities in her spoken conversation. The settings panel states that limitation explicitly.

@@ -15,18 +15,20 @@ from src.utils.camera import get_rotation_matrix
 torch.set_num_threads(2)
 use_gpu=False
 w=LivePortraitWrapper(InferenceConfig(flag_force_cpu=not use_gpu,flag_use_half_precision=use_gpu))
-source=cv2.resize(cv2.imread('/avatars/nodie-default.png'),(512,512));x,y,size=64,0,384
+source=cv2.imread('/avatars/nodie-default.png');x,y,size=128,0,768
+if source is None or source.shape[:2] != (1024,1024): raise RuntimeError('Expected the bundled 1024-pixel portrait')
 crop=source[y:y+size,x:x+size,::-1].copy()
 with torch.inference_mode():
  inp=w.prepare_source(crop);info=w.get_kp_info(inp);features=w.extract_feature_3d(inp);kp=w.transform_keypoint(info)
  baseline=w.parse_output(w.warp_decode(features,kp,kp)['out'])[0].astype(np.float32)
  closed=w.retarget_eye(kp,torch.tensor([[.3,.3,0.]],device=w.device))
  opened=w.retarget_eye(kp,torch.tensor([[.3,.3,.3]],device=w.device))
- mask=np.zeros((size,size),np.float32);cv2.ellipse(mask,(size//2,int(size*.48)),(int(size*.48),int(size*.48)),0,0,360,1,-1);mask=cv2.GaussianBlur(mask,(41,41),0)[...,None]
+ mask=np.zeros((size,size),np.float32);cv2.ellipse(mask,(size//2,int(size*.48)),(int(size*.48),int(size*.48)),0,0,360,1,-1);mask=cv2.GaussianBlur(mask,(81,81),0)[...,None]
  output=Path('/output');output.mkdir(exist_ok=True)
  for stale_frame in output.glob('frame-*.png'):
   if stale_frame.is_file(): stale_frame.unlink()
  preview='--preview' in sys.argv or '--motion-preview' in sys.argv
+ blink_only='--blink' in sys.argv
  gesture=next((name for name in ['tilt','left','right'] if '--'+name in sys.argv),None)
  duration=3 if gesture else 6
  frame_count=75 if gesture else 150
@@ -41,7 +43,7 @@ with torch.inference_mode():
   t=times[i]
   blink=max(0,1-abs(t-2.25)/.18)+max(0,1-abs(t-4.7)/.18)
   if '--preview' in sys.argv: blink=i/(count-1)
-  amplitude=math.sin(math.pi*t/6)**2
+  amplitude=0 if blink_only else math.sin(math.pi*t/6)**2
   # Small but visible pose changes; the wider feathered mask includes the hair.
   rotation=get_rotation_matrix(info['pitch']+amplitude*1.2*math.sin(t*.7),info['yaw']+amplitude*4.0*math.sin(t),info['roll']+amplitude*1.8*math.sin(t*.8))
   if gesture:
@@ -54,7 +56,7 @@ with torch.inference_mode():
   target+= (closed-opened)*min(1,blink)
   target=w.stitching(kp,target)
   rendered=w.parse_output(w.warp_decode(features,kp,target)['out'])[0].astype(np.float32)
-  delta=cv2.resize(rendered-baseline,(size,size))[:,:,::-1]
+  delta=cv2.resize(rendered-baseline,(size,size),interpolation=cv2.INTER_CUBIC)[:,:,::-1]
   frame=source.copy();frame[y:y+size,x:x+size]=np.clip(source[y:y+size,x:x+size].astype(np.float32)+delta*mask,0,255).astype(np.uint8)
   if not preview and (i==0 or i==count-1): frame=source.copy()
   keys.append(frame)

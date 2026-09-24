@@ -1,9 +1,9 @@
 const {test}=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');
-function harness(){
+function harness(devicePixelRatio=1){
  const timers=new Map();let id=0,draws=0;const listeners={};const video={currentTime:0,style:{},play(){this.paused=false;return Promise.resolve()},pause(){this.paused=true},load(){},addEventListener(name,fn){listeners[name]=fn}};
  const cover={width:512,height:512,style:{},getContext:()=>({drawImage(){draws++}})};
  const motion={matches:false,addEventListener(){},removeEventListener(){}};
- const context={Math:Object.assign(Object.create(Math),{random:()=>.999}),module:{exports:{}},window:{matchMedia:()=>motion},document:{getElementById:id=>id==='avatar-idle'?video:cover},setTimeout:(fn,ms)=>{timers.set(++id,{fn,ms});return id},clearTimeout:id=>timers.delete(id)};
+ const context={Math:Object.assign(Object.create(Math),{random:()=>.999}),module:{exports:{}},window:{devicePixelRatio,matchMedia:()=>motion},document:{getElementById:id=>id==='avatar-idle'?video:cover},setTimeout:(fn,ms)=>{timers.set(++id,{fn,ms});return id},clearTimeout:id=>timers.delete(id)};
  vm.runInNewContext(fs.readFileSync('modules/idle-avatar.js','utf8'),context);
  const idle=new context.module.exports.IdleAvatar();
  return {idle,video,cover,motion,timers,listeners,draws:()=>draws,run(){const list=[...timers.values()];timers.clear();list.forEach(t=>t.fn())}};
@@ -46,4 +46,10 @@ test('a stale play rejection cannot hide a newer motion-preference playback',asy
  h.motion.matches=false;h.idle.onMotion();await Promise.resolve();
  reject(new Error('old attempt'));await Promise.resolve();await Promise.resolve();
  assert.equal(h.video.paused,false);assert.equal(h.video.style.opacity,'1');h.idle.dispose();
+});
+
+test('handoff canvas retains detail on scaled displays with bounded allocation',()=>{
+ for(const [scale,pixels] of [[1,250],[2,500],[3,750],[5,1024]]) {
+  const h=harness(scale);assert.equal(h.cover.width,pixels);assert.equal(h.cover.height,pixels);h.idle.dispose();
+ }
 });

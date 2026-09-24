@@ -2,13 +2,13 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
-|f3d9ffa |2026-09-18 |Merge branch 'feat/unmute-neural-lip-sync' into feat/idle-avatar-motion
-|d92eb72 |2026-09-18 |fix: omit redundant AAC track from streamed lip-sync clips
-|6f3c879 |2026-09-18 |fix: address idle lifecycle and rebuild documentation review
-|8f167cd |2026-09-18 |fix: reduce speech video lag and segment crossfading
-|108073c |2026-09-18 |feat: vary idle glances with gentle head motion and occasional tilts
-|9f2574a |2026-09-17 |feat: add lightweight idle blinks and held-frame speech transitions
-|6c66758 |2026-09-17 |Merge branch 'fix/unmute-streaming' into feat/unmute-neural-lip-sync
-|3cb3f19 |2026-09-17 |fix: keep streaming speech independent of neural rendering
+|2f6091d |2026-09-24 |Merge remote-tracking branch 'origin/feat/local-face-recognition' into integrate/reviewed-voice-vision
+|3ce4811 |2026-09-24 |Merge remote-tracking branch 'origin/feat/vision-recognition' into integrate/reviewed-voice-vision
+|9d40757 |2026-09-24 |Merge remote-tracking branch 'origin/feat/unmute-speaker-diarization' into integrate/reviewed-voice-vision
+|bf05d43 |2026-09-24 |Merge remote-tracking branch 'origin/feat/speaker-diarization' into integrate/reviewed-voice-vision
+|c50d8b6 |2026-09-24 |Merge remote-tracking branch 'origin/feat/hybrid-memory-recall' into integrate/reviewed-voice-vision
+|944a728 |2026-09-24 |Merge remote-tracking branch 'origin/feat/unmute-memory-writing' into integrate/reviewed-voice-vision
+|8c06c4a |2026-09-24 |Merge remote-tracking branch 'origin/fix/lip-sync-speech-context' into integrate/reviewed-voice-vision
+|ad7979b |2026-09-24 |Merge remote-tracking branch 'origin/feat/idle-avatar-motion' into integrate/reviewed-voice-vision
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

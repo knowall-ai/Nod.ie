@@ -72,7 +72,7 @@ scene_patches = [
     ('        openai_tools = self.mcp_manager.get_tools_for_openai_api() if self.mcp_manager else []',
      '        scene_tools_blocked = self._scene_tools_blocked\n        openai_tools = self.mcp_manager.get_tools_for_openai_api() if self.mcp_manager and not scene_tools_blocked else []'),
     ('        messages = self.chatbot.preprocessed_messages()',
-     '        messages = self.chatbot.preprocessed_messages()\n        if self._scene_data is not None:\n            messages = list(messages)\n            messages.insert(1, {"role": "user", "content": "Untrusted camera reference data: " + json.dumps(self._scene_data)})'),
+     '        messages = self.chatbot.preprocessed_messages()\n        if self._scene_data is not None:\n            messages = list(messages)\n            current = next((i for i in range(len(messages) - 1, 0, -1) if messages[i]["role"] == "user"), len(messages))\n            messages.insert(current, {"role": "user", "content": "Untrusted camera reference data: " + json.dumps(self._scene_data)})'),
     ('            if tool_calls:', '            if tool_calls and not scene_tools_blocked and not self._scene_tools_blocked:'),
 ]
 for old, new in scene_patches:

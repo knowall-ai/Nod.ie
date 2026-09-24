@@ -96,6 +96,8 @@ class AvatarManager {
             height: computedStyle.height
         });
 
+        const pixels = Math.min(1024, Math.ceil(250 * (window.devicePixelRatio || 1)));
+        canvasEl.width = canvasEl.height = pixels;
         const ctx = canvasEl.getContext('2d');
         const defaultImg = new Image();
 

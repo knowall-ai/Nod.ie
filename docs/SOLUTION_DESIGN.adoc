@@ -106,7 +106,7 @@ A local silent idle clip supplies blinks and subtle pose movement without a resi
 
 == Optional local speaker recognition
 
-Home-testing diarisation runs on CPU in a separate loopback service, using sherpa-onnx, Reverb segmentation and CAM++ embeddings. It starts alongside transcription and has a 1.8-second HTTP deadline. Failure leaves ordinary conversation available. Recognition is off by default; the desktop settings toggle applies immediately and is shared with the local browser backend.
+Home-testing diarisation runs on CPU in a separate loopback service, using sherpa-onnx, Reverb segmentation and CAM++ embeddings. It starts after successful transcription and has a 1.8-second HTTP deadline. Failure leaves ordinary conversation available. Recognition is off by default; the desktop settings toggle applies immediately and is shared with the local browser backend.
 
 Diarisation distinguishes speaker intervals; speaker matching compares those voices with local profiles. At least 1.5 seconds of non-overlapping speech is required. Cosine similarity must exceed 0.8 with a 0.1 margin over the next candidate. Scores from 0.65 to 0.8 remain uncertain rather than creating another profile. These conservative experimental thresholds need household testing and are not calibrated probabilities. Profiles are not authentication and never authorize node actions.
 
