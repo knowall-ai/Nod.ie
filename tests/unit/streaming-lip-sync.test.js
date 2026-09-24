@@ -97,3 +97,30 @@ test('context close cannot block cancellation indefinitely', async()=>{
  const h=harness(()=>new Promise(()=>{}));h.queue.push(new Float32Array(30720),48000);h.queue.context.close=()=>new Promise(()=>{});
  await h.queue.cancel();assert.equal(h.queue.context,null);assert.equal(h.queue.closing,null);
 });
+
+test('neural clips carry past and queued future speech without replaying context audio',async t=>{
+ const pending=[];const h=harness((audio,trim)=>new Promise(resolve=>pending.push({audio,trim,resolve})));t.after(()=>h.queue.cancel());
+ h.queue.push(new Float32Array(30720).fill(.1),48000);
+ h.queue.push(new Float32Array(30720).fill(.2),48000);
+ h.queue.push(new Float32Array(30720).fill(.3),48000);
+ assert.equal(h.sources.length,3);
+ pending[0].resolve(new Uint8Array(16));await tick();
+ const p=pending[1],wav=Buffer.from(p.audio);
+ assert.equal(p.trim.startFrame,8);assert.equal(p.trim.frameCount,16);
+ assert.equal(wav.readUInt32LE(40),Math.round(48000*1.12*2));
+ assert.equal(wav.readInt16LE(44),Math.round(.1*32767));
+ assert.equal(wav.readInt16LE(44+15360*2),Math.round(.2*32767));
+ assert.equal(wav.readInt16LE(44+46080*2),Math.round(.3*32767));
+ assert.ok(Math.abs(h.sources[1].buffer.duration-.64)<1e-9);
+ h.queue.cancel();pending[1].resolve(new Uint8Array(16));await tick();
+ assert.equal(h.queue.pastPCM,null);
+ h.queue.pastPCM=new Uint8Array(8);h.queue.beginResponse();assert.equal(h.queue.pastPCM,null);
+});
+
+test('frame ranges are bounded before a render request can start',async()=>{
+ let audio;const h=harness(async wav=>{audio=wav;return new Uint8Array(16)});
+ h.queue.push(new Float32Array(30720),48000);await tick();h.queue.cancel();
+ const {StreamingLipSync}=require('../../lib/streaming-lip-sync');const server=new StreamingLipSync({url:'http://127.0.0.1:1'});
+ for(const trim of [{startFrame:-1,frameCount:16},{startFrame:9,frameCount:1},{startFrame:0,frameCount:99},{startFrame:0,frameCount:16,path:'/tmp/x'},{startFrame:NaN,frameCount:16}])
+  await assert.rejects(server.render(audio,undefined,trim),/Invalid lip-sync frame range/);
+});
