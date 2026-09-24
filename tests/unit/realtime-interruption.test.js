@@ -62,3 +62,25 @@ test('a new response cancels the previous response avatar-reset timer',async()=>
  await r.handleRealtimeMessage({type:'response.created'});await r.handleRealtimeMessage({type:'response.done'});assert.equal(timers.size,1);
  await r.handleRealtimeMessage({type:'response.created'});assert.equal(timers.size,0);assert.equal(resets,0);
 });
+
+test('desktop readiness runs microphone capture; muted readiness never restarts it',async()=>{
+ for(const platform of ['electron','web']) {
+  let starts=0,stops=0;const analyser={};
+  class Capture {async start(){starts++;}stop(){stops++;}getAnalyser(){return analyser;}}
+  const context={window:{nodie:{platform},AudioCaptureWeb:Capture,addEventListener(){}},document:{readyState:'loading',addEventListener(){}},console:{log(){},debug(){}},module:{exports:{}}};
+  vm.runInNewContext(fs.readFileSync('renderer.js','utf8'),context);const r=context.module.exports;
+  r.setStatus=()=>{};r.hideLoadingText=()=>{};
+  assert.equal(r.state.isMuted,platform!=='electron');r.state.isConnected=true;r.checkIfFullyLoaded();await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(starts,platform==='electron'?1:0);
+  if(platform==='electron')assert.equal(r.state.analyser,analyser);
+  r.state.isMuted=true;r.stopMicrophone();r.checkIfFullyLoaded();await new Promise(resolve=>setImmediate(resolve));assert.equal(starts,platform==='electron'?1:0);
+ }
+});
+test('desktop microphone startup failure restores muted state and reports it',async()=>{
+ let stopped=0,notice;
+ class Capture {async start(){throw Error('permission denied');}stop(){stopped++;}}
+ const context={window:{nodie:{platform:'electron'},AudioCaptureWeb:Capture,addEventListener(){}},document:{readyState:'loading',addEventListener(){}},console:{log(){},debug(){}},module:{exports:{}}};
+ vm.runInNewContext(fs.readFileSync('renderer.js','utf8'),context);const r=context.module.exports;
+ r.setStatus=()=>{};r.showNotification=message=>{notice=message;};r.state.isConnected=true;
+ await r.startMicrophone();assert.equal(stopped,1);assert.equal(r.state.isMuted,true);assert.equal(r.state.audioCapture,null);assert.match(notice,/permission denied/);
+});
