@@ -75,6 +75,7 @@ Deploy the backend with `NODIE_EVENTS_DIR` pointing to the desktop's `~/.config/
 The event detector describes any visible animal using bounded `kind` and `appearance` text fields; species and coat descriptions are not a fixed vocabulary. Dogs, birds, rabbits and unfamiliar animals use the same path as cats. Unknown species may be described as `animal`. These observations remain untrusted model output, not confirmed pet identities. Personal names and appearance facts belong in the user's private animal memories, never in source-code mappings.
 
 The current presence tracker groups equal descriptions. It cannot distinguish two similar-looking animals, and changing descriptions can split observations. Repeated visibility is not proof of room entry or exit. Individual pet tracking and confirmed association with memory remain separate work.
+
 == Recognition confirmation and debug styling
 
 An explicit introduction can offer a local face or voice label. Confirm or cancel using the on-screen prompt; neither a model statement nor a nearby person's spoken confirmation saves a label. The prompt uses the same 32 px button height, 8 px radius and spacing, and 12 px inner padding as the debug controls. In compact mode its buttons lie inside the avatar's native input region. Fullscreen debug uses consistent 24 px outer insets and a slim amber scrollbar with a transparent track; forced-colour mode preserves system scroll colours.
