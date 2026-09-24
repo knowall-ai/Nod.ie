@@ -29,3 +29,8 @@ test('missing memory record does not fall back to another person with the same n
  const resolve=createLinkedResolver(async()=>({callTool:async()=>({content:[{type:'text',text:JSON.stringify([{memory:{_id:8,name:'Alex Example'}}])}]})}),async()=>({people:[{id:'p',faces:[a],voices:[],memory:{id:7,name:'Alex Example'}}]}));
  assert.deepEqual(await resolve({faces:[a],voices:[]}),{people:[]});
 });
+test('unlink during memory lookup discards the in-flight personal brief',async()=>{
+ let finish;let registry={revision:'old',people:[{id:'p',faces:[a],voices:[],memory:{id:7,name:'Alex Example'}}]};
+ const resolver=createLinkedResolver(async()=>({callTool:()=>new Promise(r=>finish=r)}),async()=>registry);
+ const pending=resolver({faces:[a],voices:[]});await new Promise(r=>setImmediate(r));registry={revision:'new',people:[]};finish({content:[{type:'text',text:JSON.stringify([{memory:{_id:7,name:'Alex Example',notes:'private'}}])}]});assert.deepEqual(await pending,{people:[]});
+});

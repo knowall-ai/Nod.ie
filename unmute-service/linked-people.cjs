@@ -9,7 +9,7 @@ function createLinkedResolver(connect,load=readRegistry){
  let cached;
  return async args=>{
   if(!valid(args))throw Error('Invalid recognition references');
-  const registry=await load();
+  const registry=await load(),revision=registry.revision;
   const people=registry.people.filter(p=>p.memory&&((p.faces||[]).some(id=>args.faces.includes(id))||(p.voices||[]).some(id=>args.voices.includes(id)))).slice(0,2);
   if(!people.length)return {people:[]};
   const key=JSON.stringify([registry.revision,people.map(p=>p.id)]);
@@ -23,6 +23,7 @@ function createLinkedResolver(connect,load=readRegistry){
    brief.connections=(row.connections||[]).slice(0,4).map(c=>({name:String(c.memory?.name||'').slice(0,100),relationship:typeof c.relationship==='string'?c.relationship.slice(0,80):String(c.relationship?.type||c.type||'').slice(0,80)}));
    briefs.push(brief);
   }
+  if((await load()).revision!==revision)return {people:[]};
   const result={people:briefs};cached={key,result,until:Date.now()+30000};return result;
  };
 }
