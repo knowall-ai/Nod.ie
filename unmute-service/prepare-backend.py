@@ -21,6 +21,11 @@ source = source.replace(old, '        await ensure_warm(str(self.client.base_url
 # OpenAI-compatible turns reset Ollama's residency to its server default.
 # Refresh through the native API after success/cancellation, without blocking audio.
 start = source.index('        stream = await self.client.chat.completions.create(**create_kwargs)')
+import ast
+line = source[:start].count('\n') + 1
+functions = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.AsyncFunctionDef) and node.lineno <= line <= node.end_lineno]
+if len(functions) != 1 or source.splitlines()[functions[0].end_lineno:]:
+    raise SystemExit('Unsupported adapter layout: streaming function must end the module.')
 body = source[start:]
 source = source[:start] + '        try:\n' + ''.join('    ' + line if line.strip() else line for line in body.splitlines(keepends=True)) + '\n        finally:\n            start_warmup(str(self.client.base_url).removesuffix("/").removesuffix("/v1"), self.model, force=True)\n'
 output = Path(__file__).parent / 'generated'
