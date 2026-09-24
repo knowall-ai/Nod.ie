@@ -4,3 +4,6 @@ services:
     volumes:
       - ${NODIE_MEMORY_DIR:?}/reverie-readonly.cjs:/app/nodie/reverie-readonly.cjs:ro
       - ${NODIE_MEMORY_DIR:?}/generated/unmute_handler.py:/app/unmute/unmute_handler.py:ro
+      - nodie-reverie-models:/tmp/nodie-reverie-models
+volumes:
+  nodie-reverie-models:

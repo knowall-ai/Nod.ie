@@ -21,3 +21,15 @@ Names are limited to 160 characters, facts to 1,500 characters and accumulated n
 The running bridge needs a Neo4j account with create/update permission. Its legacy filename `reverie-readonly.cjs` is retained for compatibility with existing mounts; the bridge now permits the bounded save operation. Memory contents and tool arguments stay out of diagnostic logs. Clearing conversation history does not erase graph memories.
 
 An unconfirmed mutation pauses further saves in that bridge process, preventing another read-modify-write from racing a possibly running request. Check stored notes and restart the bridge only after the upstream operation has settled. Mutation requests have a seven-second deadline to accommodate local embedding work; this is not proof of database cancellation.
+
+== Name variants in streaming conversations
+
+The Unmute memory bridge first uses bounded keyword search. On a miss, it asks Reverie for hybrid keyword and local semantic candidates, sharing a four-second upstream search deadline. Exact names and known aliases retain the fast path. Semantic matches retain their score and match type; they are candidates for clarification, never permission to merge people or redirect a write. Saves still use exact name/alias lookup.
+
+Local CPU embeddings use Reverie's quantized MiniLM model and a persistent Compose cache volume. The first use can download model weights; slow or unavailable embeddings leave keyword retrieval available and mark an incomplete semantic search explicitly. No additional GPU model or cloud embedding provider is configured. Cold-start and CPU contention can still affect latency. `REVERIE_EMBEDDINGS=none` in the bridge process environment disables semantic fallback. Vector arrays are removed from returned memory context without discarding relationships or match metadata.
+
+This PR does not schedule the `dream` tool or expand transcript retention. Confirming ambiguous identities and organising daily conversations are separate workflows.
+
+Existing graphs need stored embeddings for semantic matching. Before first use, an administrator should back up the graph, inspect Reverie's `dream` dry-run report, and apply only an acceptable maintenance plan. This refreshes old embeddings outside a live speech turn. `dream` can also relabel and merge records, so do not run it blindly just to warm a model. Hybrid fallback uses Reverie's default similarity threshold (0.4); scores indicate similarity, not confirmed identity.
+
+Reverie 0.5.2 does not expose a completion flag for empty semantic searches. The bridge reports hybrid retrieval only when a returned row carries semantic-match metadata. Empty or keyword-only fallback results conservatively mark semantic recall incomplete, even when a semantic search may have succeeded without a match.
