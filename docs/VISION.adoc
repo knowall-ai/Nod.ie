@@ -57,4 +57,3 @@ The current implementation provides local extraction, matching, selected-frame c
 Unmute no longer waits for a separate two-sentence scene summary. Selected JPEGs remain capped at 512 KB, 768×576 and 85% quality. Spoken input requests a fresh frame at most once every two seconds; scene changes still pass through the local frame selector. Only the latest image is retained in memory, expires after 75 seconds on both sides, and is removed when the camera is disabled. No additional background vision inference competes with speech. This is snapshot-based visual question answering, not continuous arrival/departure tracking or proactive room narration.
 
 After an image is supplied, model-directed memory tools remain disabled for that connection. Independent person recall is permitted only from microphone transcript text; image text cannot trigger it.
-
