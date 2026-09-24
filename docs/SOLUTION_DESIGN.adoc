@@ -17,7 +17,7 @@ Desktop windows use context isolation, sandboxing, navigation denial and sender-
 
 === Legacy integration
 
-MuseTalk 1.5 is optional in local mode. When LOCAL_LIP_SYNC_URL is configured and avatars are enabled, the synthesized WAV is rendered into a new synchronized speech video. Rendering failures visibly fall back to audio-only playback. The service and its measured resource use are described in the neural lip synchronisation section. Historical diagnostics and experimental modules are retained for reference but are not the supported entry points. The customised external Unmute checkout must be upgraded separately, preserving its MCP changes.
+MuseTalk 1.5 is optional in both local and Unmute modes. When LOCAL_LIP_SYNC_URL is configured and avatars are enabled, the synthesized WAV is rendered into a new synchronized speech video. Rendering failures visibly fall back to audio-only playback. The service and its measured resource use are described in the neural lip synchronisation section. Historical diagnostics and experimental modules are retained for reference but are not the supported entry points. The customised external Unmute checkout must be upgraded separately, preserving its MCP changes.
 
 === Circumference controls and desktop movement
 
@@ -76,13 +76,17 @@ Llama 3.1 8B Q4_K_M and Qwen 3.5 9B Q4_K_M were tested on the RTX 3090 with an 8
 
 Complete voice tests used the same input recording, real recall, four-thread Kokoro and MuseTalk, but generated different replies. Those totals are therefore not a controlled measure of model speed alone. Synthesized audio was not played and no conversation history was persisted. Replies in this sample were longer than the earlier six-second sample. Following this comparison, the user selected Qwen 3.5 9B as the active model to prepare for a separate vision change. Qwen voice requests explicitly disable thinking; separate reasoning fields are never sent to speech. The existing explicit-final-reply safeguard remains in place. This selection prioritises the intended multimodal direction over the measured model-path latency; camera capture and vision are not enabled by switching models.
 
-Request completion does not mean factual correctness: Llama's liquidity definition confused sending with receiving; Qwen added an unsupported “on hold” description to an inactive channel. Both need further quality evaluation. Qwen's current direct-answer behavior often triggers the application's second-call safeguard against speaking tool-selection commentary. Switching models alone does not remove the principal delay: complete speech and neural video generation before playback. Streaming speech/video segments would require a separate playback-pipeline change.
+Request completion does not mean factual correctness: Llama's liquidity definition confused sending with receiving; Qwen added an unsupported “on hold” description to an inactive channel. Both need further quality evaluation. Qwen's current direct-answer behavior often triggers the application's second-call safeguard against speaking tool-selection commentary. Switching models alone does not remove the principal delay: complete speech and neural video generation before playback. The Unmute path now implements segmented video alongside independently scheduled streaming audio; the complete-response delay described here applies to the local voice path.
 
 Automatic end-of-speech detection samples microphone energy every 50 ms while recording, requires 250 ms of sustained voice activity, then allows a 900 ms pause. This is a lightweight energy detector, not semantic sentence detection; loud background noise can delay submission and a long mid-sentence pause can submit early. Manual submission and the 30-second limit remain available. The detector stops on submission, cancellation and microphone release, with no microphone polling while idle.
 
 Ollama chat requests retain the active model for 30 minutes after use. The previous default idle expiry unloaded Qwen between conversations; a measured first load added about 13 seconds before answer generation. The finite keep-alive avoids repeated loads during a session while allowing GPU memory to be reclaimed after longer inactivity. It does not perform inference while idle or remove cold-start delay after expiry.
 
 Continuous listening is opt-in for each application session and is not restored automatically after a restart. The microphone button reflects the enabled loop, with a tooltip explaining temporary capture pauses during replies. Cancelled generations cannot reopen capture. Empty transcriptions retry at most twice before disabling the loop with a clear error; other service failures stop the loop. Expected desktop voice errors cross IPC as safe structured failures rather than Electron transport exception text.
+
+=== Streaming Unmute avatar playback
+
+MuseTalk also supports Unmute: decoded PCM is queued independently of GPU rendering, and short video segments follow the audio clock. Local voice retains complete-response rendering; Unmute uses a fixed initial buffer and discards video that misses its playback window. Both paths support cancellation.
 
 == Spoken identity and avatar branding
 
