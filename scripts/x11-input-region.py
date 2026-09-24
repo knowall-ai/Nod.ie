@@ -131,6 +131,7 @@ def main():
                     if len(line) > 8192:
                         raise ValueError('Input region message too large')
                     data = json.loads(line)
+                    cached = None
                     changed = True
                 if len(pending) > 8192:
                     raise ValueError('Input region message too large')
