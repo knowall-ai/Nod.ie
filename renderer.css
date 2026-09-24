@@ -327,10 +327,10 @@ body[data-platform="electron"] #circle { touch-action: none; user-select: none; 
 #control-camera .camera-preview[hidden], #control-camera img[hidden] { display: none; }
 #control-camera[data-on="true"] { background: #291507; border-color: #f5a623; }
 
-/* Button centres lie on the 125px avatar radius, at -40 and -60 degrees. */
+/* Button centres lie on the 125px avatar radius, at -40 and -57 degrees. */
 #control-fullscreen, #control-tray { width:28px; height:28px; padding:5px; border-width:1.5px; box-sizing:border-box; }
 #control-fullscreen { left:231.76px; top:55.65px; }
-#control-tray { left:198.5px; top:27.75px; }
+#control-tray { left:204.08px; top:31.17px; }
 #control-fullscreen svg, #control-tray svg { width:16px; height:16px; flex-shrink:0; fill:none; stroke:#291507; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
 body.fullscreen { background:radial-gradient(ellipse at center,#28313c,#10151b); }
 body.fullscreen #circle, body.fullscreen #waveform { transform:translate(-50%,-50%) scale(var(--avatar-scale,1)); }
