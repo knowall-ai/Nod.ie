@@ -28,6 +28,7 @@ def _worker(connection, factory):
 class DeadlineEngine:
     def __init__(self, factory, startup_timeout=15):
         self.factory = factory
+        self.startup_timeout = startup_timeout
         self.lock = threading.Lock()
         self.process = None
         self.connection = None
@@ -45,6 +46,7 @@ class DeadlineEngine:
         self.process = context.Process(target=_worker, args=(child, self.factory), daemon=True)
         self.ready = False
         self.process.start()
+        self.startup_deadline = time.monotonic() + self.startup_timeout
         child.close()
 
     def _receive(self, deadline):
@@ -68,7 +70,12 @@ class DeadlineEngine:
         try:
             if self.process is None:
                 self._start()
-            self._wait_ready(deadline)
+            if not self.ready:
+                if self.process.is_alive() and not self.connection.poll():
+                    if time.monotonic() >= self.startup_deadline:
+                        raise TimeoutError('Worker startup deadline exceeded')
+                    raise BusyError('Analysis worker is starting')
+                self._wait_ready(deadline)
             self.connection.send(body)
             status, result = self._receive(deadline)
             if status == 'invalid':
@@ -76,11 +83,12 @@ class DeadlineEngine:
             if status != 'result':
                 raise RuntimeError('Invalid worker result')
             return result
-        except ValueError:
+        except (ValueError, BusyError):
             raise
         except Exception:
             self.close()
-            # The next request starts a fresh process inside its own deadline.
+            # Let the replacement warm up independently of request deadlines.
+            self._start()
             raise
         finally:
             self.lock.release()
