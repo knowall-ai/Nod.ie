@@ -57,3 +57,11 @@ Additional non-blocking follow-ups: cap permanently failing X11 helper restarts 
 == Head-motion endpoint correction
 
 Adjacent-frame measurements found a discontinuity in all four head-motion clips: endpoint differences of 1.46–1.61 grayscale levels versus median interior differences of 0.095–0.133 (256×256 analysis). Matching the stitched neutral reference and easing the neural residual over eight frames reduces endpoint differences below 0.02 grayscale levels. Clips remain 25 fps at 768×768; the blink-only clip is also rebuilt against the aligned reference. These measurements address encoded pose jumps, not desktop dropped frames or speech rendering throughput. The neutral reference now uses the same stitching transform as moving poses. All five clips are rebuilt from that aligned reference, with easing applied before CRF 18 encoding.
+
+== Sustained speech recovery and direct vision
+
+The streaming renderer now skips jobs unlikely to finish before their audio ends, decays stale timing estimates and retries after transient failures. A failed render no longer disables all video for the remainder of a reply. Gaps over 250 ms return to idle instead of holding an indefinitely frozen mouth. Audio timing remains independent.
+
+A controlled headless Chromium comparison used fourteen 640 ms clips and synthetic render delays, without GPU inference. At 450 ms per render, displayed frame callbacks were 220 before and 218 after. At 720 ms per render, callbacks increased from 64 to 128, while p95 frame gaps fell from 383 to 300 ms; the worst gap increased from 650 to 767 ms because unrecoverably late clips are skipped. With the first render failing, the old path displayed zero frames for the whole reply; the revised path recovered and displayed 200. These are controlled playback measurements, not physical desktop frame-rate guarantees. Offscreen preloading was tested and removed because it worsened normal playback. GPU throughput remains a limit under concurrent workloads.
+
+A real request through the voice model's OpenAI-compatible endpoint, with an attached JPEG of the bundled portrait, correctly identified the shirt color and Bitcoin logo in 1.45 seconds. This verifies multimodal delivery; it does not establish real-room object-recognition accuracy.

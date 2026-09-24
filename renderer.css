@@ -326,3 +326,12 @@ body[data-platform="electron"] #circle { touch-action: none; user-select: none; 
 #control-camera .camera-preview { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: inherit; pointer-events: none; }
 #control-camera .camera-preview[hidden], #control-camera img[hidden] { display: none; }
 #control-camera[data-on="true"] { background: #291507; border-color: #f5a623; }
+
+#control-fullscreen { left:17px; top:93px; font-size:25px; }
+#control-tray { left:42px; top:58px; font-size:25px; }
+body.fullscreen { background:radial-gradient(ellipse at center,#28313c,#10151b); }
+body.fullscreen #circle, body.fullscreen #waveform { transform:translate(-50%,-50%) scale(var(--avatar-scale,1)); }
+body.fullscreen #avatar-controls { position:fixed; inset:auto auto 24px 50%; width:max-content; height:auto; display:flex; gap:12px; transform:translateX(-50%); }
+body.fullscreen .orbit-control { position:static; width:44px; height:44px; }
+
+body[data-platform="electron"].fullscreen { display:flex; align-items:center; justify-content:center; height:100vh; }

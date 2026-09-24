@@ -1,13 +1,13 @@
 const test=require('node:test');const assert=require('node:assert/strict');const fs=require('node:fs');const vm=require('node:vm');
-function harness(render){
-    const urls=[],players=[],sources=[];let cancels=0;
+function harness(render,{preload=false}={}){
+    const urls=[],revoked=[],players=[],sources=[];let cancels=0;
     class AudioContext { constructor(){this.currentTime=0} resume(){return Promise.resolve()} close(){return Promise.resolve()} createGain(){return {gain:{value:1},connect(){},disconnect(){}}} createBuffer(_channels,count,rate){return {duration:count/rate,getChannelData:()=>new Float32Array(count)}} createBufferSource(){const source={connect(){},disconnect(){},start(at){this.at=at},stop(){this.stopped=true}};sources.push(source);return source} }
-    class Player {constructor(){players.push(this)}play(){this.started=true;return Promise.resolve()}pause(){this.paused=true}removeAttribute(){}load(){}}
-    const video=new Player();
-    const context={AudioContext,module:{exports:{}},window:{nodie:{renderLipSegment:render,cancelLipSync:async()=>{cancels++}}},document:{getElementById:()=>video},Audio:Player,Blob,Float32Array,Uint8Array,DataView,setTimeout,clearTimeout,URL:{createObjectURL:()=>{const url='blob:'+urls.length;urls.push(url);return url},revokeObjectURL(){}}};
+    class Player {constructor(){this.currentTime=0;this.style={};players.push(this);if(preload)this.cloneNode=()=>new Player()}play(){this.started=true;return Promise.resolve()}pause(){this.paused=true}removeAttribute(){}load(){this.loads=(this.loads||0)+1}replaceWith(other){activeVideo=other}}
+    const video=new Player();let activeVideo=video;
+    const context={AudioContext,module:{exports:{}},window:{nodie:{renderLipSegment:render,cancelLipSync:async()=>{cancels++}}},document:{getElementById:()=>activeVideo},Audio:Player,Blob,Float32Array,Uint8Array,DataView,setTimeout,clearTimeout,URL:{createObjectURL:()=>{const url='blob:'+urls.length;urls.push(url);return url},revokeObjectURL:url=>revoked.push(url)}};
     vm.runInNewContext(fs.readFileSync('modules/streaming-lip-sync.js','utf8'),context);
     const errors=[];const renderer={state:{avatarEnabled:true,speakerMuted:false,avatarManager:{setSpeechVideo(){}}},showNotification:x=>errors.push(x)};
-    return {queue:new context.module.exports.StreamingLipSync(renderer),video,players,sources,errors,urls,cancels:()=>cancels};
+    return {queue:new context.module.exports.StreamingLipSync(renderer),video,players,sources,errors,urls,revoked,cancels:()=>cancels};
 }
 const tick=()=>new Promise(r=>setImmediate(r));
 test('streaming PCM is scheduled before video resolves and preserves segment order',async()=>{
@@ -157,4 +157,31 @@ test('24 kHz trailing 5500 samples are padded before frame trimming, including p
  const {audio,trim}=pending[1];assert.equal(trim.startFrame,8);assert.equal(trim.frameCount,6);
  assert.equal(audio.readUInt32LE(40)/2/24000,(trim.startFrame+trim.frameCount)/25);
  pending[1].resolve(new Uint8Array(16));await tick();assert.equal(h.errors.length,0);
+});
+
+test('one failed render does not disable animation for the remaining reply',async t=>{
+ let calls=0;const h=harness(async()=>{if(++calls===1)throw Error('transient busy');return new Uint8Array(16)},{preload:true});t.after(()=>h.queue.cancel());
+ h.queue.push(new Float32Array(61440),48000);await tick();assert.equal(calls,1);
+ await new Promise(r=>setTimeout(r,550));assert.equal(calls,2);assert.equal(h.urls.length,1);assert.equal(h.sources.length,2);
+});
+test('rendering skips jobs that cannot meet the measured deadline',async t=>{
+ const h=harness(async()=>new Uint8Array(16));t.after(()=>h.queue.cancel());
+ h.queue.rendering={};h.queue.push(new Float32Array(92160),48000);
+ h.queue.renderSeconds=.8;h.queue.context.currentTime=.9;h.queue.rendering=null;await h.queue.renderNext();
+ assert.equal(h.queue.activeJob.source,h.sources[1]);assert.equal(h.sources.length,3);
+});
+test('cancelling recovery releases queued preloads and cannot start more renders',async()=>{
+ let calls=0;const h=harness(async()=>{calls++;throw Error('busy')},{preload:true});
+ h.queue.push(new Float32Array(61440),48000);await tick();await h.queue.cancel();
+ await new Promise(r=>setTimeout(r,550));assert.equal(calls,1);assert.equal(h.queue.retryTimer,null);
+});
+
+test('a cold-render estimate cannot permanently starve later video',async t=>{
+ const h=harness(async()=>new Uint8Array(16));t.after(()=>h.queue.cancel());h.queue.renderSeconds=2.5;h.queue.beginResponse();
+ h.queue.push(new Float32Array(30720),48000);await tick();assert.equal(h.urls.length,1);
+});
+test('deadline estimate decays during a reply so one slow render cannot starve it',async t=>{
+ const h=harness(async()=>new Uint8Array(16));t.after(()=>h.queue.cancel());h.queue.renderSeconds=2.5;
+ for(let i=0;i<6;i++){h.queue.push(new Float32Array(30720),48000);await tick();h.queue.context.currentTime+=.64;}
+ assert.ok(h.urls.length>0);
 });

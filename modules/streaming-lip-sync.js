@@ -51,24 +51,44 @@ class StreamingLipSync {
         catch { this.cancel(); this.renderer.showNotification('Speech playback failed.', 'error'); return; }
         this.jobs.push(job); if(!this.collecting)this.renderNext();
     }
+    /** Dispose a preloaded/active clip exactly once, including cancelled queues. */
+    disposeVideo(job) {
+        if(!job)return;
+        if(job.player){job.player.onerror=null;job.player.pause();job.player.removeAttribute('src');job.player.load();job.player=null;}
+        if(job.url){URL.revokeObjectURL(job.url);job.url=null;}
+    }
     /** Render video serially without blocking audio scheduling. */
     async renderNext() {
         if(this.rendering || !this.jobs.length || this.ready.length >= 2) return;
-        const generation=this.generation, token=this.rendering={};
-        const job=this.jobs.shift();
-        if (job.ended) { this.rendering=null; this.renderNext(); return; }
+        if(this.retryAt>Date.now()) {
+            if(!this.retryTimer)this.retryTimer=setTimeout(()=>{this.retryTimer=null;this.renderNext();},this.retryAt-Date.now());
+            return;
+        }
+        // Do not spend GPU time on frames that cannot arrive before their audio ends.
+        let job;
+        while(this.jobs.length){
+            const candidate=this.jobs.shift();
+            if(!candidate.ended && this.context && candidate.until-this.context.currentTime>(this.renderSeconds || .45)+.04){job=candidate;break;}
+            this.disposeVideo(candidate);this.renderSeconds=Math.max(.05,(this.renderSeconds||.45)*.85);
+        }
+        if(!job)return;
+        const generation=this.generation, token=this.rendering={},started=Date.now();
         try {
-            if(!this.failed && this.enabled()) {
+            if(this.enabled()) {
                 const {audio,trim}=this.contextAudio(job);
                 job.video=await window.nodie.renderLipSegment(audio,trim);
             }
         } catch {
-            if(generation===this.generation) { this.failed=true; this.renderer.showNotification('Lip sync unavailable; continuing with audio.', 'error'); }
+            if(generation===this.generation) {
+                this.retryAt=Date.now()+500;
+                if(!this.failureReported){this.failureReported=true;this.renderer.showNotification('Lip sync is catching up; audio continues.','info');}
+            }
         }
-        if(generation!==this.generation || this.rendering!==token) return;
+        if(generation!==this.generation || this.rendering!==token)return;
         this.rendering=null;
-        if (!job.ended && this.context && this.context.currentTime < job.until) this.ready.push(job);
-        this.playNext(); this.renderNext();
+        if(job.video){this.renderSeconds=Math.max(.05,Math.min(2.5,Math.max((this.renderSeconds||0)*.8,(Date.now()-started)/1000)));this.failureReported=false;}
+        if(job.video && !job.ended && this.context && this.context.currentTime<job.until){this.ready.push(job);}
+        this.playNext();this.renderNext();
     }
     /** Preserve neighbouring phonemes while rendering only this clip's frames. */
     contextAudio(job) {
@@ -116,29 +136,31 @@ class StreamingLipSync {
             // The last audio may have no video (expired render or decoder failure).
             if(!this.sources.size) this.release(false);
             else if(this.activeJob===job) this.release();
-            this.ready=this.ready.filter(item=>!item.ended);this.playNext();this.renderNext();
+            this.ready=this.ready.filter(item=>{if(item.ended){this.disposeVideo(item);return false;}return true;});this.playNext();this.renderNext();
         };
         source.start(job.at);
     }
     /** Present ready video against its existing audio playback deadline. */
     async playNext() {
         if(this.activeJob) return;
-        this.ready=this.ready.filter(job=>!job.ended && this.context && this.context.currentTime<job.until);
+        this.ready=this.ready.filter(job=>{if(job.ended || !this.context || this.context.currentTime>=job.until){this.disposeVideo(job);return false;}return true;});
         if(!this.ready.length) return;
+        clearTimeout(this.gapTimer);
         const generation=this.generation, job=this.activeJob=this.ready.shift(); this.renderNext();
+        this.renderer.state.avatarManager?.idle?.prepareSpeech();
         const video=job.video && this.enabled() ? document.getElementById('avatar-video') : null;
         if(!video) return; // Audio is scheduled independently and never waits for video decoding.
-        const player=this.player=video;
-        this.url=URL.createObjectURL(new Blob([job.video], {type:'video/mp4'}));
+        const player=this.player=job.player=video;
+        job.url=URL.createObjectURL(new Blob([job.video],{type:'video/mp4'}));player.src=job.url;player.loop=false;player.muted=true;player.playbackRate=1;player.load();
         if(this.renderer.state.avatarManager?.idle) player.style.opacity='0';
-        player.src=this.url;player.loop=false;player.muted=true;player.playbackRate=1;player.load();
         const fail=()=>{ if(generation===this.generation && this.player===player) this.renderer.state.avatarManager?.setSpeechVideo(false); };
         player.onerror=fail;
         this.videoTimer=setTimeout(async()=>{
             if(generation!==this.generation || this.player!==player || this.activeJob!==job || job.ended) return;
             if (this.context.currentTime >= job.until) { this.release(); this.playNext(); return; }
             // A late video catches up to the independent audio clock; it never delays speech.
-            player.currentTime=Math.max(0,this.context.currentTime-job.at);
+            const offset=Math.max(0,this.context.currentTime-job.at);
+            if(offset>=.04)player.currentTime=offset;
             this.renderer.state.avatarManager?.setSpeechVideo(true);
             try {
                 await player.play();
@@ -161,18 +183,21 @@ class StreamingLipSync {
     /** Release the active video and its object URL. */
     release(continuing = [...this.sources].some(source => source !== this.activeJob?.source)) {
         this.renderer.state.avatarManager?.idle?.holdSpeech(this.player, continuing);
-        clearTimeout(this.videoTimer);clearTimeout(this.syncTimer); this.activeJob=null;
-        if(this.player) { this.player.onended=null;this.player.onerror=null;this.player.pause();this.player.removeAttribute('src');this.player.load();this.player=null; }
-        if(this.url) URL.revokeObjectURL(this.url); this.url=null;
+        clearTimeout(this.videoTimer);clearTimeout(this.syncTimer);
+        this.disposeVideo(this.activeJob);this.activeJob=null;this.player=null;
         this.renderer.state.avatarManager?.setSpeechVideo(false);
+        clearTimeout(this.gapTimer);
+        if(continuing)this.gapTimer=setTimeout(()=>{if(!this.player)this.renderer.state.avatarManager?.idle?.holdSpeech(null,false);},250);
     }
     /** Permit video rendering again after a previous response failed. */
-    beginResponse() { this.pastPCM=null; this.failed=false; this.firstSegment=true; }
+    beginResponse() { this.renderSeconds=Math.min(this.renderSeconds||.45,.6);this.pastPCM=null; this.failureReported=false; this.firstSegment=true; }
     /** Apply the speaker preference to independently scheduled PCM. */
     setMuted(muted) { if(this.gain) this.gain.gain.value=muted?0:1; }
     /** Invalidate pending work and stop all audio and video immediately. */
     cancel() {
-        ++this.generation;this.pastPCM=null; clearTimeout(this.flushTimer);this.samples=[];this.length=0;this.jobs=[];this.ready=[];this.rendering=null;this.release(false);
+        ++this.generation;this.pastPCM=null;clearTimeout(this.flushTimer);clearTimeout(this.retryTimer);this.retryTimer=null;this.retryAt=0;
+        for(const job of this.ready)this.disposeVideo(job);
+        this.samples=[];this.length=0;this.jobs=[];this.ready=[];this.rendering=null;this.release(false);
         for(const source of this.sources) {source.onended=null;try{source.stop();}catch{}source.disconnect();}
         this.sources.clear();this.gain?.disconnect();this.gain=null;
         const context = this.context; this.nextStart=0;

@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|65f9d27 |2026-09-24 |fix: align idle animation poses and remove head jolts
 |73e60dc |2026-09-24 |test: verify final reviewer edge cases and record review disposition
 |8229370 |2026-09-24 |fix: preserve local replies and memory uncertainty across reconnects
 |eb8ee4b |2026-09-24 |fix: address integration reviews and reduce animation and recognition overhead
@@ -9,6 +10,5 @@
 |2f6091d |2026-09-24 |Merge remote-tracking branch 'origin/feat/local-face-recognition' into integrate/reviewed-voice-vision
 |3ce4811 |2026-09-24 |Merge remote-tracking branch 'origin/feat/vision-recognition' into integrate/reviewed-voice-vision
 |9d40757 |2026-09-24 |Merge remote-tracking branch 'origin/feat/unmute-speaker-diarization' into integrate/reviewed-voice-vision
-|bf05d43 |2026-09-24 |Merge remote-tracking branch 'origin/feat/speaker-diarization' into integrate/reviewed-voice-vision
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

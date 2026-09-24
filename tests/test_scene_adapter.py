@@ -45,14 +45,40 @@ print('Scene schema, policy separation, persistent tool isolation and in-flight 
 import copy, types
 method=copy.deepcopy(next(n for n in ast.walk(tree) if isinstance(n,ast.AsyncFunctionDef) and n.name=='_generate_response_task'))
 start=next(i for i,n in enumerate(method.body) if isinstance(n,ast.Assign) and ast.unparse(n.targets[0])=='messages')
-method.body=method.body[start:start+2]+[ast.Return(value=ast.Name(id='messages',ctx=ast.Load()))]+method.body[start+2:]
+end=next(i for i in range(start,len(method.body)) if isinstance(method.body[i],ast.If) and 'self._scene_data' in ast.unparse(method.body[i].test))+1
+method.body=method.body[start:end]+[ast.Return(value=ast.Name(id='messages',ctx=ast.Load()))]+method.body[end:]
 ast.fix_missing_locations(method)
 exec(compile(ast.Module(body=[method],type_ignores=[]),'response-entry','exec'),ns)
 history=[{'role':'system','content':'Policy'},{'role':'user','content':'Current question'}]
-for scene in [{'status':'camera-off'},{'status':'snapshot','description':'A chair'}]:
- fake=types.SimpleNamespace(chatbot=types.SimpleNamespace(preprocessed_messages=lambda:history),_scene_data=scene)
+import sys, importlib.util, base64
+from datetime import datetime, timezone, timedelta
+spec=importlib.util.spec_from_file_location('unmute.scene_context',root.parent/'scene_context.py')
+scene_module=importlib.util.module_from_spec(spec);spec.loader.exec_module(scene_module)
+sys.modules['unmute.scene_context']=scene_module
+recall_spec=importlib.util.spec_from_file_location('unmute.person_recall',root.parent/'person_recall.py')
+recall_module=importlib.util.module_from_spec(recall_spec);recall_spec.loader.exec_module(recall_module)
+sys.modules['unmute.person_recall']=recall_module
+image=base64.b64encode(b'\xff\xd8a\xff\xd9').decode()
+for scene in [{'status':'camera-off'},{'status':'snapshot','imageJpeg':image,'capturedAt':datetime.now(timezone.utc).isoformat()}]:
+ fake=types.SimpleNamespace(chatbot=types.SimpleNamespace(preprocessed_messages=lambda:history,chat_history=history),_scene_data=scene,mcp_manager=None)
  result=asyncio.run(ns['_generate_response_task'](fake,2))
- assert result[0]==history[0] and result[-1]==history[-1]
- assert result[1]['role']=='user' and scene['status'] in result[1]['content']
- assert len(history)==2
-print('Actual response entry with camera off and snapshot: PASS')
+ assert result[-1]==history[-1] and len(history)==2
+ assert history[0]['content']=='Policy'
+ if scene['status']=='snapshot':
+  assert 'state: ON' in result[0]['content']
+  assert result[1]['content'][1]['image_url']['url']=='data:image/jpeg;base64,'+image
+ else:
+  assert 'state: OFF' in result[0]['content'] and len(result)==2
+for bad in ['not-base64',base64.b64encode(b'not JPEG').decode(),'a'*682669]:
+ result=scene_module.scene_messages(history,{'status':'snapshot','imageJpeg':bad,'capturedAt':datetime.now(timezone.utc).isoformat()})
+ assert len(result)==2 and 'state: ON' in result[0]['content']
+for seconds in [76,-10]:
+ result=scene_module.scene_messages(history,{'status':'snapshot','imageJpeg':image,'capturedAt':(datetime.now(timezone.utc)-timedelta(seconds=seconds)).isoformat()})
+ assert len(result)==2 and 'state: ON' in result[0]['content']
+print('Direct image insertion, trusted device state, expiry, validation and history isolation: PASS')
+
+# Execute the actual downstream metric expression with multimodal content.
+word_count=next(n.value for n in ast.walk(tree) if isinstance(n,ast.Assign) and any(isinstance(t,ast.Name) and t.id=='num_words_sent' for t in n.targets))
+multimodal=scene_module.scene_messages(history,{'status':'snapshot','imageJpeg':image,'capturedAt':datetime.now(timezone.utc).isoformat()})
+assert eval(compile(ast.Expression(word_count),'multimodal-metrics','eval'),{'messages':multimodal})>0
+print('Actual downstream word counter accepts image messages: PASS')

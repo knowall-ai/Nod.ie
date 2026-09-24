@@ -27,6 +27,9 @@ services:
     volumes:
       - ${NODIE_UNMUTE_DIR:?}/generated/mcp.json:/app/.mcp.json:ro
       - ${NODIE_UNMUTE_DIR:?}/mcp-trial.json:/app/.mcp.local.json:ro
+      - ${NODIE_UNMUTE_DIR:?}/person_recall.py:/app/unmute/person_recall.py:ro
+      - ${NODIE_UNMUTE_DIR:?}/person-recall.cjs:/app/nodie/person-recall.cjs:ro
+      - ${NODIE_UNMUTE_DIR:?}/scene_context.py:/app/unmute/scene_context.py:ro
       - ${NODIE_UNMUTE_DIR:?}/ollama_warmup.py:/app/unmute/ollama_warmup.py:ro
       - ${NODIE_UNMUTE_DIR:?}/generated/llm_utils.py:/app/unmute/llm/llm_utils.py:ro
       - ${NODIE_UNMUTE_DIR:?}/generated/openai_realtime_api_events.py:/app/unmute/openai_realtime_api_events.py:ro
