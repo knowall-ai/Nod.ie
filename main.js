@@ -17,7 +17,7 @@ function start() {
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
     const voice = new LocalVoice({ logger, historyStore, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
-    let mainWindow, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
+    let mainWindow, pointerTracker, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
     const stopDrag = () => { updateDrag?.(); clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; updateDrag = null; return dragMoved; };
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
     const isLocalFrame = (event, file) => event.senderFrame === event.sender.mainFrame && event.senderFrame.url === pathToFileURL(path.join(__dirname, file)).href;
@@ -87,6 +87,10 @@ function start() {
             throw error;
         }
     }, true);
+    ipcMain.on('overlay-hit-regions', (event, value) => {
+        if (!trusted(event) || event.sender !== mainWindow?.webContents) return;
+        try { pointerTracker?.setRegions(value); } catch { logger.write('warn', 'overlay.invalid-hit-regions'); }
+    });
     ipcMain.on('begin-drag', event => {
         if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
         const { screen } = require('electron');
@@ -131,6 +135,8 @@ function start() {
         mainWindow = secureWindow({ width: 300, height: 300, title: 'Nod.ie', frame: false, transparent: true, alwaysOnTop: true, resizable: false, skipTaskbar: true, ...(process.platform === 'linux' ? { type: 'dock' } : {}) }, 'index.html');
         // A Linux dock overlay avoids KWin's normal-window panel avoidance and resize drift.
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
+        const input = require('./lib/window-hit-test');
+        pointerTracker = process.platform === 'linux' && process.env.DISPLAY ? input.nativeInputRegion(mainWindow, logger) : input.trackPointer(mainWindow, require('electron').screen, () => Boolean(dragTimer));
         const position = store.get('position');
         const { screen } = require('electron');
         const area = screen.getPrimaryDisplay().workArea;
@@ -148,7 +154,19 @@ function start() {
         monitor.start().catch(() => logger.write('error', 'updates.monitor-failed'));
         logger.write('info', 'desktop.started');
     }).catch(error => { logger.write('error', 'desktop.start-failed', { code: error.code || 'unknown' }); app.quit(); });
-    app.on('before-quit', () => { app.isQuitting = true; stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {}); mainWindow?.webContents.send('app-will-quit'); });
+    let quitCleanup = false;
+    app.on('before-quit', event => {
+        if (quitCleanup) return;
+        event.preventDefault();
+        if (app.isQuitting) return;
+        app.isQuitting = true;
+        stopDrag(); monitor?.stop(); diagnostics.stop(); voice.close().catch(() => {});
+        mainWindow?.webContents.send('app-will-quit');
+        (async () => {
+            try { await pointerTracker?.stop(); }
+            finally { quitCleanup = true; app.quit(); }
+        })().catch(() => {});
+    });
     app.on('will-quit', () => globalShortcut.unregisterAll());
     app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus(); });
 }

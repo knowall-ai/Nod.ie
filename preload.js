@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('nodie', {
     onToggleMute: (fn) => subscribe('toggle-mute', fn),
     onConfigChanged: (fn) => subscribe('config-changed', fn),
     onQuit: (fn) => subscribe('app-will-quit', fn),
+    setHitRegions: value => ipcRenderer.send('overlay-hit-regions', value),
     beginDrag: () => ipcRenderer.send('begin-drag'),
     endDrag: () => ipcRenderer.invoke('end-drag'),
     getDiagnostics: () => ipcRenderer.invoke('diagnostics-status'),
