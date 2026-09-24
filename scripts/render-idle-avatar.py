@@ -24,6 +24,8 @@ with torch.inference_mode():
  opened=w.retarget_eye(kp,torch.tensor([[.3,.3,.3]],device=w.device))
  mask=np.zeros((size,size),np.float32);cv2.ellipse(mask,(size//2,int(size*.48)),(int(size*.48),int(size*.48)),0,0,360,1,-1);mask=cv2.GaussianBlur(mask,(41,41),0)[...,None]
  output=Path('/output');output.mkdir(exist_ok=True)
+ for stale_frame in output.glob('frame-*.png'):
+  if stale_frame.is_file(): stale_frame.unlink()
  preview='--preview' in sys.argv or '--motion-preview' in sys.argv
  gesture=next((name for name in ['tilt','left','right'] if '--'+name in sys.argv),None)
  duration=3 if gesture else 6
