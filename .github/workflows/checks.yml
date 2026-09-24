@@ -20,6 +20,7 @@ jobs:
         run: |
           python3 -m pip install numpy==2.4.3
           python3 tests/test_recognition_context.py
+          python3 tests/test_speaker_intervals.py
       - name: Check neural service and model setup syntax
         run: python3 -m py_compile musetalk-service/neural_api.py scripts/setup-neural-models.py
       - run: npm audit --audit-level=high

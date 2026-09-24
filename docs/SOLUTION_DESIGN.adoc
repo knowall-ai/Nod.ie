@@ -125,3 +125,5 @@ A separate bounded model request interprets explicit introductions without a fix
 Unfamiliar identities can prompt a naturally worded question at most once per eligible observation and with a five-minute profile cooldown. Seeing one or two people only narrows possible candidates; off-camera speech and television remain possible. Recognition is never authentication and cannot authorize privileged actions.
 
 Local voice mode supports conversational naming and enrolment. Unmute matches existing profiles and uses names assigned in Settings > People. Conversational naming through Unmute and real household accuracy/calibration remain follow-up work.
+
+The diarizer can emit intervals inside its padded inference window beyond the submitted audio. Those intervals are clipped to the recording duration; padding-only intervals are discarded before matching and attribution. A four-second, 24 kHz synthetic WAV took 118 ms on the local two-thread CPU engine after initialization. This checks pipeline latency and bounds, not household recognition accuracy.

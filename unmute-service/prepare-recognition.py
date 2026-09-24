@@ -82,6 +82,13 @@ h=patch(h,'        messages = self.chatbot.preprocessed_messages()','''        m
 # Pass EndWord through without delaying ordinary transcription or interruption.
 root=Path(__import__('sys').argv[1]);stt=(root/'unmute/stt/speech_to_text.py').read_text()
 stt=patch(stt,'                    case STTEndWordMessage():\n                        continue','                    case STTEndWordMessage():\n                        yield message')
+class PrivateLogs(ast.NodeTransformer):
+ def visit_Call(self,node):
+  self.generic_visit(node)
+  if isinstance(node.func,ast.Attribute) and isinstance(node.func.value,ast.Name) and node.func.value.id=='logger':
+   node.args=[ast.Constant('STT transport event; private details omitted')];node.keywords=[]
+  return node
+stt=ast.unparse(ast.fix_missing_locations(PrivateLogs().visit(ast.parse(stt))))+'\n'
 chatbot=(p/'chatbot.py').read_text()
 chatbot=patch(chatbot,"observation, received = getattr(self, 'nodie_speakers', (None, 0))","observation, received = (None, 0)  # exact-clock context is injected by the handler")
 for name,value in [('chatbot.py',chatbot),('openai_realtime_api_events.py',s),('unmute_handler.py',h),('speech_to_text.py',stt)]:ast.parse(value);(p/name).write_text(value)

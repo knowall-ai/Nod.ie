@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|4e880b3 |2026-09-24 |Keep unknown identities ephemeral and resolve recognition review blockers
 |9d9219c |2026-09-24 |Validate recognition UI and bound naming-model inference
 |a85728b |2026-09-24 |Connect timed recognition and confirmed conversational naming
 |f931675 |2026-09-24 |Address Opus review of timezone failure and model example
@@ -9,6 +10,5 @@
 |cb41234 |2026-09-24 |Merge pull request #55 from knowall-ai/feat/daily-event-journal
 |6c11828 |2026-09-24 |Merge pull request #54 from knowall-ai/fix/head-turn-ghosting
 |0142631 |2026-09-24 |Address journal review findings and connect read-only Lightning context
-|6e11ea8 |2026-09-24 |Clarify separate blink and head-gesture rendering paths
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===
