@@ -24,6 +24,7 @@ class VisionContext {
             if(frame.signal.aborted || sequence!==this.sequence || !this.active)return;
             if(image.length<4 || image.length>512000 || image[0]!==255 || image[1]!==216 || image.at(-2)!==255 || image.at(-1)!==217)return {retry:true};
             let binary='';for(let i=0;i<image.length;i+=8192)binary+=String.fromCharCode(...image.subarray(i,i+8192));
+            this.renderer.debugStream?.add('Camera','Fresh image supplied to conversation model');
             this.scene={imageJpeg:btoa(binary),capturedAt:frame.capturedAt};this.lastAnalysis=this.now();
             clearTimeout(this.expiry);this.expiry=setTimeout(()=>{this.scene=null;this.update();},75000);
             this.update();

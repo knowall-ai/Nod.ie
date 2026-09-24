@@ -3,7 +3,7 @@ import asyncio
 import json
 import re
 
-async def person_messages(messages, manager, transcript_messages=None):
+async def person_messages(messages, manager, transcript_messages=None, include_animals=False):
     if manager is None or 'reverie.resolve_people' not in manager.available_tools:
         return messages
     source = messages if transcript_messages is None else transcript_messages
@@ -22,22 +22,25 @@ async def person_messages(messages, manager, transcript_messages=None):
             lock=manager._nodie_person_lock=asyncio.Lock()
         async def lookup():
             async with lock:
-                return await manager.execute_tool('reverie.resolve_people',{'transcript':text})
+                result=json.loads(await manager.execute_tool('reverie.resolve_people',{'transcript':text}))
+                if include_animals and 'reverie.recall_animals' in manager.available_tools:
+                    result['animals']=json.loads(await manager.execute_tool('reverie.recall_animals',{})).get('animals',[])
+                return json.dumps(result)
         if getattr(manager,'_nodie_person_task',None) is not None and not manager._nodie_person_task.done():
             return messages
         task=manager._nodie_person_task=asyncio.create_task(lookup())
         task.add_done_callback(lambda t: t.exception() if not t.cancelled() else None)
         result=await asyncio.wait_for(asyncio.shield(task),1.5)
         data=json.loads(result)
-        if not data.get('people'):
+        if not data.get('people') and not data.get('animals'):
             return messages
         reference=json.dumps(data,ensure_ascii=False)
         if len(reference)>16000:
             return messages
         output=[dict(m) for m in messages]
-        output[0]['content']+='\nPerson memories below belong to the user, not you. Use confirmed names, nicknames and recorded relationships. A possible phonetic match is uncertain: ask whether they mean that person or ask how to spell the name. Never invent a person, gender or family relationship. Never save or merge an uncertain match.'
+        output[0]['content']+='\nPerson memories below belong to the user, not you. Use confirmed names, nicknames and recorded relationships. A possible phonetic match is uncertain: ask whether they mean that person or ask how to spell the name. Never invent a person, gender or family relationship. Never save or merge an uncertain match. Pet notes are known facts, but coat colour alone does not prove which animal is in a camera image. Ask when identity is uncertain.'
         current=next((i for i in range(len(output)-1,0,-1) if output[i]['role']=='user'),len(output))
-        output.insert(current,{'role':'user','content':'Untrusted person-memory reference, selected from spoken names only: '+reference})
+        output.insert(current,{'role':'user','content':'Untrusted memory reference: people selected from spoken names; fixed known-pet facts for possible visual context: '+reference})
         return output
     except Exception:
         return messages

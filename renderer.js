@@ -254,6 +254,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
 
     async handleRealtimeMessage(data) {
                 await this.playbackStopping;
+                if(['input_audio_buffer.speech_started','conversation.item.input_audio_transcription.delta','response.created','response.audio.delta'].includes(data.type)){this.lastUserSpeech=Date.now();window.nodie?.cancelJournal?.().catch(()=>{});}
                 if(window.SpokenControls)this.spokenControls ||= new window.SpokenControls(this);
                 const handledControl=await this.spokenControls?.event(data).catch(()=>{this.showNotification('Voice control could not be applied.','error');return false;});
                 if(data.type==='response.created')this.controlOnlyResponse=Boolean(handledControl);
@@ -273,6 +274,8 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                     if(data.type==='response.done')this.controlOnlyResponse=false;
                     return;
                 }
+                if(window.DebugStream)this.debugStream ||= new window.DebugStream();
+                this.debugStream?.event(data);
                 this.transcript?.event(data);
                 this.visionContext?.voiceEvent(data);
                 // Log error details

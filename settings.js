@@ -133,3 +133,14 @@ el('face-enabled').onchange = async () => {
 el('face-refresh').onclick = () => loadFaces().catch(error);
 el('face-forget').onclick = () => { if (confirm('Delete every face profile and disable recognition?')) api.faceForget().then(loadFaces).catch(error); };
 loadFaces().catch(error);
+
+async function loadJournal(){
+ const data=await api.listJournal();el('journal-retention').value=String(data.retentionDays);
+ el('journal-status').textContent=`${data.events.length} retained events. Showing the latest 100.`;
+ const labels={appeared:'appeared in view','out-of-view':'no longer in view',observed:'observed',recognised:'possible recognition','name-confirmed':'name confirmed'};
+ el('journal-events').replaceChildren(...data.events.slice(-100).reverse().map(event=>{const li=document.createElement('li');li.textContent=`${new Date(event.at).toLocaleString()} · ${event.source} · ${event.subject}: ${labels[event.kind]}${event.uncertain?' (uncertain)':''}`;return li;}));
+}
+el('journal-refresh').onclick=()=>loadJournal().catch(error);
+el('journal-clear').onclick=()=>api.clearJournal().then(loadJournal).catch(error);
+el('journal-retention').onchange=()=>api.journalRetention(Number(el('journal-retention').value)).then(loadJournal).catch(error);
+loadJournal().catch(error);
