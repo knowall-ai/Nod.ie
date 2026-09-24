@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { renderSpeech } = require('../../lib/lip-sync');
+const { renderSpeech, VIDEO_ONLY_HEADER, VIDEO_ONLY_VALUE } = require('../../lib/lip-sync');
 const { LocalVoice } = require('../../lib/local-voice');
 const video = Buffer.alloc(16); video.write('ftyp', 4);
 test('neural client validates video type and bounds streamed responses', async () => {
@@ -50,8 +50,14 @@ test('cancelling neural rendering does not return a stale audio fallback or save
 test('only separately scheduled streaming speech requests video-only encoding',async()=>{
  for(const videoOnly of [false,true]) {
   await renderSpeech(new Uint8Array(44),{url:'http://localhost',videoOnly,fetchImpl:async(_url,options)=>{
-   assert.equal(options.headers['X-Nodie-Video-Only'],videoOnly?'1':undefined);
+   assert.equal(options.headers[VIDEO_ONLY_HEADER],videoOnly?VIDEO_ONLY_VALUE:undefined);
    return new Response(video,{headers:{'Content-Type':'video/mp4'}});
   }});
  }
+});
+
+test('invalid options fail before contacting the neural service', async () => {
+ let calls=0;const options={url:'http://localhost',fetchImpl:async()=>{calls++;}};
+ for(const extra of [{videoOnly:'true'},{unexpected:true},{videoOnly:1},{fetchImpl:null},{fetchImpl:42}]) await assert.rejects(renderSpeech(new Uint8Array(44),{...options,...extra}),/Invalid/);
+ assert.equal(calls,0);
 });

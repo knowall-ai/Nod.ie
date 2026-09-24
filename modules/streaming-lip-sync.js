@@ -7,13 +7,23 @@ class StreamingLipSync {
     /** Collect decoded speech into short neural-rendering segments. */
     push(frame, rate) {
         if (!this.enabled()) return;
-        if (!Number.isFinite(rate) || rate < 8000 || rate > 96000) return;
+        if (!Number.isInteger(rate) || rate < 8000 || rate > 96000 || !(frame instanceof Float32Array) || !frame.length) return;
+        if (this.closing) {
+            const generation = this.generation;
+            this.closing.then(() => { if (generation === this.generation) this.push(frame, rate); });
+            return;
+        }
+        if (this.length && this.rate !== rate) this.flush();
         this.rate = rate;
         this.renderer.state.avatarManager?.idle?.prepareSpeech();
-        this.samples.push(new Float32Array(frame)); this.length += frame.length;
         clearTimeout(this.flushTimer);
-        if (this.length >= rate * .64) this.flush();
-        else this.flushTimer = setTimeout(() => this.flush(), 150);
+        const generation = this.generation, limit = Math.floor(rate * .64);
+        for (let offset = 0; offset < frame.length && generation === this.generation;) {
+            const count = Math.min(limit - this.length, frame.length - offset);
+            this.samples.push(frame.slice(offset, offset + count)); this.length += count; offset += count;
+            if (this.length === limit) this.flush();
+        }
+        if (this.length) this.flushTimer = setTimeout(() => this.flush(), 150);
     }
     /** Queue PCM immediately and prepare the corresponding video job. */
     flush() {
@@ -129,8 +139,17 @@ class StreamingLipSync {
         ++this.generation; clearTimeout(this.flushTimer);this.samples=[];this.length=0;this.jobs=[];this.ready=[];this.rendering=null;this.release(false);
         for(const source of this.sources) {source.onended=null;try{source.stop();}catch{}source.disconnect();}
         this.sources.clear();this.gain?.disconnect();this.gain=null;
-        this.context?.close().catch(()=>{});this.context=null;this.nextStart=0;
+        const context = this.context; this.nextStart=0;
         window.nodie?.cancelLipSync?.().catch(()=>{});
+        if (this.closing) return this.closing;
+        let timer;
+        const close = Promise.resolve().then(() => context?.close()).catch(() => {});
+        const closing = this.closing = Promise.race([close, new Promise(resolve => { timer = setTimeout(resolve, 500); })]).finally(() => {
+            clearTimeout(timer);
+            if (this.context === context) this.context = null;
+            if (this.closing === closing) this.closing = null;
+        });
+        return closing;
     }
 }
 if(typeof window!=='undefined') window.StreamingLipSync=StreamingLipSync;
