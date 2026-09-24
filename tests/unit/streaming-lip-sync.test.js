@@ -149,3 +149,12 @@ test('a decoded batch supplies future context before its first render starts',as
  assert.equal(h.sources.length,2);assert.equal(request.trim.frameCount,16);
  assert.equal(request.audio.readUInt32LE(40),48000*.8*2);
 });
+
+test('24 kHz trailing 5500 samples are padded before frame trimming, including past context',async t=>{
+ const pending=[];const h=harness((audio,trim)=>new Promise(resolve=>pending.push({audio:Buffer.from(audio),trim,resolve})));t.after(()=>h.queue.cancel());
+ h.queue.push(new Float32Array(15360),24000);
+ h.queue.push(new Float32Array(5500),24000);h.queue.flush();pending[0].resolve(new Uint8Array(16));await tick();
+ const {audio,trim}=pending[1];assert.equal(trim.startFrame,8);assert.equal(trim.frameCount,6);
+ assert.equal(audio.readUInt32LE(40)/2/24000,(trim.startFrame+trim.frameCount)/25);
+ pending[1].resolve(new Uint8Array(16));await tick();assert.equal(h.errors.length,0);
+});

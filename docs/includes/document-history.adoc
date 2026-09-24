@@ -2,6 +2,7 @@
 [cols="1,1,4",options="header"]
 |===
 |Commit |Date |Change
+|8229370 |2026-09-24 |fix: preserve local replies and memory uncertainty across reconnects
 |eb8ee4b |2026-09-24 |fix: address integration reviews and reduce animation and recognition overhead
 |5bdb1a0 |2026-09-24 |fix: integrate reviewed voice vision and sharper avatar rendering
 |2f6091d |2026-09-24 |Merge remote-tracking branch 'origin/feat/local-face-recognition' into integrate/reviewed-voice-vision
@@ -9,6 +10,5 @@
 |9d40757 |2026-09-24 |Merge remote-tracking branch 'origin/feat/unmute-speaker-diarization' into integrate/reviewed-voice-vision
 |bf05d43 |2026-09-24 |Merge remote-tracking branch 'origin/feat/speaker-diarization' into integrate/reviewed-voice-vision
 |c50d8b6 |2026-09-24 |Merge remote-tracking branch 'origin/feat/hybrid-memory-recall' into integrate/reviewed-voice-vision
-|944a728 |2026-09-24 |Merge remote-tracking branch 'origin/feat/unmute-memory-writing' into integrate/reviewed-voice-vision
 |Working tree |Unreleased |Security, voice, memory and documentation improvements; awaiting review.
 |===

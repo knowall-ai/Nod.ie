@@ -45,3 +45,11 @@ The new assets remove sparse-pose crossfades, use antialiased neural input and r
 * Settings currently reconnect voice even for visual-only changes. Applying those changes without losing backend conversation state remains follow-up work.
 * Face inference starts a separate Python process per selected frame. A persistent bounded worker should be evaluated if measurements show startup is material.
 * Physical microphone/speaker latency, live duplex interruption, camera-then-memory wording, backend restart recovery and extended desktop playback still require runtime acceptance on the final deployed build.
+
+== Final review disposition
+
+Opus reviewed all 15 open PR entries individually (14 component heads plus integration #46). The final merge-gate follow-up at `8229370` found no remaining merge-blocking defects after the local recognition-result regression was corrected.
+
+The individual review's frame-rounding concern was checked against the actual flush path: render WAVs are padded to whole video frames before trimming. A regression reproduces its 24 kHz / 5500-sample example with eight frames of past context and confirms the requested range fits exactly. Applying the suggested floor would unnecessarily discard a padded render frame.
+
+Additional non-blocking follow-ups: cap permanently failing X11 helper restarts and offer pointer-tracking fallback; preserve text-presentation symbols in emoji filtering where appropriate; evaluate a persistent face worker; clean up cancelled upstream tool streams before reusing their protocol; and make visual-only settings changes avoid voice reconnection. These are not claimed as completed in this integration.

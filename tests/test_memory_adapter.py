@@ -7,6 +7,7 @@ import types
 import unittest
 root = Path(__file__).resolve().parents[1]
 tree = ast.parse((root / 'unmute-service/generated/mcp_manager.py').read_text())
+assert any(isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '_nodie_uncertain_save' for t in n.targets) and isinstance(n.value, ast.Constant) and n.value.value is False for n in tree.body), 'Missing module-level uncertainty latch'
 wrapper = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == 'execute_tool')
 ns = {'asyncio': asyncio, '_nodie_uncertain_save': False}
 exec(compile(ast.Module(body=[wrapper], type_ignores=[]), '<memory-adapter>', 'exec'), ns)
