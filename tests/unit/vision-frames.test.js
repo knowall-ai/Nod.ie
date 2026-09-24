@@ -37,7 +37,7 @@ test('transient motion returning to the reference cancels selection',()=>{
  assert.equal(s.select(a,6250),null);assert.equal(s.select(a,7000),null);
  assert.throws(()=>s.select(a,6999));assert.throws(()=>s.select(new Uint8ClampedArray(4),8000));
 });
-function fixture() {
+function fixture(options = {}) {
  let stopped=0, resolvePermission, resolveEncode, calls=0;
  const track={stop(){stopped++;},addEventListener(){}};
  const stream={getTracks:()=>[track],getVideoTracks:()=>[track]};
@@ -45,7 +45,7 @@ function fixture() {
  const context={drawImage(){},getImageData:()=>({data:frame()})};
  const document={createElement:kind=>kind==='video'?video:{getContext:()=>context,toBlob:fn=>{resolveEncode=fn;}}};
  const mediaDevices={getUserMedia:()=>new Promise(r=>{resolvePermission=r;})};
- const camera=new Camera({mediaDevices,document,selector:new Selector(),clock:()=>1000,onFrame:async()=>{calls++;}});
+ const camera=new Camera({...options,mediaDevices,document,selector:new Selector(),clock:()=>1000,onFrame:async()=>{calls++;}});
  return {camera,stream,get stopped(){return stopped;},get calls(){return calls;},permit(){resolvePermission(stream);},encode(){resolveEncode(new Blob(['jpeg'],{type:'image/jpeg'}));}};
 }
 test('stopping during permission prompt closes late stream without starting capture',async()=>{
@@ -75,4 +75,14 @@ test('selected frames retain detail, preserve aspect ratio and never upscale',as
   assert.deepEqual([f.camera.full.width,f.camera.full.height],expected);
   f.encode();await tick;f.camera.stop();
  }
+});
+
+test('unanswered permission is bounded and a late stream is closed',async()=>{
+ const f=fixture({startupTimeoutMs:5});await f.camera.start();
+ assert.equal(f.camera.starting,false);assert.equal(f.camera.active,false);
+ f.permit();await Promise.resolve();assert.equal(f.stopped,1);
+});
+test('stop settles startup even if permission never resolves',async()=>{
+ const f=fixture();const pending=f.camera.start();f.camera.stop();await pending;
+ assert.equal(f.camera.starting,false);assert.equal(f.camera.active,false);
 });

@@ -4,7 +4,7 @@
 
 The camera button is an opt-in live preview. It starts off on each launch and shows the camera feed inside its amber circular border while enabled. Clicking it again stops the tracks, clears the preview and discards the retained frame. Microphone capture remains independent; this camera stream requests no audio.
 
-In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. A short description and capture timestamp are supplied through Unmute's session instructions without clearing conversation history. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
+In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. A short description and capture timestamp are supplied through a validated `scene_data` session field and a separate user-data message without clearing conversation history. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
 
 Face identification, unsolicited spoken observations and Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
 
@@ -21,3 +21,11 @@ Pixel changes are triggers, not a judgement of interest or danger. Small or brie
 == Validation
 
 Unit tests cover unchanged scenes, sensor noise, brightness shifts, object arrivals, transient movement, continuous motion, cumulative changes, cooldowns, refreshes, explicit requests, camera permission races, late JPEG completion and analysis backpressure. A Chromium fake-camera check verifies the button preview, selected JPEG generation, absent camera audio and stopped tracks when disabled.
+
+== Scene-data transport and tool isolation
+
+Re-run `python3 unmute-service/prepare-backend.py /path/to/unmute` and recreate the backend with `compose.override.yml` to install the extended session schema and handler. Older backends ignore the new field and cannot describe snapshots; they do not receive scene text as policy.
+
+Scene text never enters the system instructions. Once a session receives a snapshot, its tool advertisement and execution are disabled for the rest of that connection, including after the camera is switched off, because earlier replies may retain visual content. Start a fresh voice connection with the camera off to restore memory tools. This deliberately limits camera-assisted conversation to spoken answers; visual content cannot authorize memory queries or writes.
+
+Camera startup, including an unanswered permission request or stalled video playback, has a ten-second deadline. Cancelling startup settles immediately and stops any stream that arrives later.

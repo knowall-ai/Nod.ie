@@ -26,10 +26,10 @@ function fixture(t){let now=Date.now(),calls=0,cancels=0;const sent=[];
 }
 test('voice gets priority, selected scene is bounded context and off clears it',async t=>{
  const h=fixture(t);h.context.initialCapture=false;assert.equal(h.context.canAnalyse(),false);h.advance(2100);await h.context.analyse(h.frame());assert.equal(h.calls(),1);
- assert.match(h.sent.at(-1).session.instructions.text,/A cat/);assert.equal(h.sent.at(-1).session.allow_recording,false);
+ assert.equal(h.sent.at(-1).session.scene_data.description,'A cat.');assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/A cat/);assert.equal(h.sent.at(-1).session.allow_recording,false);
  assert.equal(h.context.canAnalyse(),false);h.advance(15000);assert.equal(h.context.canAnalyse(),true);
  h.context.voiceEvent({type:'response.audio.delta'});assert.equal(h.context.canAnalyse(),false);
- h.context.setActive(false);assert.match(h.sent.at(-1).session.instructions.text,/camera-off/);assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/A cat/);
+ h.context.setActive(false);assert.equal(h.sent.at(-1).session.scene_data.status,'camera-off');assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/A cat/);
 });
 test('camera off during analysis discards late scene, stale scenes expire',async t=>{
  const h=fixture(t);h.advance(2100);let finish;h.api.analyseVision=()=>new Promise(r=>{finish=r;});
@@ -45,5 +45,5 @@ test('explicit camera enable gets a first snapshot despite voice activity; later
  finish({status:'ready',description:'A chair.'});await pending;assert.equal(h.context.initialCapture,false);
  assert.equal(h.context.status,'snapshot');h.context.setActive(false);assert.equal(h.context.status,'camera-off');
  h.context.setActive(true);assert.equal(h.context.status,'camera-on-awaiting-analysis');assert.equal(h.context.canAnalyse(),true);
- assert.match(h.sent.at(-1).session.instructions.text,/analysis is pending, not that you lack a camera connection/);
+ assert.ok(h.sent.at(-1).session.instructions.text.includes(Context.PENDING_ANALYSIS_MESSAGE));
 });
