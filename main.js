@@ -16,7 +16,7 @@ function start() {
     const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
-    const journal = new (require('./lib/event-journal').EventJournal)(path.join(require('node:os').homedir(), '.config/nodie/events/journal.json'));
+    const journal = new (require('./lib/event-journal').EventJournal)(path.join(require('node:os').homedir(), '.config/nodie/events/journal.json'), {timezone:env.getConfig('NODIE_TIMEZONE') || Intl.DateTimeFormat().resolvedOptions().timeZone});
     const debug=(source,text)=>mainWindow?.webContents.send('debug-event',{source,text});
     journal.onEvent=event=>debug('Journal',`${event.source}: ${event.subject} — ${event.kind}${event.uncertain?' (uncertain)':''}`);
     void journal.load().catch(()=>console.warn('Event journal unavailable'));

@@ -2,7 +2,7 @@
 services:
   unmute-backend:
     environment:
-      NODIE_TIMEZONE: ${NODIE_TIMEZONE:-Europe/London}
+      NODIE_TIMEZONE: ${NODIE_TIMEZONE:-}
     volumes:
       - type: bind
         source: ${NODIE_EVENTS_DIR:?Create and set the local events directory first}

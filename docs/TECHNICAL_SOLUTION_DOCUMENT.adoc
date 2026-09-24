@@ -18,6 +18,7 @@ include::includes/document-history.adoc[]
 
 include::SOLUTION_DESIGN.adoc[]
 include::DATA_MODEL.adoc[]
+include::PORTABILITY_AUDIT.adoc[]
 include::INSTALLATION.adoc[]
 
 include::SECURITY_UPDATES.adoc[]

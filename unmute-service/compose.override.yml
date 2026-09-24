@@ -21,8 +21,8 @@ services:
           memory: 8G
   unmute-backend:
     environment:
-      KYUTAI_LLM_MODEL: nodie-qwen3.5:9b
-      OLLAMA_NUM_CTX: '8192'
+      KYUTAI_LLM_MODEL: ${LLM_MODEL:?Set LLM_MODEL to an installed image-capable model}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
       USER_SILENCE_TIMEOUT: 'inf'
     volumes:
       - ${NODIE_UNMUTE_DIR:?}/generated/mcp.json:/app/.mcp.json:ro
