@@ -1,5 +1,5 @@
 // Only voice operations are exposed by the loopback web app. No Docker/update API.
-if (!window.nodie && window.ENV_CONFIG?.VOICE_MODE === 'local') {
+if (!window.nodie && window.ENV_CONFIG) {
     const post = async (route, body, type = 'application/octet-stream') => {
         const response = await fetch(route, { method: 'POST', headers: { 'Content-Type': type }, body });
         const result = await response.json();
@@ -8,6 +8,8 @@ if (!window.nodie && window.ENV_CONFIG?.VOICE_MODE === 'local') {
     };
     window.nodie = {
         platform: 'web',
+        renderLipSegment: async audio => { const r = await fetch('/lip/segment', { method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: audio }); if (!r.ok) throw new Error('Lip sync unavailable'); return new Uint8Array(await r.arrayBuffer()); },
+        cancelLipSync: () => post('/lip/cancel'),
         getConfig: async () => window.ENV_CONFIG,
         getSystemPrompt: async () => (await fetch('/system-prompt')).text(),
         transcriptSession: () => post('/transcript/session'),
