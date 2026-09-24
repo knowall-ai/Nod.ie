@@ -1,0 +1,47 @@
+= Application and performance review — 24 September 2026
+
+The application, integration and individual open PRs were reviewed with Claude Code 2.1.281 using the exact `claude-opus-5-5` model. CodeRabbit also reviewed the component PRs and integration. Static reviewer estimates are distinguished below from measurements. These checks do not establish that the integrated application has been deployed.
+
+== Measurements
+
+[cols="2,2,2",options="header"]
+|===
+|Check |Result |Limits
+|Live MuseTalk, 1.12 s synthetic WAV trimmed to 0.64 s video |First measured request: 744 ms wall / 682 ms render. Repeats: 455/458 ms wall, 429/418 ms render. Reported peak GPU allocation: 2909 MiB. |Existing running service, not a cold model-start test or concurrent camera benchmark. Warm wall time is about 0.71 times the resulting video duration.
+|Old 512×512 idle, 15 s at device pixel ratio 3 |373 video frames, zero dropped frames, zero long main-thread tasks; renderer 2.05 CPU seconds, GPU process 1.52 CPU seconds. |Headless Chromium with the application UI, mocked voice connection and no real microphone or camera.
+|New 768×768 idle, same test |375 video frames, zero dropped frames, zero long main-thread tasks; renderer 2.38 CPU seconds, GPU process 1.55 CPU seconds. |One short sample, not a statistical benchmark. Renderer use rose from about 13.7% to 15.9% of one CPU core. GPU-process CPU time is not GPU utilization.
+|Offline corrected idle rendering |150 frames in 14.47 s, about 1058 MiB peak GPU allocation on RTX 3090. |Optional GPU path with PyTorch allocator capped at 12% of device memory; no persistent animation model.
+|===
+
+The new assets remove sparse-pose crossfades, use antialiased neural input and replace eye detail during blinks so source irises do not remain visible. Frames are composed at 1024×1024, then encoded at 768×768, H.264 CRF 18. Neutral and handoff canvases track display density, including monitor-scale changes. All five clips were visually inspected at representative poses. Headless playback does not measure the real transparent desktop compositor.
+
+== Fixes included with integration
+
+* Missing lip-sync configuration no longer enables the segmented audio buffer and repeated render errors.
+* Speaker status/load operations avoid rewriting unchanged profiles; background matching persists last-seen at most once per minute per profile and does not consume conversational naming prompts. A regression exercises repeated matches with zero unchanged-profile writes.
+* Independent local speaker recognition and memory recall run concurrently after successful transcription.
+* Audio already decoded in one batch is available as future phoneme context before rendering starts. Playback does not wait for undecoded future speech.
+* The worklet distinguishes silent end padding from audible underruns when adapting its buffer.
+* Warm-up uses cancellable asynchronous HTTP with a total load deadline and bounded connection cleanup.
+* Speaker observations refresh before backend expiry, without repeatedly publishing a disabled state.
+* Scene insertion, memory save uncertainty, backend preparation order, helper recovery and recognition-setting error handling have regression coverage.
+
+== Highest-value performance follow-ups
+
+. *First audio latency:* the current streaming path collects up to 640 ms of audio before scheduling with a 750 ms initial buffer. Approximately 1.4 s is an inferred delay when delivery is real time, not a measured physical speech latency. Measure actual decoded-audio arrival rate and evaluate a shorter first segment while keeping later segments larger.
+. *Video predecode:* reloading one video element per segment puts decoder startup on the boundary. Evaluate two alternating video elements and measure first decoded frame versus the independent audio clock. Do not hold audio to wait for late video.
+. *MuseTalk stage timings:* measure feature extraction, Whisper encoding, UNet/VAE, compositing and FFmpeg independently. Warm-up should exercise real video-only segment shapes. Measure first requests after idle separately from a genuinely cold model start.
+. *Contention:* measure voice with camera, face and speaker recognition individually enabled. Report p50/p95 first-audio latency, render deadlines, worker restarts and GPU residency; a separately configured vision model currently remains resident for 30 minutes.
+. *Desktop idle overhead:* profile waveform redraw and transparent-window compositing when muted, listening and speaking. The browser measurement above includes the existing waveform redraw, but not the physical desktop compositor.
+. *Interruption recovery:* measure context teardown/recreation and busy-render responses before changing their cancellation semantics. Check microphone echo/ducking against actual playback time.
+
+== Functional limitations and remaining acceptance work
+
+* Unmute matches voice profiles learned through deliberate local-mode turns; it does not yet enrol or name new speakers conversationally. Household accuracy and overlapping speech remain uncalibrated.
+* Face profiles are explicitly opt-in and managed in Settings. Their results are not yet used in voice conversation; conversational face naming and unfamiliar-person notifications remain future work. No image or voice match authenticates a person.
+* A camera snapshot disables memory tool execution for the remainder of that backend connection. The UI and prompt now explain this limitation. A fresh connection restores availability when no snapshot is supplied again. Camera descriptions remain untrusted reference data.
+* Local transcripts persist, but previous Unmute sessions are not automatically inserted into current model context.
+* Unmute prompt time is captured when the connection configuration is prepared; refreshing it for long-lived sessions remains follow-up work.
+* Settings currently reconnect voice even for visual-only changes. Applying those changes without losing backend conversation state remains follow-up work.
+* Face inference starts a separate Python process per selected frame. A persistent bounded worker should be evaluated if measurements show startup is material.
+* Physical microphone/speaker latency, live duplex interruption, camera-then-memory wording, backend restart recovery and extended desktop playback still require runtime acceptance on the final deployed build.

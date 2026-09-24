@@ -108,10 +108,12 @@ timeouts = [n for n in ast.walk(execute) if isinstance(n, ast.Call) and ast.unpa
 if len(timeouts) != 1:
     raise SystemExit('Unsupported MCP tool deadline; inspect upstream')
 next(k for k in timeouts[0].keywords if k.arg == 'timeout').value = ast.parse("20.0 if tool_name == 'reverie.save_memory' else 10.0", mode='eval').body
+manager_tree.body.extend(ast.parse('_nodie_uncertain_save = False').body)
 wrapper = ast.parse('''
 async def execute_tool(self, tool_name, arguments):
+    global _nodie_uncertain_save
     saving = tool_name == 'reverie.save_memory'
-    if saving and getattr(self, '_nodie_uncertain_save', False):
+    if saving and _nodie_uncertain_save:
         return __import__('json').dumps({'status': 'not-saved', 'reason': 'A previous save is unconfirmed. Further saves are paused until stored notes are checked and the backend is restarted.'})
     try:
         result = await self._nodie_execute_tool(tool_name, arguments)
@@ -121,17 +123,17 @@ async def execute_tool(self, tool_name, arguments):
             except (ValueError, AttributeError, TypeError):
                 status = 'unknown'
             if status not in ('saved', 'not-saved'):
-                self._nodie_uncertain_save = True
+                _nodie_uncertain_save = True
                 return __import__('json').dumps({'status': 'unknown', 'reason': 'Saving was not confirmed and might have committed. Do not retry automatically. Check stored notes before restarting the backend.'})
         return result
     except asyncio.CancelledError:
         if saving:
-            self._nodie_uncertain_save = True
+            _nodie_uncertain_save = True
         raise
     except Exception:
         if not saving:
             raise
-        self._nodie_uncertain_save = True
+        _nodie_uncertain_save = True
         return __import__('json').dumps({'status': 'unknown', 'reason': 'Saving was not confirmed and might have committed. Do not retry automatically. Check stored notes before restarting the backend.'})
 ''').body[0]
 manager_class.body.append(wrapper)

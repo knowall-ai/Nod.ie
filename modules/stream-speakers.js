@@ -6,7 +6,7 @@ class StreamSpeakers {
     }
     emit(observation) {
         const encoded = JSON.stringify(observation);
-        if (encoded === this.lastObservation && (observation === null || this.now() - this.lastPublished < 5000)) return;
+        if (encoded === this.lastObservation && (observation === null || this.now() - this.lastPublished < 3000)) return;
         this.lastObservation = encoded; this.lastPublished = this.now(); this.publish(observation);
     }
     start(stream) { this.stop(); this.stream = stream; const generation = this.generation; void this.cycle(generation); }

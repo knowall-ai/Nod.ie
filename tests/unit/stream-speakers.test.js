@@ -33,7 +33,7 @@ test('recording duration is bounded and unchanged null observations are suppress
 test('unchanged live speakers refresh before backend expiry while null remains deduplicated',()=>{
  let now=0;const updates=[];const stream=new StreamSpeakers({},value=>updates.push(value),{now:()=>now});
  const observation={speakers:[{name:'Ben',uncertain:false}]};stream.emit(observation);
- now=4000;stream.emit(observation);assert.equal(updates.length,1);
+ now=2000;stream.emit(observation);assert.equal(updates.length,1);
  now=6000;stream.emit(observation);assert.equal(updates.length,2);
  stream.emit(null);now=30000;stream.emit(null);assert.equal(updates.length,3);
 });
