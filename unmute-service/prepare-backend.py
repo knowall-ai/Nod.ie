@@ -10,6 +10,24 @@ needle = '"temperature": self.temperature,'
 if source.count(needle) != 1:
     raise SystemExit('Unsupported Unmute adapter: review the upstream source before applying this patch.')
 source = source.replace(needle, needle + '\n            "reasoning_effort": "none",')
+# Warm before the first turn and shield loading from speech interruptions.
+source = source.replace('from unmute.kyutai_constants import LLM_SERVER', 'from unmute.ollama_warmup import start_warmup, ensure_warm\nfrom unmute.kyutai_constants import LLM_SERVER')
+old = '    return AsyncOpenAI(api_key="EMPTY", base_url=server_url + "/v1")'
+assert source.count(old) == 1
+source = source.replace(old, '    start_warmup(server_url, KYUTAI_LLM_MODEL)\n' + old)
+old = '        stream = await self.client.chat.completions.create(**create_kwargs)'
+assert source.count(old) == 1
+source = source.replace(old, '        await ensure_warm(str(self.client.base_url).removesuffix("/").removesuffix("/v1"), self.model)\n' + old)
+# OpenAI-compatible turns reset Ollama's residency to its server default.
+# Refresh through the native API after success/cancellation, without blocking audio.
+start = source.index('        stream = await self.client.chat.completions.create(**create_kwargs)')
+import ast
+line = source[:start].count('\n') + 1
+functions = [node for node in ast.walk(ast.parse(source)) if isinstance(node, ast.AsyncFunctionDef) and node.lineno <= line <= node.end_lineno]
+if len(functions) != 1 or source.splitlines()[functions[0].end_lineno:]:
+    raise SystemExit('Unsupported adapter layout: streaming function must end the module.')
+body = source[start:]
+source = source[:start] + '        try:\n' + ''.join('    ' + line if line.strip() else line for line in body.splitlines(keepends=True)) + '\n        finally:\n            start_warmup(str(self.client.base_url).removesuffix("/").removesuffix("/v1"), self.model, force=True)\n'
 output = Path(__file__).parent / 'generated'
 output.mkdir(exist_ok=True)
 (output / 'llm_utils.py').write_text(source)
