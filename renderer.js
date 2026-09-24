@@ -237,7 +237,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
             this.unmuteBasePrompt = config.SYSTEM_PROMPT;
             this.messageQueue = Promise.resolve();
             const handler = new window.WebSocketHandler(config, {
-                onConnect: () => { this.state.isConnected = true; this.updateWSStatus('Connected'); this.checkIfFullyLoaded(); if(this.visionContext)this.visionContext.memoryBlocked=false; this.visionContext?.update(); },
+                onConnect: () => { this.state.isConnected = true; if(window.RecognitionSession&&window.nodie?.analyseSpeakers){this.recognition ||= new window.RecognitionSession(this);this.recognition.start();} this.updateWSStatus('Connected'); this.checkIfFullyLoaded(); if(this.visionContext)this.visionContext.memoryBlocked=false; this.visionContext?.update(); },
                 onClose: () => { this.transcript?.finish(); this.state.isConnected = false; this.stopMicrophone(); this.stopPlayback(); this.updateWSStatus('Reconnecting...'); },
                 onError: error => this.showNotification(error.message, 'error'),
                 onMessage: data => {
@@ -276,6 +276,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                 }
                 if(window.DebugStream)this.debugStream ||= new window.DebugStream();
                 this.debugStream?.event(data);
+                this.recognition?.event(data);
                 this.transcript?.event(data);
                 this.visionContext?.voiceEvent(data);
                 // Log error details
@@ -392,12 +393,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
         try {
             await capture.start();
             if (this.state.audioCapture !== capture || this.state.isMuted) { capture.stop(); return; }
-            if (window.nodie?.analyseSpeakers && window.StreamSpeakers) {
-                this.streamSpeakers = new window.StreamSpeakers(window.nodie, observation => {
-                    this.state.wsHandler?.send({ type: 'session.update', session: { allow_recording: false, speaker_observation: observation } });
-                });
-                this.streamSpeakers.start(capture.stream);
-            }
+            this.recognition?.start();
             this.state.analyser = capture.getAnalyser();
             this.controls?.update();
         } catch (error) {
@@ -407,6 +403,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
         }
     },
     stopMicrophone() {
+        this.recognition?.stop();
         this.streamSpeakers?.stop(); this.streamSpeakers = null;
         const capture = this.state.audioCapture;
         this.state.audioCapture = null;

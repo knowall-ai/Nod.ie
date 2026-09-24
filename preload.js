@@ -6,6 +6,10 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
+    proposeRecognitionName:turn=>ipcRenderer.invoke('recognition-propose',turn),
+    onRecognitionProposal:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('recognition-proposal',listener);return ()=>ipcRenderer.removeListener('recognition-proposal',listener);},
+    cancelRecognition:()=>ipcRenderer.invoke('recognition-cancel'),
+    confirmRecognitionName:(token,accepted)=>ipcRenderer.invoke('recognition-confirm',token,accepted),
     onDebugEvent:callback=>subscribe('debug-event',callback),
     journalFrame:image=>ipcRenderer.invoke('journal-frame',image),
     cancelJournal:reset=>ipcRenderer.invoke('journal-cancel',reset),
@@ -20,7 +24,7 @@ contextBridge.exposeInMainWorld('nodie', {
     onHistoryCleared: fn => subscribe('history-cleared', fn),
 
 
-    analyseSpeakers: audio => ipcRenderer.invoke('speaker-analyse', audio),
+    analyseSpeakers: (audio,interval) => ipcRenderer.invoke('speaker-analyse', audio,interval),
     cancelSpeakers: () => ipcRenderer.invoke('speaker-cancel'),
     liveSpeakerStatus: () => ipcRenderer.invoke('speaker-live-status'),
     speakerStatus: () => ipcRenderer.invoke('speaker-status'),

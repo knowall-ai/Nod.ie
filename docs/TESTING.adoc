@@ -36,3 +36,7 @@ The CPU service was smoke-tested using generated speech: one interval, one 512-d
 Run `python3 recognition/test_deadline_worker.py` to verify that a timed-out analysis terminates its worker and decoder process group, and that the next request succeeds within the caller's deadline. Request-body reading, decoding and inference share a 1.6-second deadline. Replacement workers start independently and return busy until ready; busy inference is rejected instead of queued. A real-model synthetic check completed in 126 ms through the isolated worker on the development host.
 
 See `PERFORMANCE_REVIEW.adoc` for the dated application review, measured rendering/decoding results and prioritized runtime acceptance work. Static performance estimates are explicitly labelled and are not physical end-to-end latency measurements.
+
+== Recognition attribution regression checks
+
+Run `npm test` for proposal expiry, speaker switches, UI confirmation, cancelled inference and persistence. Run `.venv-recognition/bin/python tests/test_recognition_context.py` for audio-clock padding, per-word attribution, overlapping speech, stale observations and STT clock resets. Use synthetic audio and ephemeral profile stores for integration checks; do not enroll test fixtures in a real household store. Recognition accuracy still requires consenting household trials.

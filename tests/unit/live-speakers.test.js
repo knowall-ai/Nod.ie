@@ -15,7 +15,7 @@ test('cancel discards late identity and concurrent requests do not queue', async
 });
 test('only public identity hints leave main process', async () => {
     const live = new LiveSpeakers({ analyse: async () => ({ state: 'ready', epoch: 'private', speakers: [{ id: 'private', name: 'Example', embedding: [1] }], transcriptAttribution: 'single-speaker' }) });
-    assert.deepEqual(await live.analyse(new Uint8Array(100)), { speakers: [{ name: 'Example', uncertain: false }], attribution: 'single-speaker' });
+    assert.deepEqual(await live.analyse(new Uint8Array(100)), { speakers: [{ speaker:undefined,id:'private',name: 'Example', uncertain: false,mayAskName:false }], segments:[],attribution: 'single-speaker' });
 });
 
 test('whole-operation timeout settles caller without overlapping unfinished storage',async()=>{

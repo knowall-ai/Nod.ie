@@ -39,3 +39,9 @@ test('invalid models and vectors cannot be saved', async t => {
     assert.throws(() => s.observe({ ...result(vector(0)), model: 'wrong' }, d.epoch));
     assert.throws(() => s.observe(result([NaN]), d.epoch));
 });
+test('runtime faces are temporary until a name is confirmed',async t=>{
+ const s=await store(t);await s.configure(true);const engine=new FaceRecognition({store:s,analyse:async()=>result(vector(0))});
+ const first=await engine.analyse(new Uint8Array(100));assert.equal((await s.status()).profiles.length,0);
+ const second=await engine.analyse(new Uint8Array(100));assert.equal(first.faces[0].id,second.faces[0].id);
+ assert.equal(await s.nameObserved(first,first.faces[0].id,'Example'),true);assert.equal((await s.status()).profiles.length,1);
+});

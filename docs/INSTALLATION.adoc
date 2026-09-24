@@ -55,7 +55,7 @@ Model downloads are separate from Nod.ie's MIT source. The Reverb segmentation w
 
 Install and start the speaker service from the speaker-diarization instructions first. Enable recognition in Settings > People; it is disabled by default.
 
-Run `python3 unmute-service/prepare-backend.py /path/to/unmute`, followed by `python3 unmute-service/prepare-speakers.py /path/to/unmute`. When stacking memory overrides, apply the speaker preparer to their generated handler so their privacy and memory changes are retained. Set `NODIE_SPEAKERS_DIR` to this branch's `unmute-service` directory and append `compose.speakers.yml` after the other backend Compose overlays. Recreate only `unmute-backend`.
+Run `python3 unmute-service/prepare-backend.py /path/to/unmute --with-speakers`. This prepares memory/privacy adapters, speaker schemas, exact-clock audio windows and word-end propagation together. Set `NODIE_SPEAKERS_DIR` to this branch’s `unmute-service` directory and append `compose.speakers.yml` after the other backend Compose overlays. Recreate only `unmute-backend`.
 
 Without this backend overlay, older Unmute ignores the new field; speech continues but identity hints do not reach the model. Browser-only recognition is not exposed by this change. Raw audio remains in memory and is not retained.
 

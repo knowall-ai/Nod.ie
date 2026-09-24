@@ -103,7 +103,12 @@ function start() {
     }, true);
 
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
-    handle('speaker-analyse',audio=>recorder.capture(()=>liveSpeakers.analyse(audio),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
+    const recognitionNames=new(require('./lib/recognition-names').RecognitionNames)({faces,voices:{store:speakerRecognition.store,forInterval:(start,end)=>liveSpeakers.forInterval(start,end)},classify:require('./lib/recognition-intent').recognitionIntent({url:env.getConfig('OLLAMA_URL'),model:env.LLM_MODEL||env.getConfig('LOCAL_LLM_MODEL')}),record:event=>recorder.record(event)});
+    voice.proposeSpeakerName=async(observation,text,previousAssistant)=>{const proposal=await recognitionNames.proposeLocal(observation,text,previousAssistant);if(proposal.status==='pending')mainWindow?.webContents.send('recognition-proposal',proposal);return proposal;};
+    handle('recognition-propose',turn=>recognitionNames.propose(turn));
+    handle('recognition-confirm',(token,accepted)=>recognitionNames.confirm(token,accepted));
+    handle('recognition-cancel',()=>recognitionNames.cancel());
+    handle('speaker-analyse',(audio,interval)=>recorder.capture(()=>liveSpeakers.analyse(audio,interval),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
     handle('speaker-cancel', () => liveSpeakers.cancel());
     handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
     app.on('before-quit', () => liveSpeakers.cancel());
@@ -112,7 +117,7 @@ function start() {
     handle('speaker-edit', async (id, name) => {await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}, true);
     handle('speaker-merge', (source, target) => speakerRecognition.store.merge(source, target), true);
     handle('speaker-forget', () => speakerRecognition.store.forget(), true);
-    handle('voice-cancel', () => voice.cancel());
+    handle('voice-cancel', () => {voice.cancel();recognitionNames.cancel();});
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
         let stage = 'validation';

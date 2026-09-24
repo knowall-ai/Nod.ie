@@ -62,7 +62,7 @@ load().catch(error);
 async function loadSpeakers() {
     const status = await api.speakerStatus();
     el('speaker-enabled').checked = status.enabled;
-    el('speaker-status').textContent = status.enabled ? 'Enabled. Learn voice profiles in local voice mode first; Unmute matches existing profiles only and requires its backend overlay.' : 'Disabled. No new voice profiles are collected.';
+    el('speaker-status').textContent = status.enabled ? 'Enabled. Unmute learns recurring voice profiles from bounded audio windows. Introduce yourself and confirm the proposed name; uncertain/overlapping words stay unattributed.' : 'Disabled. No new voice profiles are collected.';
     el('speaker-profiles').replaceChildren();
     if (!status.profiles.length) el('speaker-profiles').textContent = 'No voice profiles learned yet.';
     const label = profile => `${profile.name || 'Unfamiliar speaker'} (${profile.id.slice(0, 8)})`;
@@ -107,7 +107,7 @@ el('speaker-forget').onclick = () => { if (window.confirm('Remove all voice prof
 async function loadFaces() {
     const status = await api.faceStatus();
     el('face-enabled').checked = status.enabled;
-    el('face-status').textContent = status.enabled ? 'Learning selected camera frames. Voice notifications and conversational naming are not connected yet.' : 'Disabled. No faces are collected.';
+    el('face-status').textContent = status.enabled ? 'Matching selected camera frames; unknown candidates stay in memory until a label is confirmed. Recent matches reach Unmute as uncertain observations. Introduce one visible person, then confirm the label on screen.' : 'Disabled. No faces are collected.';
     el('face-profiles').replaceChildren();
     if (!status.profiles.length) el('face-profiles').textContent = 'No face profiles learned yet.';
     for (const profile of status.profiles) {

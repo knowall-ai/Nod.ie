@@ -6,6 +6,7 @@ import subprocess
 import time
 import threading
 from deadline_worker import DeadlineEngine, BusyError
+from segment_bounds import clip_intervals
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -43,7 +44,7 @@ class SpeakerEngine:
         samples = np.frombuffer(decoded, dtype='<f4').copy()
         if not 1600 <= len(samples) <= 480000 or not np.isfinite(samples).all():
             raise ValueError('Invalid audio duration')
-        intervals = self.diarizer.process(samples).sort_by_start_time()
+        intervals = clip_intervals(self.diarizer.process(samples).sort_by_start_time(),len(samples)/16000)
         if len(intervals) > 64 or len({r.speaker for r in intervals}) > 8:
             raise ValueError('Too many speaker segments')
         segments = [{'start': round(r.start, 3), 'end': round(r.end, 3), 'speaker': int(r.speaker)} for r in intervals]

@@ -6,7 +6,7 @@ The camera button is an opt-in live preview. It starts off on each launch and sh
 
 In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. The selected JPEG and its capture timestamp are supplied through validated `scene_data`. The voice model receives the actual image as an ephemeral multimodal user-data message next to the current question. Images are never appended to conversation history. Camera ON/OFF is supplied separately as trusted device state, so pending or expired images do not imply the camera is off. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
 
-Face identities are not supplied to voice conversation; unsolicited spoken observations and Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
+Recent face matches are supplied to Unmute conversation as uncertain observations; they never establish who spoke. Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
 
 == Selection policy
 
@@ -36,7 +36,7 @@ Face recognition is separate from Qwen scene descriptions. The desktop sends sel
 
 Recognition is disabled by default and requires the camera to be on. Frames reuse the current vision selection and quiet-period policy. No additional camera is opened. Input is capped at 512 KB and 1280 by 960 pixels, inference at three seconds, output at 64 KB, and processing at one request with no backlog. At most eight sufficiently large and sharp faces are analysed per frame; small/blurry faces are skipped. The worker uses no GPU. Images are never written to disk or sent to an external recognition provider.
 
-Settings > People — faces supports enable, rename, forget and merge. Local embeddings are kept in `~/.config/nodie/recognition/faces.json`, with owner-only file permissions, atomic writes and locking. At most 32 profiles and four samples per profile are retained. Unnamed profiles expire after seven days; named profiles remain until removed. Disabling stops collection but preserves profiles; Forget all deletes profiles and disables recognition. Clear conversation history does not delete these profiles. Disabling, editing or deleting invalidates in-flight matches.
+Settings > People — faces supports enable, rename, forget and merge. Local embeddings are kept in `~/.config/nodie/recognition/faces.json`, with owner-only file permissions, atomic writes and locking. At most 32 profiles and four samples per profile are retained. Unknown runtime candidates remain in memory for at most 90 seconds without a match; confirmation creates a named profile that remains until removed. Legacy unnamed saved profiles expire after seven days. Disabling stops collection but preserves profiles; Forget all deletes profiles and disables recognition. Clear conversation history does not delete these profiles. Disabling, editing or deleting invalidates in-flight matches.
 
 The initial thresholds are conservative engineering defaults, not calibrated household accuracy guarantees. Ambiguous matches remain unnamed. A face match does not establish who is speaking, grant device access, or authenticate a person. Photos and screens may also match; no liveness detection is provided.
 
@@ -50,7 +50,7 @@ python3 scripts/setup-face-models.py
 node --test tests/unit/face-recognition.test.js
 ----
 
-The current implementation provides local extraction, matching, selected-frame collection and profile management. Pending before user acceptance: typed face observations into Unmute (separate from system instructions), conversational naming with an unambiguous current face, model-worded unknown-person notifications, thumbnail-based disambiguation in Settings, household matching calibration and end-to-end camera/voice load testing. Until those are complete, Nodie does not receive these face identities in her spoken conversation. The settings panel states that limitation explicitly.
+Local face extraction, matching, selected-frame collection, profile management and typed uncertain observations into Unmute are connected. Explicit naming supports a sole unknown visible face with on-screen confirmation. Thumbnail-based multi-face disambiguation and household calibration remain future work.
 
 == Direct image questions
 
@@ -75,3 +75,9 @@ Deploy the backend with `NODIE_EVENTS_DIR` pointing to the desktop's `~/.config/
 The event detector describes any visible animal using bounded `kind` and `appearance` text fields; species and coat descriptions are not a fixed vocabulary. Dogs, birds, rabbits and unfamiliar animals use the same path as cats. Unknown species may be described as `animal`. These observations remain untrusted model output, not confirmed pet identities. Personal names and appearance facts belong in the user's private animal memories, never in source-code mappings.
 
 The current presence tracker groups equal descriptions. It cannot distinguish two similar-looking animals, and changing descriptions can split observations. Repeated visibility is not proof of room entry or exit. Individual pet tracking and confirmed association with memory remain separate work.
+
+== Recognition confirmation and debug styling
+
+An explicit introduction can offer a local face or voice label. Confirm or cancel using the on-screen prompt; neither a model statement nor a nearby person's spoken confirmation saves a label. The prompt uses the same 32 px button height, 8 px radius and spacing, and 12 px inner padding as the debug controls. In compact mode its buttons lie inside the avatar's native input region. Fullscreen debug uses consistent 24 px outer insets and a slim amber scrollbar with a transparent track; forced-colour mode preserves system scroll colours.
+
+Enable People — faces and People — voices separately in Settings. Face matching also needs the camera enabled; voice matching needs the microphone enabled and the local diarization service healthy. This is fallible recognition of enrolled local profiles, not identification of arbitrary people from the internet. Do not interpret an empty profile list as a malfunction before enrollment.

@@ -348,3 +348,26 @@ body.fullscreen #debug-stream:not([hidden]) { display:block;position:fixed;left:
 #debug-lines li { padding:5px 0;border-bottom:1px solid #ffffff14; }
 body.fullscreen #app { z-index:2;pointer-events:none; }
 body.fullscreen #circle,body.fullscreen #avatar-controls { pointer-events:auto; }
+
+#recognition-confirm { position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(240px,calc(100vw - 32px));box-sizing:border-box;z-index:130;padding:12px;border:1px solid #f5a623;border-radius:8px;background:#202a35;color:#fff;font:12px/1.5 system-ui,sans-serif;text-align:center; }
+#recognition-confirm[hidden] { display:none; }
+#recognition-confirm span { display:block;overflow-wrap:anywhere;margin:0 0 8px;max-height:72px;overflow:auto; }
+#recognition-confirm button,#debug-clear,#control-debug { box-sizing:border-box;min-height:32px;padding:4px 12px;border:1px solid #a97630;border-radius:8px;background:#202a35;color:#f5c77e;font:12px/1.5 system-ui,sans-serif;cursor:pointer; }
+#recognition-confirm button { min-width:80px;margin:0; }
+#recognition-confirm button+button { margin-left:8px; }
+#recognition-confirm button:hover,#debug-clear:hover { background:#36414d; }
+#recognition-confirm button:focus-visible,#debug-clear:focus-visible,#control-debug:focus-visible { outline:2px solid #f5a623;outline-offset:2px; }
+body.fullscreen #recognition-confirm { top:auto;bottom:88px;transform:translateX(-50%);width:min(360px,calc(100vw - 48px)); }
+body.fullscreen #control-debug { top:24px;right:24px;min-height:32px;padding:4px 12px;border-color:#a97630;color:#f5c77e;background:#202a35; }
+body.fullscreen #debug-stream:not([hidden]) { left:24px;top:24px;bottom:88px; }
+#debug-lines { margin:8px 0 0;padding:0; }
+#debug-lines li { padding:8px 0; }
+/* Quiet amber scroll affordance, with no opaque native scrollbar gutter. */
+#debug-stream { scrollbar-width:thin;scrollbar-color:#b67d2999 transparent;scrollbar-gutter:stable; }
+#debug-stream:hover,#debug-stream:focus-within { scrollbar-color:#f5a623 transparent; }
+#debug-stream::-webkit-scrollbar { width:6px;height:6px; }
+#debug-stream::-webkit-scrollbar-track { background:transparent; }
+#debug-stream::-webkit-scrollbar-thumb { background:#b67d2999;border-radius:999px; }
+#debug-stream:hover::-webkit-scrollbar-thumb { background:#f5a623; }
+#debug-stream::-webkit-scrollbar-corner { background:transparent; }
+@media (forced-colors:active) { #debug-stream { scrollbar-color:auto; } }
