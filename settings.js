@@ -5,6 +5,7 @@ const error = err => { el('settings-error').textContent = err.message || String(
 async function load() {
     const config = await api.getConfig();
     el('avatarEnabled').checked = config.AVATAR_ENABLED;
+    el('avatarIdleEnabled').checked = config.AVATAR_IDLE_ENABLED;
     for (const [id, key] of Object.entries({ assistantName: 'ASSISTANT_NAME', unmuteBackendUrl: 'UNMUTE_BACKEND_URL', voiceModel: 'VOICE_MODEL', globalHotkey: 'GLOBAL_HOTKEY' })) el(id).value = config[key] || '';
     if (!config.AVATAR_ENABLED) el('avatarStatus').textContent = 'Hidden';
     else if (config.VOICE_MODE === 'local') {
@@ -50,7 +51,7 @@ el('cancel').onclick = () => window.close();
 el('save').onclick = async () => {
     el('settings-error').textContent = '';
     el('save').disabled = true;
-    try { await api.saveSettings({ AVATAR_ENABLED: el('avatarEnabled').checked, ASSISTANT_NAME: el('assistantName').value, UNMUTE_BACKEND_URL: el('unmuteBackendUrl').value, VOICE_MODEL: el('voiceModel').value, GLOBAL_HOTKEY: el('globalHotkey').value }); window.close(); }
+    try { await api.saveSettings({ AVATAR_ENABLED: el('avatarEnabled').checked, AVATAR_IDLE_ENABLED: el('avatarIdleEnabled').checked, ASSISTANT_NAME: el('assistantName').value, UNMUTE_BACKEND_URL: el('unmuteBackendUrl').value, VOICE_MODEL: el('voiceModel').value, GLOBAL_HOTKEY: el('globalHotkey').value }); window.close(); }
     catch (err) { error(err); }
     finally { el('save').disabled = false; }
 };

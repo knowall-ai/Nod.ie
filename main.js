@@ -27,7 +27,7 @@ function start() {
         return callback(...args);
     });
     function secureWindow(options, file) {
-        const win = new BrowserWindow({ ...options, webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, autoplayPolicy: 'no-user-gesture-required' } });
+        const win = new BrowserWindow({ ...options, webPreferences: { preload: path.join(__dirname, 'preload.js'), nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, backgroundThrottling: file !== 'index.html', autoplayPolicy: 'no-user-gesture-required' } });
         win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
         win.webContents.on('will-navigate', event => event.preventDefault());
         win.webContents.on('will-attach-webview', event => event.preventDefault());

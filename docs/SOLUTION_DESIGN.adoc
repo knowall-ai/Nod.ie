@@ -99,3 +99,7 @@ The built-in image generation tool produced `assets/avatars/nodie-getnodie-shirt
 === Transparent overlay input
 
 Only the circular avatar and visible circular buttons intercept desktop mouse input. Transparent corners pass clicks and scrolling to the underlying application. The renderer supplies measured circle bounds; the main process maps native cursor coordinates into that viewport, so desktop scaling and monitors with negative coordinates are supported. On Linux/X11, a small Python standard-library helper applies an input-only XShape region using the actual native pixel dimensions; this needs Python 3, libX11 and libXext. It includes only exclusive same-size KWin wrapper frames, never the root/shared windows. A 50 ms native check repairs input masks reset by window movement; unchanged masks are not rewritten. Other desktop platforms use native cursor polling with mouse-move forwarding. Input remains captured throughout an avatar drag. The waveform and glow remain visually unclipped; they do not add an input surface. Before geometry arrives or after a renderer failure, the window accepts input so it remains recoverable.
+
+=== Idle portrait and speech transitions
+
+A local silent idle clip supplies blinks and subtle pose movement without a resident neural animation model. The idle controller respects Settings and reduced-motion preferences, settles a blink before the initial speech buffer expires, and holds the previous decoded frame across speech segment changes. The static portrait remains beneath all media layers.

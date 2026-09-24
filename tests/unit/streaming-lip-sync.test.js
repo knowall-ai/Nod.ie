@@ -43,6 +43,41 @@ test('server rejects a render submitted with a pre-cancelled generation',async()
     await assert.rejects(server.render(new Uint8Array(44),generation),/cancelled/);
 });
 
+test('video catches up with audio after asynchronous decoder startup',async()=>{
+    const h=harness(async()=>new Uint8Array(16));
+    h.video.play=async()=>{h.queue.context.currentTime=1.03;};
+    h.queue.push(new Float32Array(30720),48000);
+    await new Promise(r=>setTimeout(r,800));
+    assert.equal(h.video.currentTime,0);
+    assert.equal(h.video.playbackRate,1.3);
+    h.video.currentTime=.29;await new Promise(r=>setTimeout(r,50));
+    assert.ok(h.video.playbackRate<1 && h.video.playbackRate>=.9);
+    h.queue.cancel();
+});
+
+test('the final audio restores idle even when its video never arrives',async()=>{
+    const pending=[];const held=[];
+    const h=harness(()=>new Promise(resolve=>pending.push(resolve)));
+    h.video.style={};
+    h.queue.renderer.state.avatarManager.idle={prepareSpeech(){},holdSpeech(_video,continuing){held.push(continuing)}};
+    h.queue.push(new Float32Array(30720),48000);h.queue.push(new Float32Array(30720),48000);
+    pending[0](new Uint8Array(16));await tick();
+    h.queue.context.currentTime=h.sources[1].at;h.sources[0].onended();
+    assert.equal(held.at(-1),true);
+    h.queue.context.currentTime=3;h.sources[1].onended();
+    assert.equal(held.at(-1),false);
+    assert.equal(h.queue.activeJob,null);
+    pending[1](new Uint8Array(16));await tick();assert.equal(h.queue.activeJob,null);
+    h.queue.cancel();
+});
+
+test('expiring final video does not count its own source as continuing speech',async()=>{
+ const h=harness(()=>new Promise(()=>{}));const held=[];
+ h.queue.renderer.state.avatarManager.idle={prepareSpeech(){},holdSpeech(_v,c){held.push(c)}};
+ h.queue.push(new Float32Array(30720),48000);
+ h.queue.activeJob={source:h.sources[0]};h.queue.release();
+ assert.equal(held.at(-1),false);h.queue.cancel();
+});
 test('oversized PCM splits without losing samples and rejects invalid inputs', async()=>{
  const h=harness(()=>new Promise(()=>{}));
  h.queue.push(new Float32Array(70000),48000);
