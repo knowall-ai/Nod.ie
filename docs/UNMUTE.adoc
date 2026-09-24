@@ -79,3 +79,13 @@ Recognition and persistent conversation-history integration remain separate work
 The TTS startup stages only the nine demo voice files into a dedicated runtime directory. Restricting Hugging Face downloads alone is insufficient: its snapshot may already contain other cached voices, which the old TTS loader would also load onto the GPU.
 
 Decoded audio carries a response generation. Interruptions invalidate queued output, and the decoder clears partial PCM buffers at generation changes while retaining its continuous Opus state. Late frames cannot restart animation, microphone ducking or playback in a later response.
+
+== Local streaming transcripts
+
+Unmute saves received user speech text and the speech generator's `response.text.delta` events in `~/.config/nodie/conversations/local.json`.
+The private, mode-0600 file keeps at most 12 messages, each limited to 2,000 UTF-16 code units, with message timestamps and a 60 KB serialized bound for streaming writes.
+Partial turns are checkpointed every 500 ms; turn boundaries and disconnects flush pending text. An abrupt crash may lose the final checkpoint interval.
+The settings Clear History control clears these transcripts too; stale pending writes cannot restore erased text.
+Only text is retained: no microphone audio, generated audio, internal reasoning, tool results or transcript text in diagnostic logs.
+This records recognized/generated text, not proof of every sound played: voice-model noises may have no corresponding word.
+Saved transcripts are available for local diagnosis; this change does not inject previous sessions into the Unmute model or enable speaker identification.
