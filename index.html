@@ -12,6 +12,8 @@
             <button id="control-mic" class="orbit-control" type="button" aria-label="Microphone" aria-pressed="false" disabled title="Microphone off"><img src="assets/icons/lucide/mic-off.svg" alt="" aria-hidden="true"></button>
             <button id="control-camera" class="orbit-control" type="button" aria-label="Turn camera preview on" aria-pressed="false" title="Camera off"><video class="camera-preview" muted playsinline aria-hidden="true" hidden></video><img src="assets/icons/lucide/camera-off.svg" alt="" aria-hidden="true"></button>
             <button id="control-speaker" class="orbit-control" type="button" aria-label="Speaker" aria-pressed="true" title="Speaker on"><img src="assets/icons/lucide/volume-2.svg" alt="" aria-hidden="true"></button>
+            <button id="control-fullscreen" class="orbit-control" type="button" aria-label="Full screen" title="Full screen" hidden>⛶</button>
+            <button id="control-tray" class="orbit-control" type="button" aria-label="Minimize to system tray" title="Minimize to system tray" hidden>−</button>
             <button id="control-settings" class="orbit-control" type="button" aria-label="Settings" title="Settings" hidden><img src="assets/icons/lucide/settings.svg" alt="" aria-hidden="true"></button>
         </div>
         <canvas id="waveform"></canvas>
@@ -61,7 +63,9 @@
     <script src="modules/streaming-transcript.js"></script>
 
     <script src="modules/stream-speakers.js"></script>
+    <script src="modules/spoken-controls.js"></script>
     <script src="renderer.js"></script>
+    <script src="modules/window-controls.js"></script>
     <script src="modules/overlay-hit-regions.js"></script>
 </body>
 </html>

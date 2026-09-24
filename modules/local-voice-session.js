@@ -93,6 +93,7 @@ class LocalVoiceSession {
             const result = await window.nodie.voiceTurn(audio);
             if (generation !== this.generation) return;
             this.emptyTurns = 0;
+            if(window.SpokenControls){this.renderer.spokenControls ||= new window.SpokenControls(this.renderer);if(await this.renderer.spokenControls.accept(result.transcript)){this.state='idle';this.status('');this.resumeListening();return;}}
             if (result.controls) this.renderer.controls.applyVoiceControls(result.controls);
             if (result.silent) { this.state = 'idle'; this.status(''); this.resumeListening(); return; }
             await this.playReply(result, generation);

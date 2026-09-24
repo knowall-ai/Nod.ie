@@ -18,6 +18,7 @@ function start() {
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
     const speakerRecognition = new (require('./lib/speaker-recognition').SpeakerRecognition)();
     const voice = new LocalVoice({ logger, historyStore, speakerRecognition, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
+    let windowMode;
     let mainWindow, pointerTracker, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
     const stopDrag = () => { updateDrag?.(); clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; updateDrag = null; return dragMoved; };
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
@@ -49,7 +50,9 @@ function start() {
         }
         globalShortcut.register('CommandOrControl+Shift+A', () => mainWindow.show());
         globalShortcut.register('CommandOrControl+Shift+Q', () => app.quit());
+        windowMode?.syncEscape();
     }
+    handle('window-action', value => windowMode.action(value));
     handle('get-config', config);
     handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
@@ -118,7 +121,7 @@ function start() {
         try { pointerTracker?.setRegions(value); } catch { logger.write('warn', 'overlay.invalid-hit-regions'); }
     });
     ipcMain.on('begin-drag', event => {
-        if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer) return;
+        if (!trusted(event) || event.sender !== mainWindow.webContents || dragTimer || windowMode?.isFullscreen()) return;
         const { screen } = require('electron');
         const origin = screen.getCursorScreenPoint();
         const start = mainWindow.getPosition();
@@ -163,12 +166,13 @@ function start() {
         mainWindow.setAlwaysOnTop(true, 'screen-saver');
         const input = require('./lib/window-hit-test');
         pointerTracker = process.platform === 'linux' && process.env.DISPLAY ? input.nativeInputRegion(mainWindow, logger) : input.trackPointer(mainWindow, require('electron').screen, () => Boolean(dragTimer));
+        windowMode=require('./lib/window-controls').windowControls(mainWindow,pointerTracker,globalShortcut);
         const position = store.get('position');
         const { screen } = require('electron');
         const area = screen.getPrimaryDisplay().workArea;
         if (position && Number.isFinite(position.x) && Number.isFinite(position.y) && screen.getAllDisplays().some(d => { const p = dragPosition({ x: 0, y: 0 }, { x: 0, y: 0 }, [position.x, position.y], [300, 300], d.bounds); return p[0] === position.x && p[1] === position.y; })) mainWindow.setPosition(position.x, position.y);
         else mainWindow.setPosition(area.x + area.width - 350, area.y + area.height - 350);
-        mainWindow.on('moved', () => { const [x, y] = mainWindow.getPosition(); store.set('position', { x, y }); });
+        mainWindow.on('moved', () => { if(windowMode.isFullscreen())return; const [x, y] = mainWindow.getPosition(); store.set('position', { x, y }); });
         mainWindow.on('close', event => { if (!app.isQuitting) { event.preventDefault(); mainWindow.hide(); } });
         const menu = Menu.buildFromTemplate([{ label: 'Show Nod.ie', click: () => mainWindow.show() }, { label: 'Settings and security updates', click: showSettings }, { label: 'Reload', click: () => mainWindow.reload() }, { label: 'Developer tools', click: () => mainWindow.webContents.openDevTools({ mode: 'detach' }) }, { type: 'separator' }, { label: 'Quit', click: () => app.quit() }]);
         mainWindow.webContents.on('context-menu', () => menu.popup());

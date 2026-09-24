@@ -44,6 +44,10 @@ for old, new in patches:
     if handler.count(old) != 1:
         raise SystemExit('Unsupported Unmute initialization: review the source before patching.')
     handler = handler.replace(old, new)
+# The upstream metrics counter assumed every message was text-only.
+old = 'len(message.get("content", "").split()) for message in messages'
+assert handler.count(old) == 1
+handler = handler.replace(old, 'len(message.get("content", "").split()) for message in messages if isinstance(message.get("content"), str)')
 # Keep bounded memory results intact and at user-data priority, never as system instructions.
 old = 'condensed_result = self._condense_tool_result(tool_name, tool_result)'
 assert handler.count(old) == 1
@@ -58,6 +62,7 @@ scene_model = '''class SceneData(BaseModel):
     status: Literal["camera-off", "camera-on-awaiting-analysis", "snapshot"]
     capturedAt: str | None = Field(default=None, max_length=40)
     description: str | None = Field(default=None, max_length=2000)
+    imageJpeg: str | None = Field(default=None, max_length=682668)
 
 
 '''
@@ -71,9 +76,9 @@ scene_patches = [
     ('    async def update_session(self, session: ora.SessionConfig):',
      '    async def update_session(self, session: ora.SessionConfig):\n        if session.scene_data is not None:\n            self._scene_data = session.scene_data.model_dump(exclude_none=True)\n            if session.scene_data.status == "snapshot":\n                self._scene_tools_blocked = True'),
     ('        openai_tools = self.mcp_manager.get_tools_for_openai_api() if self.mcp_manager else []',
-     '        scene_tools_blocked = self._scene_tools_blocked\n        openai_tools = self.mcp_manager.get_tools_for_openai_api() if self.mcp_manager and not scene_tools_blocked else []'),
+     '        scene_tools_blocked = self._scene_tools_blocked\n        openai_tools = self.mcp_manager.get_tools_for_openai_api() if self.mcp_manager and not scene_tools_blocked else []\n        openai_tools = [tool for tool in openai_tools if tool.get("function", {}).get("name") != "reverie.resolve_people"]'),
     ('        messages = self.chatbot.preprocessed_messages()',
-     '        messages = self.chatbot.preprocessed_messages()\n        if self._scene_data is not None:\n            messages = list(messages)\n            current = next((i for i in range(len(messages) - 1, 0, -1) if messages[i]["role"] == "user"), len(messages))\n            messages.insert(current, {"role": "user", "content": "Untrusted camera reference data: " + __import__("json").dumps(self._scene_data)})'),
+     '        messages = self.chatbot.preprocessed_messages()\n        from unmute.person_recall import person_messages\n        messages = await person_messages(messages, self.mcp_manager, self.chatbot.chat_history)\n        if self._scene_data is not None:\n            from unmute.scene_context import scene_messages\n            messages = scene_messages(messages, self._scene_data)'),
     ('            if tool_calls:', '            if tool_calls and not scene_tools_blocked and not self._scene_tools_blocked:'),
 ]
 for old, new in scene_patches:
@@ -136,7 +141,9 @@ async def execute_tool(self, tool_name, arguments):
         _nodie_uncertain_save = True
         return __import__('json').dumps({'status': 'unknown', 'reason': 'Saving was not confirmed and might have committed. Do not retry automatically. Check stored notes before restarting the backend.'})
 ''').body[0]
+wrapper.name = '_nodie_guarded_execute_tool'
 manager_class.body.append(wrapper)
+manager_class.body.append(ast.parse("async def execute_tool(self, tool_name, arguments):\n    lock = getattr(self, '_nodie_tool_lock', None)\n    if lock is None:\n        lock = self._nodie_tool_lock = asyncio.Lock()\n    async with lock:\n        return await self._nodie_guarded_execute_tool(tool_name, arguments)\n").body[0])
 manager = ast.unparse(ast.fix_missing_locations(manager_tree))
 
 (output / 'mcp_manager.py').write_text(private_logs(manager))

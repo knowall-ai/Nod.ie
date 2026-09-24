@@ -58,3 +58,13 @@ Install and start the speaker service from the speaker-diarization instructions 
 Run `python3 unmute-service/prepare-backend.py /path/to/unmute`, followed by `python3 unmute-service/prepare-speakers.py /path/to/unmute`. When stacking memory overrides, apply the speaker preparer to their generated handler so their privacy and memory changes are retained. Set `NODIE_SPEAKERS_DIR` to this branch's `unmute-service` directory and append `compose.speakers.yml` after the other backend Compose overlays. Recreate only `unmute-backend`.
 
 Without this backend overlay, older Unmute ignores the new field; speech continues but identity hints do not reach the model. Browser-only recognition is not exposed by this change. Raw audio remains in memory and is not retained.
+
+== Window and directly addressed voice controls
+
+The desktop has Full screen / Restore and Minimize to system tray controls. Full screen presents the enlarged avatar with a dark background and bottom controls; Escape restores the previous compact position and size. Hiding does not end the conversation. Tray click or the existing show shortcut reopens it.
+
+Directly address Nodie's name for voice controls: natural variants of fullscreen, restore, hide/minimize, show/open, speaker mute/unmute and microphone stop are supported. Overheard keywords, quoted commands, hypothetical discussion and negated window commands do not activate them. This is a bounded intention parser, not unrestricted voice automation. Stop talking means persistent speaker mute, as requested; it does not stop microphone capture. A hidden app can hear an addressed open request while the microphone remains enabled. Once listening is stopped, use the tray or hotkey to enable it again. No secondary always-listening wake-word microphone is opened.
+
+Known people are resolved from names and nicknames in the microphone transcript using a bounded private index. Phonetic variants and ambiguous first names are candidates requiring clarification or spelling; they are never automatically saved or merged. Only matched person facts are supplied to the conversation, without embedding vectors. Cold lookups wait up to 1.5 seconds on the response path and complete privately under a serialized MCP transport.
+
+Directly addressed local controls confirm through the resulting window or mute state. Their model reply is suppressed because the model has not received the local action result. Escape is registered while the fullscreen window is visible and released when hidden or restored.

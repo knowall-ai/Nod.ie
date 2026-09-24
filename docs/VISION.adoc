@@ -4,7 +4,7 @@
 
 The camera button is an opt-in live preview. It starts off on each launch and shows the camera feed inside its amber circular border while enabled. Clicking it again stops the tracks, clears the preview and discards the retained frame. Microphone capture remains independent; this camera stream requests no audio.
 
-In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. A short description and capture timestamp are supplied through a validated `scene_data` session field and a separate user-data message without clearing conversation history. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
+In Unmute mode, selected snapshots are analysed by the configured local Ollama model (`LOCAL_VISION_MODEL`, falling back to the voice `LLM_MODEL`). The installed Qwen alias supports images. The selected JPEG and its capture timestamp are supplied through validated `scene_data`. The voice model receives the actual image as an ephemeral multimodal user-data message next to the current question. Images are never appended to conversation history. Camera ON/OFF is supplied separately as trusted device state, so pending or expired images do not imply the camera is off. Nod.ie can answer questions about that snapshot. No new model stays loaded solely for vision, and no images are saved to disk. See https://docs.ollama.com/capabilities/vision[Ollama vision API].
 
 Face identities are not supplied to voice conversation; unsolicited spoken observations and Reverie observation writes are not connected. Local batch voice mode currently retains preview only. A frame description is untrusted reference data, never a command, identity proof, or authority for a memory write. Camera-off immediately cancels analysis and clears the description; stale descriptions expire after 75 seconds. The desktop does not persist camera-on across restarts.
 
@@ -51,3 +51,9 @@ node --test tests/unit/face-recognition.test.js
 ----
 
 The current implementation provides local extraction, matching, selected-frame collection and profile management. Pending before user acceptance: typed face observations into Unmute (separate from system instructions), conversational naming with an unambiguous current face, model-worded unknown-person notifications, thumbnail-based disambiguation in Settings, household matching calibration and end-to-end camera/voice load testing. Until those are complete, Nodie does not receive these face identities in her spoken conversation. The settings panel states that limitation explicitly.
+
+== Direct image questions
+
+Unmute no longer waits for a separate two-sentence scene summary. Selected JPEGs remain capped at 512 KB, 768×576 and 85% quality. Spoken input requests a fresh frame at most once every two seconds; scene changes still pass through the local frame selector. Only the latest image is retained in memory, expires after 75 seconds on both sides, and is removed when the camera is disabled. No additional background vision inference competes with speech. This is snapshot-based visual question answering, not continuous arrival/departure tracking or proactive room narration.
+
+After an image is supplied, model-directed memory tools remain disabled for that connection. Independent person recall is permitted only from microphone transcript text; image text cannot trigger it.

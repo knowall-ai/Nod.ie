@@ -65,9 +65,17 @@ async function saveMemory(client, args) {
 /** Build the actual MCP handler with an injectable upstream for transport-level tests. */
 function createMemoryServer(connect, {searchTimeout = 4000, hybrid = true} = {}) {
     let writing = false, uncertainWrite = false;
+    const resolvePeople=require('./person-recall.cjs').createResolver(connect);
+    const personTool={name:'resolve_people',description:'Internal read-only transcript person resolver.',inputSchema:{type:'object',properties:{transcript:{type:'string',maxLength:1200}},required:['transcript'],additionalProperties:false}};
     const server = new Server({ name: 'nodie-reverie-readonly', version: '1.0.0' }, { capabilities: { tools: {} } });
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [tool, saveTool] }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [tool, saveTool, personTool] }));
     server.setRequestHandler(CallToolRequestSchema, async request => {
+        if(request.params.name==='resolve_people') {
+            const args=request.params.arguments;
+            if(!args || Object.keys(args).length!==1 || typeof args.transcript!=='string' || args.transcript.length>1200)return {isError:true,content:[{type:'text',text:'Invalid transcript'}]};
+            try{return {content:[{type:'text',text:JSON.stringify(await resolvePeople(args.transcript))}]};}
+            catch{return {content:[{type:'text',text:'{"status":"unavailable","people":[]}'}]};}
+        }
         if (request.params.name === saveTool.name) {
             if (!validSave(request.params.arguments)) return { isError: true, content: [{ type: 'text', text: 'Invalid memory arguments' }] };
             if (uncertainWrite) return { content: [{ type: 'text', text: JSON.stringify({ status: 'not-saved', reason: 'A previous write is unconfirmed. Further saves are paused until the bridge is restarted after checking stored notes.' }) }] };

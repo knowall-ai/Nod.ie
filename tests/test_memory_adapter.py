@@ -8,9 +8,13 @@ import unittest
 root = Path(__file__).resolve().parents[1]
 tree = ast.parse((root / 'unmute-service/generated/mcp_manager.py').read_text())
 assert any(isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == '_nodie_uncertain_save' for t in n.targets) and isinstance(n.value, ast.Constant) and n.value.value is False for n in tree.body), 'Missing module-level uncertainty latch'
-wrapper = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == 'execute_tool')
+wrappers = [n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name in ['execute_tool','_nodie_guarded_execute_tool']]
 ns = {'asyncio': asyncio, '_nodie_uncertain_save': False}
-exec(compile(ast.Module(body=[wrapper], type_ignores=[]), '<memory-adapter>', 'exec'), ns)
+exec(compile(ast.Module(body=wrappers, type_ignores=[]), '<memory-adapter>', 'exec'), ns)
+
+class Manager:
+    def __init__(self, _nodie_execute_tool): self._nodie_execute_tool=_nodie_execute_tool
+    _nodie_guarded_execute_tool=ns['_nodie_guarded_execute_tool']
 
 class MemoryTest(unittest.IsolatedAsyncioTestCase):
     def setUp(self): ns['_nodie_uncertain_save'] = False
@@ -22,7 +26,7 @@ class MemoryTest(unittest.IsolatedAsyncioTestCase):
                 calls.append(name)
                 if isinstance(outcome, Exception): raise outcome
                 return outcome
-            manager = types.SimpleNamespace(_nodie_execute_tool=execute)
+            manager = Manager(_nodie_execute_tool=execute)
             result = json.loads(await ns['execute_tool'](manager, 'reverie.save_memory', {}))
             self.assertEqual(result['status'], 'unknown')
             result = json.loads(await ns['execute_tool'](manager, 'reverie.save_memory', {}))
@@ -31,15 +35,15 @@ class MemoryTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_reconnect_does_not_clear_unconfirmed_save(self):
         async def execute(name, args): return '{"status":"unknown"}'
-        first=types.SimpleNamespace(_nodie_execute_tool=execute)
+        first=Manager(_nodie_execute_tool=execute)
         await ns['execute_tool'](first, 'reverie.save_memory', {})
         async def never(*args): self.fail('write after reconnect')
-        replacement=types.SimpleNamespace(_nodie_execute_tool=never)
+        replacement=Manager(_nodie_execute_tool=never)
         self.assertEqual(json.loads(await ns['execute_tool'](replacement, 'reverie.save_memory', {}))['status'], 'not-saved')
 
     async def test_confirmed_saves_and_searches_keep_working(self):
         async def execute(name, args): return '{"status":"saved"}'
-        manager = types.SimpleNamespace(_nodie_execute_tool=execute)
+        manager = Manager(_nodie_execute_tool=execute)
         for _ in range(2):
             self.assertEqual(json.loads(await ns['execute_tool'](manager, 'reverie.save_memory', {}))['status'], 'saved')
         ns['_nodie_uncertain_save'] = True
@@ -47,7 +51,7 @@ class MemoryTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancellation_preserves_uncertainty(self):
         async def execute(name, args): raise asyncio.CancelledError()
-        manager = types.SimpleNamespace(_nodie_execute_tool=execute)
+        manager = Manager(_nodie_execute_tool=execute)
         with self.assertRaises(asyncio.CancelledError):
             await ns['execute_tool'](manager, 'reverie.save_memory', {})
         self.assertTrue(ns['_nodie_uncertain_save'])

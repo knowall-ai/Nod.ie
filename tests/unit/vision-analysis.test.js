@@ -18,32 +18,38 @@ test('oversized output and tool calls are rejected',async()=>{
   const service=new VisionAnalysis({fetchImpl:async()=>Response.json(data)});assert.equal((await service.analyse(jpeg)).status,'unavailable');
  }
 });
-function fixture(t){let now=Date.now(),calls=0,cancels=0;const sent=[];
+function fixture(t){let now=Date.now();const sent=[];
  const renderer={state:{isConnected:true,wsHandler:{send:x=>sent.push(x)}},unmuteBasePrompt:'You are Nodie.',showNotification(){}};
- const api={analyseVision:async()=>{calls++;return {status:'ready',description:'A cat.'};},cancelVision:async()=>{cancels++;}};
+ const api={analyseVision:async()=>{throw Error('Background model must not run')}};
  const context=new Context(renderer,api,{now:()=>now});t.after(()=>context.dispose());context.setActive(true);
- return {context,renderer,api,sent,advance:n=>{now+=n;},calls:()=>calls,cancels:()=>cancels,frame:()=>({image:new Blob([jpeg]),capturedAt:new Date(now).toISOString(),signal:new AbortController().signal})};
+ return {context,renderer,sent,advance:n=>{now+=n;},frame:()=>({image:new Blob([jpeg]),capturedAt:new Date(now).toISOString(),signal:new AbortController().signal})};
 }
-test('voice gets priority, selected scene is bounded context and off clears it',async t=>{
- const h=fixture(t);h.context.initialCapture=false;assert.equal(h.context.canAnalyse(),false);h.advance(2100);await h.context.analyse(h.frame());assert.equal(h.calls(),1);
- assert.equal(h.sent.at(-1).session.scene_data.description,'A cat.');assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/A cat/);assert.equal(h.sent.at(-1).session.allow_recording,false);
- assert.equal(h.context.canAnalyse(),false);h.advance(15000);assert.equal(h.context.canAnalyse(),true);
- h.context.voiceEvent({type:'response.audio.delta'});assert.equal(h.context.canAnalyse(),false);
- h.context.setActive(false);assert.equal(h.sent.at(-1).session.scene_data.status,'camera-off');assert.doesNotMatch(h.sent.at(-1).session.instructions.text,/A cat/);
+test('voice receives the actual JPEG separately from authoritative camera state',async t=>{
+ const h=fixture(t);await h.context.analyse(h.frame());const session=h.sent.at(-1).session;
+ assert.equal(session.scene_data.imageJpeg,Buffer.from(jpeg).toString('base64'));
+ assert.match(session.instructions.text,/camera device state: ON/);assert.equal(session.allow_recording,false);
+ assert.equal(session.scene_data.description,undefined);assert.doesNotMatch(session.instructions.text,/\/9gB\/9k=/);
+ assert.equal(h.context.canAnalyse(),false);h.advance(2001);assert.equal(h.context.canAnalyse(),true);
+ h.context.setActive(false);assert.deepEqual(h.sent.at(-1).session.scene_data,{status:'camera-off'});
+ assert.match(h.sent.at(-1).session.instructions.text,/camera device state: OFF/);
 });
-test('camera off during analysis discards late scene, stale scenes expire',async t=>{
- const h=fixture(t);h.advance(2100);let finish;h.api.analyseVision=()=>new Promise(r=>{finish=r;});
- const pending=h.context.analyse(h.frame());await new Promise(r=>setImmediate(r));h.context.setActive(false);finish({status:'ready',description:'old scene'});await pending;
+test('camera off during JPEG conversion discards the late image',async t=>{
+ const h=fixture(t);let finish;const frame=h.frame();frame.image={arrayBuffer:()=>new Promise(r=>finish=r)};
+ const pending=h.context.analyse(frame);h.context.setActive(false);finish(jpeg.buffer);await pending;
  assert.equal(h.context.scene,null);assert.equal(h.sent.at(-1).session.scene_data.status,'camera-off');
- h.context.active=true;h.context.scene={description:'stale',capturedAt:new Date(0).toISOString()};h.context.update();assert.equal(h.sent.at(-1).session.scene_data.status,'camera-on-awaiting-analysis');
 });
-
-test('explicit camera enable gets a first snapshot despite voice activity; later work yields',async t=>{
- const h=fixture(t);assert.equal(h.context.canAnalyse(),true);
- let finish;h.api.analyseVision=()=>new Promise(r=>{finish=r;});const pending=h.context.analyse(h.frame());await new Promise(r=>setImmediate(r));
- const before=h.cancels();h.context.voiceEvent({type:'response.created'});assert.equal(h.cancels(),before);
- finish({status:'ready',description:'A chair.'});await pending;assert.equal(h.context.initialCapture,false);
- assert.equal(h.context.status,'snapshot');assert.ok(!h.sent.at(-1).session.instructions.text.includes(Context.PENDING_ANALYSIS_MESSAGE));h.context.setActive(false);assert.equal(h.context.status,'camera-off');assert.ok(!h.sent.at(-1).session.instructions.text.includes(Context.PENDING_ANALYSIS_MESSAGE));
- h.context.setActive(true);assert.equal(h.context.status,'camera-on-awaiting-analysis');assert.equal(h.context.canAnalyse(),true);
- assert.ok(h.sent.at(-1).session.instructions.text.includes(Context.PENDING_ANALYSIS_MESSAGE));
+test('expired image leaves the camera ON and is not sent',async t=>{
+ const h=fixture(t);await h.context.analyse(h.frame());h.advance(76000);h.context.update();
+ const session=h.sent.at(-1).session;assert.equal(session.scene_data.status,'camera-on-awaiting-analysis');
+ assert.match(session.instructions.text,/Camera is ON/);assert.equal(session.scene_data.imageJpeg,undefined);
+});
+test('speech requests a fresh selected image without a background vision inference',async t=>{
+ const h=fixture(t);let requests=0;h.renderer.controls={updateCamera(){},cameraSource:{requestFrame:()=>requests++}};
+ h.context.voiceEvent({type:'conversation.item.input_audio_transcription.delta'});assert.equal(requests,1);
+ await h.context.analyse(h.frame());assert.equal(h.context.status,'snapshot');
+ h.context.setActive(false);h.context.voiceEvent({type:'conversation.item.input_audio_transcription.delta'});assert.equal(requests,1);
+});
+test('invalid JPEG never replaces the current camera image',async t=>{
+ const h=fixture(t);await h.context.analyse(h.frame());h.advance(2001);const scene=h.context.scene;
+ const f=h.frame();f.image=new Blob(['not jpeg']);assert.deepEqual(await h.context.analyse(f),{retry:true});assert.equal(h.context.scene,scene);
 });

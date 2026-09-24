@@ -19,12 +19,14 @@ include::includes/document-history.adoc[]
 include::SOLUTION_DESIGN.adoc[]
 include::DATA_MODEL.adoc[]
 include::INSTALLATION.adoc[]
+
 include::SECURITY_UPDATES.adoc[]
 include::MEMORY.adoc[]
 include::LIP_SYNC.adoc[]
 include::UNMUTE.adoc[]
 
 include::VISION.adoc[]
+
 include::TESTING.adoc[]
 
 include::DIAGNOSTICS.adoc[]
