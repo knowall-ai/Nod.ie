@@ -20,6 +20,7 @@ jobs:
         run: |
           python3 -m pip install numpy==2.4.3
           python3 tests/test_curiosity_context.py
+          python3 tests/test_person_recall.py
           python3 tests/test_recognition_context.py
           python3 tests/test_speaker_intervals.py
       - name: Check neural service and model setup syntax

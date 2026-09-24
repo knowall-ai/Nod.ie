@@ -36,4 +36,24 @@ class RecallTests(unittest.IsolatedAsyncioTestCase):
   messages=[{'role':'system','content':'Policy'},{'role':'user','content':'What is Edi holding?'}]
   output=await m.person_messages(messages,manager,include_animals=True)
   self.assertIn('Edi',output[-2]['content'])
+ async def test_recognition_link_recall_without_spoken_name(self):
+  import time
+  calls=[]
+  async def execute(name,args):
+   calls.append((name,args))
+   return json.dumps({'people':[{'personId':'person','name':'Alex','match':'possible-recognition'}] if name.endswith('resolve_linked_people') else []})
+  manager=types.SimpleNamespace(available_tools={'reverie.resolve_people':{},'reverie.resolve_linked_people':{}},execute_tool=execute)
+  history=[{'role':'system','content':'Policy'},{'role':'user','content':'Hello there'}]
+  face=([{'profileId':'11111111-1111-1111-1111-111111111111','name':'Alex','uncertain':True}],time.monotonic())
+  output=await m.person_messages(history,manager,faces=face)
+  self.assertEqual(calls[-1][0],'reverie.resolve_linked_people');self.assertIn('Alex',output[-2]['content']);self.assertEqual(len(history),2)
+  calls.clear();await m.person_messages(history,manager,faces=(face[0],time.monotonic()-16));self.assertEqual(len(calls),1)
+ async def test_uncertain_or_unnamed_voice_never_triggers_linked_recall(self):
+  import time
+  calls=[]
+  async def execute(name,args):calls.append(name);return '{"people":[]}'
+  manager=types.SimpleNamespace(available_tools={'reverie.resolve_people':{},'reverie.resolve_linked_people':{}},execute_tool=execute)
+  state=types.SimpleNamespace(observed_at=time.monotonic(),observations=[{'speakers':[{'id':'id','name':'Alex','uncertain':True}]}])
+  await m.person_messages([{'role':'system','content':'Policy'},{'role':'user','content':'Hello'}],manager,recognition_state=state)
+  self.assertNotIn('reverie.resolve_linked_people',calls)
 if __name__=='__main__':unittest.main()

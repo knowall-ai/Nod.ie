@@ -146,3 +146,17 @@ el('journal-clear').onclick=()=>{if(confirm('Permanently clear all saved events?
 el('journal-enabled').onchange=()=>api.journalEnabled(el('journal-enabled').checked).then(loadJournal).catch(error);
 el('journal-retention').onchange=()=>api.journalRetention(Number(el('journal-retention').value)).then(loadJournal).catch(error);
 loadJournal().catch(error);
+
+
+let personChoices;
+async function loadPeople(){
+ const data=await api.personOptions();personChoices=data;
+ const select=(id,rows,empty)=>{const input=el(id);input.replaceChildren();const none=document.createElement('option');none.value='';none.textContent=empty;input.append(none);for(const row of rows){const option=document.createElement('option');option.value=String(row.id);option.textContent=row.name+' ('+String(row.id).slice(0,8)+')';input.append(option);}};
+ select('person-existing',data.people,'Create a new local person');select('person-face',data.faces,'No face selected');select('person-voice',data.voices,'No voice selected');select('person-memory',[...new Map([...data.memories,...data.people.map(p=>p.memory).filter(Boolean)].map(m=>[m.id,m])).values()],'No memory link');
+ el('people-status').textContent=data.memoryAvailable?'Select the profiles you know belong to this person.':'Memory is unavailable; recognition profiles can still be linked locally.';
+ el('people-list').replaceChildren(...data.people.map(p=>{const row=document.createElement('p');row.textContent=p.name+': '+p.faces.length+' face profile(s), '+p.voices.length+' voice profile(s)'+(p.memory?', memory: '+p.memory.name:'');const button=document.createElement('button');button.textContent='Unlink';button.onclick=()=>api.removePerson(p.id).then(loadPeople).catch(error);row.append(button);return row;}));
+}
+el('person-existing').onchange=()=>{const p=personChoices?.people.find(p=>p.id===el('person-existing').value);el('person-name').value=p?.name||'';el('person-memory').value=p?.memory?String(p.memory.id):'';};
+el('people-refresh').onclick=()=>loadPeople().catch(error);
+el('person-save').onclick=async()=>{const button=el('person-save');button.disabled=true;try{await api.savePerson({id:el('person-existing').value||null,name:el('person-name').value,faceId:el('person-face').value||null,voiceId:el('person-voice').value||null,memoryId:el('person-memory').value===''?null:Number(el('person-memory').value)});await loadPeople();}catch(e){error(e);}finally{button.disabled=false;}};
+loadPeople().catch(error);

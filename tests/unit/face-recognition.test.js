@@ -45,3 +45,10 @@ test('runtime faces are temporary until a name is confirmed',async t=>{
  const second=await engine.analyse(new Uint8Array(100));assert.equal(first.faces[0].id,second.faces[0].id);
  assert.equal(await s.nameObserved(first,first.faces[0].id,'Example'),true);assert.equal((await s.status()).profiles.length,1);
 });
+test('status polling and repeated temporary face frames do not rewrite profiles',async t=>{
+ const s=await store(t);await s.configure(true);let writes=0;const original=s.write.bind(s);s.write=async d=>{writes++;return original(d);};
+ const engine=new FaceRecognition({store:s,analyse:async()=>result(vector(0))});
+ for(let i=0;i<10;i++){await s.status();await engine.analyse(new Uint8Array(100));}
+ assert.equal(writes,0);const o=engine.lastObservation;await s.nameObserved(o,o.faces[0].id,'Example');assert.equal(writes,1);
+ for(let i=0;i<10;i++)await engine.analyse(new Uint8Array(100));assert.equal(writes,1);
+});

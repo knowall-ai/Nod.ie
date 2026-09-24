@@ -6,6 +6,9 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
+    personOptions:()=>ipcRenderer.invoke('person-options'),
+    savePerson:choice=>ipcRenderer.invoke('person-save',choice),
+    removePerson:id=>ipcRenderer.invoke('person-remove',id),
     proposeRecognitionName:turn=>ipcRenderer.invoke('recognition-propose',turn),
     onRecognitionProposal:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('recognition-proposal',listener);return ()=>ipcRenderer.removeListener('recognition-proposal',listener);},
     cancelRecognition:()=>ipcRenderer.invoke('recognition-cancel'),

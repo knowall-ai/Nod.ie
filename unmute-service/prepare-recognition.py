@@ -16,6 +16,7 @@ s=patch(s,'class SpeakerObservation(BaseModel):','''class SpeakerSegment(BaseMod
     speaker: int = Field(ge=0,le=8)
 
 class FaceItem(BaseModel):
+    profileId: str | None = Field(default=None,max_length=40)
     name: str | None = Field(default=None,max_length=80)
     uncertain: bool = True
     mayAskName: bool = False

@@ -106,3 +106,8 @@ Background speaker samples match existing profiles without enrolling unfamiliar 
 Prepare all backend overlays from the same checkout and generated directory using `python3 unmute-service/prepare-backend.py /path/to/unmute --with-speakers`. Regenerating the base preserves an already-installed speaker adapter; rerunning the speaker patch is idempotent.
 
 Memory saves have a 20-second outer tool deadline, exceeding the bridge’s 5-second connection, 2.5-second lookup and 7-second write budgets. Unknown results, process errors and cancellation pause further saves in the backend as well as the bridge; search remains available. Check stored notes and wait for upstream work to settle before restarting the backend to clear that latch.
+
+
+== Recognition reliability follow-up
+
+Conversational naming retries cache the introduction classification for at most 15 seconds and three turns. Adjacent audio windows can support an introduction only when the same sole, unambiguous profile and epoch cover its whole interval continuously, including the boundary margin. Different speakers, gaps and stale windows remain rejected. A backward audio clock clears the cached observations. Long, noisy or insufficiently covered introductions can still require another attempt; this is not complete word-by-word diarization coverage.
