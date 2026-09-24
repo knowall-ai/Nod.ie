@@ -1,8 +1,11 @@
-import importlib.util,json,tempfile,unittest
+import importlib.util,json,tempfile,unittest,os
+from unittest.mock import patch
 from pathlib import Path
 from datetime import datetime,timezone
 spec=importlib.util.spec_from_file_location('journal',Path(__file__).resolve().parents[1]/'unmute-service/journal_context.py');m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 class JournalTests(unittest.TestCase):
+ def setUp(self):
+  env=patch.dict(os.environ,{'NODIE_TIMEZONE':''});env.start();self.addCleanup(env.stop)
  def test_local_day_query_and_untrusted_reference(self):
   with tempfile.TemporaryDirectory() as d:
    p=Path(d)/'journal.json';p.write_text(json.dumps({'version':1,'timezone':'Europe/London','retentionDays':30,'events':[{'at':'2026-09-23T23:30:00Z','source':'vision','kind':'appeared','subject':'grey cat','uncertain':True}]}))
@@ -15,6 +18,8 @@ class JournalTests(unittest.TestCase):
    messages=[{'role':'system','content':'Policy'},{'role':'user','content':'What happened today?'}]
    result=m.journal_messages(messages,messages,p,datetime(2026,9,24,1,tzinfo=timezone.utc))
    self.assertIn('2026-09-23',result[-2]['content']);self.assertIn('America/Los_Angeles',result[-2]['content'])
+   with patch.dict(os.environ,{'NODIE_TIMEZONE':'Asia/Tokyo'}):
+    result=m.journal_messages(messages,messages,p,datetime(2026,9,24,1,tzinfo=timezone.utc));self.assertIn('2026-09-24',result[-2]['content']);self.assertIn('Asia/Tokyo',result[-2]['content'])
  def test_unavailable_is_not_no_events_and_nonquery_has_no_io(self):
   messages=[{'role':'system','content':'Policy'},{'role':'user','content':'Hello'}];self.assertIs(m.journal_messages(messages,messages,'/missing'),messages)
   messages[-1]['content']='What happened today?';self.assertIn('unavailable',m.journal_messages(messages,messages,'/missing')[-2]['content'])
