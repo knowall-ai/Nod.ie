@@ -117,7 +117,7 @@ function start() {
     handle('speaker-edit', async (id, name) => {await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}, true);
     handle('speaker-merge', (source, target) => speakerRecognition.store.merge(source, target), true);
     handle('speaker-forget', () => speakerRecognition.store.forget(), true);
-    handle('voice-cancel', () => voice.cancel());
+    handle('voice-cancel', () => {voice.cancel();recognitionNames.cancel();});
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
         let stage = 'validation';

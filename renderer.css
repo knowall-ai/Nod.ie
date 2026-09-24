@@ -358,7 +358,7 @@ body.fullscreen #circle,body.fullscreen #avatar-controls { pointer-events:auto; 
 #recognition-confirm button:hover,#debug-clear:hover { background:#36414d; }
 #recognition-confirm button:focus-visible,#debug-clear:focus-visible,#control-debug:focus-visible { outline:2px solid #f5a623;outline-offset:2px; }
 body.fullscreen #recognition-confirm { top:auto;bottom:88px;transform:translateX(-50%);width:min(360px,calc(100vw - 48px)); }
-body.fullscreen #control-debug { top:24px;right:24px;min-height:32px;padding:4px 12px; }
+body.fullscreen #control-debug { top:24px;right:24px;min-height:32px;padding:4px 12px;border-color:#a97630;color:#f5c77e;background:#202a35; }
 body.fullscreen #debug-stream:not([hidden]) { left:24px;top:24px;bottom:88px; }
 #debug-lines { margin:8px 0 0;padding:0; }
 #debug-lines li { padding:8px 0; }
