@@ -58,6 +58,6 @@ test('only separately scheduled streaming speech requests video-only encoding',a
 
 test('invalid options fail before contacting the neural service', async () => {
  let calls=0;const options={url:'http://localhost',fetchImpl:async()=>{calls++;}};
- for(const extra of [{videoOnly:'true'},{unexpected:true},{videoOnly:1}]) await assert.rejects(renderSpeech(new Uint8Array(44),{...options,...extra}),/Invalid/);
+ for(const extra of [{videoOnly:'true'},{unexpected:true},{videoOnly:1},{fetchImpl:null},{fetchImpl:42}]) await assert.rejects(renderSpeech(new Uint8Array(44),{...options,...extra}),/Invalid/);
  assert.equal(calls,0);
 });
