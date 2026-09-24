@@ -29,3 +29,5 @@ Local CPU embeddings use Reverie's quantized MiniLM model and a persistent Compo
 This PR does not schedule the `dream` tool or expand transcript retention. Confirming ambiguous identities and organising daily conversations are separate workflows.
 
 Existing graphs need stored embeddings for semantic matching. Before first use, an administrator should back up the graph, inspect Reverie's `dream` dry-run report, and apply only an acceptable maintenance plan. This refreshes old embeddings outside a live speech turn. `dream` can also relabel and merge records, so do not run it blindly just to warm a model. Hybrid fallback uses Reverie's default similarity threshold (0.4); scores indicate similarity, not confirmed identity.
+
+Reverie 0.5.2 does not expose a completion flag for empty semantic searches. The bridge reports hybrid retrieval only when a returned row carries semantic-match metadata. Empty or keyword-only fallback results conservatively mark semantic recall incomplete, even when a semantic search may have succeeded without a match.

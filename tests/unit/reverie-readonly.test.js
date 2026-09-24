@@ -49,3 +49,10 @@ test('explicit embedding opt-out never attempts semantic retrieval',async()=>{
  let calls=0;const pair=await linked(createMemoryServer(async()=>({async callTool(){calls++;return {content:[{type:'text',text:'[]'}]};}}),{hybrid:false}));
  try {await pair.client.callTool({name:'search_memories',arguments:{query:'variant'}});assert.equal(calls,1);}finally{await pair.close();}
 });
+
+test('successful keyword-only fallback does not claim completed semantic recall',async()=>{
+ for(const rows of [[],[{memory:{name:'Example',_match:'keyword'}}]]) {
+  let calls=0;const pair=await linked(createMemoryServer(async()=>({async callTool(){return {content:[{type:'text',text:JSON.stringify(++calls===1?[]:rows)}]};}})));
+  try {const result=JSON.parse((await pair.client.callTool({name:'search_memories',arguments:{query:'variant'}})).content[0].text);assert.equal(result.semanticUnavailable,true);assert.equal(result.retrieval,'keyword');assert.deepEqual(result.memories,rows);}finally{await pair.close();}
+ }
+});

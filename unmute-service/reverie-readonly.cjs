@@ -91,7 +91,8 @@ function createMemoryServer(connect, {searchTimeout = 4000, hybrid = true} = {})
                 try {
                     if (remaining <= 0) throw Error('Search deadline reached');
                     const semantic = decode(await upstream.callTool({ name: 'search_memories', arguments: { ...args, search_mode: 'hybrid' } }, undefined, { timeout: remaining }));
-                    output = { ...bounded(semantic), retrieval: 'hybrid' };
+                    const confirmed = semantic.some(row => ['semantic', 'both'].includes(row?.memory?._match));
+                    output = { ...bounded(semantic), retrieval: confirmed ? 'hybrid' : 'keyword', ...(!confirmed ? { semanticUnavailable: true } : {}) };
                 } catch { output.semanticUnavailable = true; }
             }
             return { content: [{ type: 'text', text: JSON.stringify(output) }] };
