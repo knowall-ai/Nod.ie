@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld('nodie', {
     speakerMerge: (source, target) => ipcRenderer.invoke('speaker-merge', source, target),
     speakerForget: () => ipcRenderer.invoke('speaker-forget'),
     clearHistory: () => ipcRenderer.invoke('clear-history'),
+    analyseVision: image => ipcRenderer.invoke('vision-analyse', image),
+    cancelVision: () => ipcRenderer.invoke('vision-cancel'),
     voiceHealth: () => ipcRenderer.invoke('voice-health'),
     voiceTurn: async (audio) => {
         const result = await ipcRenderer.invoke('voice-turn', audio);
