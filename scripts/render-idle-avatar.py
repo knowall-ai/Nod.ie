@@ -21,7 +21,8 @@ if source is None or source.shape[:2] != (1024,1024): raise RuntimeError('Expect
 crop=source[y:y+size,x:x+size,::-1].copy()
 with torch.inference_mode():
  inp=w.prepare_source(cv2.resize(crop,(256,256),interpolation=cv2.INTER_AREA));info=w.get_kp_info(inp);features=w.extract_feature_3d(inp);kp=w.transform_keypoint(info)
- baseline=w.parse_output(w.warp_decode(features,kp,kp)['out'])[0].astype(np.float32)
+ # Match the neutral reference to the same stitching transform as moving poses.
+ baseline=w.parse_output(w.warp_decode(features,kp,w.stitching(kp,kp))['out'])[0].astype(np.float32)
  closed=w.retarget_eye(kp,torch.tensor([[.3,.3,0.]],device=w.device))
  opened=w.retarget_eye(kp,torch.tensor([[.3,.3,.3]],device=w.device))
  eye_mask=np.zeros((size,size),np.float32)
@@ -36,12 +37,10 @@ with torch.inference_mode():
  preview='--preview' in sys.argv or '--motion-preview' in sys.argv
  blink_only='--blink' in sys.argv
  gesture=next((name for name in ['tilt','left','right'] if '--'+name in sys.argv),None)
- duration=3 if gesture else 6
- frame_count=75 if gesture else 150
+ duration=(2.8 if gesture=='tilt' else 3) if gesture else 6
+ frame_count=(70 if gesture=='tilt' else 75) if gesture else 150
  # Render every output frame. Crossfading sparse poses ghosts eyes and hair.
  times=([0.,1.8,4.2] if '--motion-preview' in sys.argv else [0.,3.,6.]) if preview else np.linspace(0,duration,frame_count).tolist()
- # Remove the near-stationary apex samples so the small tilt does not dwell.
- if gesture=='tilt' and not preview: times=[t for i,t in enumerate(times) if not 36<=i<=40]
  count=len(times)
  started=time.monotonic()
  for i in range(count):
@@ -57,7 +56,7 @@ with torch.inference_mode():
   rotation=get_rotation_matrix(info['pitch']+amplitude*1.2*math.sin(t*.7),info['yaw']+amplitude*4.0*math.sin(t),info['roll']+amplitude*1.8*math.sin(t*.8))
   if gesture:
    blink=0
-   envelope=math.sin(math.pi*t/3)**2
+   envelope=math.sin(math.pi*t/duration)**2
    yaw=(-3.5 if gesture=='left' else 3.5 if gesture=='right' else 0)*envelope
    roll=(2.2 if gesture=='tilt' else 0)*envelope
    rotation=get_rotation_matrix(info['pitch'],info['yaw']+yaw,info['roll']+roll)
@@ -66,14 +65,22 @@ with torch.inference_mode():
   target=w.stitching(kp,target)
   rendered=w.parse_output(w.warp_decode(features,kp,target)['out'])[0].astype(np.float32)
   delta=cv2.resize(rendered-baseline,(size,size),interpolation=cv2.INTER_CUBIC)[:,:,::-1]
-  frame=source.copy();frame[y:y+size,x:x+size]=np.clip(source[y:y+size,x:x+size].astype(np.float32)+delta*mask,0,255).astype(np.uint8)
+  frame=source.copy()
+  # Blink-only clips change the eyes, not a retargeted neck or jaw.
+  if not blink_only:
+   frame[y:y+size,x:x+size]=np.clip(source[y:y+size,x:x+size].astype(np.float32)+delta*mask,0,255).astype(np.uint8)
   if blink>0:
    # Replace eye detail during closure: adding a residual retains the original iris.
    eyes=cv2.resize(rendered,(size,size),interpolation=cv2.INTER_CUBIC)[:,:,::-1]+eye_colour
    weight=eye_mask*min(1,blink*4)
    region=frame[y:y+size,x:x+size]
    frame[y:y+size,x:x+size]=np.clip(region*(1-weight)+eyes*weight,0,255).astype(np.uint8)
-  if not preview and (i==0 or i==count-1): frame=source.copy()
+  if not preview:
+   # Neural reconstruction differs slightly even at zero pose. Ease that residual
+   # in/out over eight frames instead of snapping to the portrait at one frame.
+   edge=min(1., i/8., (count-1-i)/8.)
+   weight=edge*edge*(3-2*edge)
+   frame=np.clip(source.astype(np.float32)+(frame.astype(np.float32)-source)*weight,0,255).round().astype(np.uint8)
   if not cv2.imwrite(str(output/f'frame-{i:04d}.png'),frame): raise RuntimeError('Could not write frame')
   if i%5==0: print('Rendered keyframe',i+1,'of',count,flush=True)
  print(json.dumps({'frames':count,'seconds':round(time.monotonic()-started,2),'gpu':use_gpu,'peak_mib':round(torch.cuda.max_memory_allocated()/1048576) if use_gpu else 0}),flush=True)
