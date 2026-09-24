@@ -11,3 +11,13 @@ A memory failure does not prevent conversation: the UI and model receive an expl
 The latest six conversation turns are saved at `~/.config/nodie/conversations/local.json`, separately from Reverie and diagnostic logs. Desktop and browser share this file. It is plaintext with owner-only file permissions, written atomically, and limited to twelve messages of at most 2,000 characters each. It survives application restarts. Older turns are discarded; this is not a full conversation archive.
 
 Use *Clear saved conversation history* in desktop Settings or the browser to erase the stored turns. Clearing also invalidates pending writes so an older in-flight turn cannot restore deleted history. Clearing this file does not delete Reverie memories. New conversations after clearing are retained normally. Nod.ie must distinguish the supplied recent history, recalled Reverie records and unavailable older conversations.
+
+== Unmute memory writing
+
+The streaming voice bridge exposes bounded `search_memories` and `save_memory` tools. The latter stores a concise user-supplied fact under a person or topic name. An exact-name/alias search precedes each save: a unique existing memory receives appended notes, while a missing name creates a memory. Multiple matches require clarification. Existing properties and relationships remain intact; corrections are appended and do not erase older statements.
+
+Names are limited to 160 characters, facts to 1,500 characters and accumulated notes to 12,000 characters. Identical fact lines are idempotent. Writes are serialized within the bridge process; unrelated external graph writers are not coordinated. No delete, arbitrary property, relationship-write or Cypher tool is exposed. The voice prompt requires a successful `saved` result before acknowledging persistence. A timeout after a mutation reports `unknown`, never success, and must not trigger an automatic retry. Model compliance remains a limitation; tool results are the evidence of persistence.
+
+The running bridge needs a Neo4j account with create/update permission. Its legacy filename `reverie-readonly.cjs` is retained for compatibility with existing mounts; the bridge now permits the bounded save operation. Memory contents and tool arguments stay out of diagnostic logs. Clearing conversation history does not erase graph memories.
+
+An unconfirmed mutation pauses further saves in that bridge process, preventing another read-modify-write from racing a possibly running request. Check stored notes and restart the bridge only after the upstream operation has settled. Mutation requests have a seven-second deadline to accommodate local embedding work; this is not proof of database cancellation.
