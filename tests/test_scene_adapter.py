@@ -16,6 +16,7 @@ for payload in [dict(status='bad'),dict(status='snapshot',description='x'*2001),
 tree=ast.parse((root/'unmute_handler.py').read_text())
 method=next(n for c in tree.body if isinstance(c,ast.ClassDef) for n in c.body if isinstance(n,ast.AsyncFunctionDef) and n.name=='update_session')
 method.args.args[1].annotation=None
+ns['asyncio']=asyncio
 exec(compile(ast.Module(body=[method],type_ignores=[]),'handler','exec'),ns)
 class Bot:
  def set_instructions(self,value):self.instructions=value
@@ -58,6 +59,12 @@ sys.modules['unmute.scene_context']=scene_module
 recall_spec=importlib.util.spec_from_file_location('unmute.person_recall',root.parent/'person_recall.py')
 recall_module=importlib.util.module_from_spec(recall_spec);recall_spec.loader.exec_module(recall_module)
 sys.modules['unmute.person_recall']=recall_module
+journal_spec=importlib.util.spec_from_file_location('unmute.journal_context',root.parent/'journal_context.py')
+journal_module=importlib.util.module_from_spec(journal_spec);journal_spec.loader.exec_module(journal_module)
+sys.modules['unmute.journal_context']=journal_module
+node_spec=importlib.util.spec_from_file_location('unmute.node_context',root.parent/'node_context.py')
+node_module=importlib.util.module_from_spec(node_spec);node_spec.loader.exec_module(node_module)
+sys.modules['unmute.node_context']=node_module
 image=base64.b64encode(b'\xff\xd8a\xff\xd9').decode()
 for scene in [{'status':'camera-off'},{'status':'snapshot','imageJpeg':image,'capturedAt':datetime.now(timezone.utc).isoformat()}]:
  fake=types.SimpleNamespace(chatbot=types.SimpleNamespace(preprocessed_messages=lambda:history,chat_history=history),_scene_data=scene,mcp_manager=None)

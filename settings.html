@@ -122,6 +122,15 @@
         <div id="face-profiles"></div>
         <button id="face-forget">Forget all face profiles</button>
     </div>
+    <div class="section">
+        <h2>Event journal</h2>
+        <p>Text observations only; no camera images or audio are saved. Appearance and disappearance refer to the camera view, not confirmed room entry or exit. Recognition can be wrong.</p>
+        <label><input id="journal-enabled" type="checkbox"> Keep a text event journal</label>
+        <p>Clearing recognition profiles does not clear past journal entries. Shortening retention permanently removes older entries.</p>
+        <label>Keep events <select id="journal-retention"><option value="7">7 days</option><option value="30">30 days</option><option value="0">Until cleared (up to 6,000 events)</option></select></label>
+        <button id="journal-refresh">Refresh events</button><button id="journal-clear">Clear event journal</button>
+        <p id="journal-status" role="status"></p><ol id="journal-events"></ol>
+    </div>
     <p id="settings-error" role="alert"></p>
     <div class="button-row">
         <button class="btn-secondary" id="cancel">Cancel</button>

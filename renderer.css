@@ -340,3 +340,11 @@ body.fullscreen #avatar-controls .orbit-control { position:relative; left:auto; 
 body[data-platform="electron"].fullscreen { display:flex; align-items:center; justify-content:center; height:100vh; }
 
 body.fullscreen #avatar-controls #control-fullscreen, body.fullscreen #avatar-controls #control-tray { width:32px; height:32px; }
+/* Fullscreen diagnostics use existing signals, with no extra inference. */
+#control-debug,#debug-stream { display:none; }
+body.fullscreen #control-debug { display:block;position:fixed;right:24px;top:20px;z-index:120;padding:7px 12px;border:1px solid #8994a2;border-radius:8px;background:#202a35;color:#fff;cursor:pointer; }
+body.fullscreen #debug-stream:not([hidden]) { display:block;position:fixed;left:20px;top:20px;bottom:92px;width:min(30vw,380px);min-width:180px;overflow:auto;text-align:left;color:#d6e0eb;background:#10151b99;border-radius:8px;padding:12px;box-sizing:border-box;font:12px/1.5 ui-monospace,monospace;z-index:1; }
+#debug-lines { padding:0;list-style:none;overflow-wrap:anywhere; }
+#debug-lines li { padding:5px 0;border-bottom:1px solid #ffffff14; }
+body.fullscreen #app { z-index:2;pointer-events:none; }
+body.fullscreen #circle,body.fullscreen #avatar-controls { pointer-events:auto; }

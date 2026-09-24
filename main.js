@@ -16,8 +16,14 @@ function start() {
     const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
+    const journal = new (require('./lib/event-journal').EventJournal)(path.join(require('node:os').homedir(), '.config/nodie/events/journal.json'));
+    const debug=(source,text)=>mainWindow?.webContents.send('debug-event',{source,text});
+    journal.onEvent=event=>debug('Journal',`${event.source}: ${event.subject} — ${event.kind}${event.uncertain?' (uncertain)':''}`);
+    void journal.load().catch(()=>console.warn('Event journal unavailable'));
+    const nodePublisher=new(require('./lib/node-status-publisher').NodeStatusPublisher)(path.join(require('node:os').homedir(),'.config/nodie/events/node-status.json'));
+    nodePublisher.start();app.on('before-quit',()=>nodePublisher.stop());
     const speakerRecognition = new (require('./lib/speaker-recognition').SpeakerRecognition)();
-    const voice = new LocalVoice({ logger, historyStore, speakerRecognition, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
+    const voice = new LocalVoice({ logger, historyStore, journal, speakerRecognition, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
     let windowMode;
     let mainWindow, pointerTracker, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
     const stopDrag = () => { updateDrag?.(); clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; updateDrag = null; return dragMoved; };
@@ -63,14 +69,23 @@ function start() {
 
     const vision = new (require('./lib/vision-analysis').VisionAnalysis)({ url: env.getConfig('OLLAMA_URL', 'http://127.0.0.1:11434'), model: env.getConfig('LOCAL_VISION_MODEL', env.LLM_MODEL || 'nodie-qwen3.5:9b') });
     const faces = new (require('./lib/face-recognition').FaceRecognition)();
-    handle('face-analyse', image => faces.analyse(image));
+    const recorder=new(require('./lib/journal-recorder').JournalRecorder)(journal,debug);
+    handle('face-analyse',image=>recorder.capture(()=>faces.analyse(image),result=>{debug('Face',result.state==='ready'?result.faces.map(f=>f.name?`Possible match: ${f.name}`:'Unknown person').join('; ')||'No usable face':result.state);return result.state==='ready'?result.faces.map(f=>({source:'face',kind:f.name?'recognised':'observed',subject:f.name||'Unknown person',uncertain:true})):[];}));
     handle('face-cancel', () => faces.cancel());
     handle('face-status', () => faces.store.status(), true);
     handle('face-enabled', enabled => { faces.cancel(); return faces.store.configure(enabled); }, true);
-    handle('face-edit', (id, name) => faces.store.edit(id, name), true);
+    handle('face-edit', async (id, name) => {await faces.store.edit(id,name);if(name)recorder.record({source:'face',kind:'name-confirmed',subject:name,uncertain:false});}, true);
     handle('face-merge', (source, target) => faces.store.merge(source, target), true);
     handle('face-forget', () => { faces.cancel(); return faces.store.forget(); }, true);
     app.on('before-quit', () => faces.cancel());
+    const journalVision=new(require('./lib/journal-vision').JournalVision)({journal,publish:debug,vision:new(require('./lib/vision-analysis').VisionAnalysis)({url:env.getConfig('OLLAMA_URL','http://127.0.0.1:11434'),model:env.getConfig('LOCAL_VISION_MODEL',env.LLM_MODEL||'nodie-qwen3.5:9b'),timeoutMs:3000})});
+    handle('journal-frame',image=>journalVision.analyse(image));
+    handle('journal-cancel',reset=>journalVision.cancel(reset===true));
+    handle('journal-list',()=>journal.load(),true);
+    handle('journal-enabled',value=>{journalVision.cancel(true);return journal.enabled(value);},true);
+    handle('journal-retention',days=>journal.configure(days),true);
+    handle('journal-clear',async()=>{journalVision.cancel(true);return journal.clear();},true);
+    app.on('before-quit',()=>journalVision.cancel());
     handle('vision-analyse' , image => vision.analyse(image));
     handle('vision-cancel', () => vision.cancel());
     app.on('before-quit', () => vision.cancel());
@@ -88,13 +103,13 @@ function start() {
     }, true);
 
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
-    handle('speaker-analyse', audio => liveSpeakers.analyse(audio));
+    handle('speaker-analyse',audio=>recorder.capture(()=>liveSpeakers.analyse(audio),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
     handle('speaker-cancel', () => liveSpeakers.cancel());
     handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
     app.on('before-quit', () => liveSpeakers.cancel());
     handle('speaker-status', () => speakerRecognition.store.status(), true);
     handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
-    handle('speaker-edit', (id, name) => speakerRecognition.store.edit(id, name), true);
+    handle('speaker-edit', async (id, name) => {await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}, true);
     handle('speaker-merge', (source, target) => speakerRecognition.store.merge(source, target), true);
     handle('speaker-forget', () => speakerRecognition.store.forget(), true);
     handle('voice-cancel', () => voice.cancel());

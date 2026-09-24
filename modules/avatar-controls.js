@@ -28,6 +28,9 @@ class AvatarControls {
                 canAnalyse: () => renderer.visionContext.canAnalyse(),
                 onFrame: async frame => {
                     const analysis = renderer.visionContext.analyse(frame);
+                    if(window.nodie?.journalFrame && !renderer.streamingLips?.sources.size && Date.now()-(renderer.lastUserSpeech||0)>5000){
+                        void frame.image.arrayBuffer().then(buffer=>{if(!frame.signal.aborted)return window.nodie.journalFrame(new Uint8Array(buffer));}).catch(()=>{});
+                    }
                     if (typeof window.nodie?.analyseFaces !== 'function') return analysis;
                     void (async () => {
                     const image = new Uint8Array(await frame.image.arrayBuffer());
@@ -40,7 +43,7 @@ class AvatarControls {
                     return analysis;
                 },
                 onError: message => renderer.showNotification(message, 'error'),
-                onState: () => { renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
+                onState: () => { if(!this.cameraSource?.active)window.nodie?.cancelJournal?.(true).catch(()=>{}); renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
             });
             window.addEventListener('pagehide', () => this.cameraSource.stop());
         }
