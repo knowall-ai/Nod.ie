@@ -1,12 +1,14 @@
 """Run after prepare-backend and prepare-speakers to verify the combined adapter."""
-import ast,asyncio,json
+import ast,asyncio,json,sys
 from pathlib import Path
 from typing import Literal
 from pydantic import BaseModel,Field,ValidationError
 root=Path(__file__).resolve().parents[1] / 'unmute-service/generated'
 tree=ast.parse((root/'openai_realtime_api_events.py').read_text())
-schema=ast.Module(body=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name in ['SceneData','SpeakerObservationItem','SpeakerObservation','SessionConfig']],type_ignores=[])
-ns=dict(BaseModel=BaseModel,Field=Field,Literal=Literal,Instructions=str)
+schema=ast.Module(body=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name in ['CuriosityEvent','SceneData','SpeakerSegment','FaceItem','NamingFeedback','SpeakerObservationItem','SpeakerObservation','SessionConfig']],type_ignores=[])
+sys.path.insert(0,str(root.parent))
+from recognition_context import AudioWindows,recognition_messages
+ns=dict(BaseModel=BaseModel,Field=Field,Literal=Literal,Instructions=str,AudioWindows=AudioWindows,recognition_messages=recognition_messages)
 exec(compile(schema,'schema','exec'),ns)
 Scene=ns['SceneData'];Session=ns['SessionConfig']
 for payload in [dict(status='bad'),dict(status='snapshot',description='x'*2001),dict(status='camera-off',tool_calls=[])]:
@@ -47,7 +49,7 @@ import copy, types
 method=copy.deepcopy(next(n for n in ast.walk(tree) if isinstance(n,ast.AsyncFunctionDef) and n.name=='_generate_response_task'))
 start=next(i for i,n in enumerate(method.body) if isinstance(n,ast.Assign) and ast.unparse(n.targets[0])=='messages')
 end=next(i for i in range(start,len(method.body)) if isinstance(method.body[i],ast.If) and 'self._scene_data' in ast.unparse(method.body[i].test))+1
-method.body=method.body[start:end]+[ast.Return(value=ast.Name(id='messages',ctx=ast.Load()))]+method.body[end:]
+method.body=ast.parse('curiosity=None').body+method.body[start:end]+[ast.Return(value=ast.Name(id='messages',ctx=ast.Load()))]+method.body[end:]
 ast.fix_missing_locations(method)
 exec(compile(ast.Module(body=[method],type_ignores=[]),'response-entry','exec'),ns)
 history=[{'role':'system','content':'Policy'},{'role':'user','content':'Current question'}]

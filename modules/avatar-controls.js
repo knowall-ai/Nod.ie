@@ -22,6 +22,7 @@ class AvatarControls {
         this.speaker?.addEventListener('click', () => this.setSpeakerMuted(!renderer.state.speakerMuted));
         this.preview = this.camera?.querySelector('video');
         if (window.VisionCamera && this.preview) {
+            if(window.CuriositySession && window.nodie?.claimCuriosity)renderer.curiosity ||= new window.CuriositySession(renderer);
             renderer.visionContext = new window.VisionContext(renderer, window.nodie);
             this.cameraSource = new window.VisionCamera({
                 preview: this.preview,
@@ -29,7 +30,7 @@ class AvatarControls {
                 onFrame: async frame => {
                     const analysis = renderer.visionContext.analyse(frame);
                     if(window.nodie?.journalFrame && !renderer.streamingLips?.sources.size && Date.now()-(renderer.lastUserSpeech||0)>5000){
-                        void frame.image.arrayBuffer().then(buffer=>{if(!frame.signal.aborted)return window.nodie.journalFrame(new Uint8Array(buffer));}).catch(()=>{});
+                        void frame.image.arrayBuffer().then(buffer=>{if(!frame.signal.aborted)return window.nodie.journalFrame(new Uint8Array(buffer),frame.capturedAt);}).then(candidate=>{if(!frame.signal.aborted)return renderer.curiosity?.consider(candidate,frame);}).catch(()=>{});
                     }
                     if (typeof window.nodie?.analyseFaces !== 'function') return analysis;
                     void (async () => {
@@ -43,7 +44,7 @@ class AvatarControls {
                     return analysis;
                 },
                 onError: message => renderer.showNotification(message, 'error'),
-                onState: () => { if(!this.cameraSource?.active){window.nodie?.cancelJournal?.(true).catch(()=>{});renderer.recognition?.faces(null);window.nodie?.cancelFaces?.().catch(()=>{});} renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
+                onState: () => { renderer.curiosity?.reset();if(!this.cameraSource?.active){window.nodie?.cancelJournal?.(true).catch(()=>{});renderer.recognition?.faces(null);window.nodie?.cancelFaces?.().catch(()=>{});} renderer.visionContext.setActive(Boolean(this.cameraSource?.active)); this.updateCamera(); }
             });
             window.addEventListener('pagehide', () => this.cameraSource.stop());
         }

@@ -237,7 +237,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
             this.unmuteBasePrompt = config.SYSTEM_PROMPT;
             this.messageQueue = Promise.resolve();
             const handler = new window.WebSocketHandler(config, {
-                onConnect: () => { this.state.isConnected = true; if(window.RecognitionSession&&window.nodie?.analyseSpeakers){this.recognition ||= new window.RecognitionSession(this);this.recognition.start();} this.updateWSStatus('Connected'); this.checkIfFullyLoaded(); if(this.visionContext)this.visionContext.memoryBlocked=false; this.visionContext?.update(); },
+                onConnect: () => { this.curiosity?.reset();this.state.isConnected = true; if(window.RecognitionSession&&window.nodie?.analyseSpeakers){this.recognition ||= new window.RecognitionSession(this);this.recognition.start();} this.updateWSStatus('Connected'); this.checkIfFullyLoaded(); if(this.visionContext)this.visionContext.memoryBlocked=false; this.visionContext?.update(); },
                 onClose: () => { this.transcript?.finish(); this.state.isConnected = false; this.stopMicrophone(); this.stopPlayback(); this.updateWSStatus('Reconnecting...'); },
                 onError: error => this.showNotification(error.message, 'error'),
                 onMessage: data => {
@@ -276,6 +276,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                 }
                 if(window.DebugStream)this.debugStream ||= new window.DebugStream();
                 this.debugStream?.event(data);
+                this.curiosity?.event(data);
                 this.recognition?.event(data);
                 this.transcript?.event(data);
                 this.visionContext?.voiceEvent(data);
@@ -403,6 +404,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
         }
     },
     stopMicrophone() {
+        this.curiosity?.reset();
         this.recognition?.stop();
         this.streamSpeakers?.stop(); this.streamSpeakers = null;
         const capture = this.state.audioCapture;

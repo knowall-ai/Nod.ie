@@ -155,3 +155,6 @@ if args.with_speakers or (output / 'chatbot.py').exists():
     subprocess.run([sys.executable, str(Path(__file__).with_name('prepare-speakers.py')), str(args.unmute_root)], check=True)
 
     subprocess.run([sys.executable,str(Path(__file__).with_name('prepare-recognition.py')),str(args.unmute_root)],check=True)
+
+import subprocess, sys
+subprocess.run([sys.executable,str(Path(__file__).with_name("prepare-curiosity.py"))],check=True)
