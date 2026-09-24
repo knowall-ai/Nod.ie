@@ -29,6 +29,7 @@ class AvatarControls {
         renderer.state.speakerMuted = muted;
         if (renderer.localVoice?.player) renderer.localVoice.player.muted = muted;
         renderer.state.audioPlayback?.setMuted(muted);
+        renderer.streamingLips?.setMuted(muted);
         try { localStorage.setItem(AvatarControls.speakerStorageKey, String(muted)); } catch { /* Still works without persistence. */ }
         this.update();
     }
