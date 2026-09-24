@@ -33,7 +33,7 @@ function decode(result) {
 async function saveMemory(client, args) {
     if (!validSave(args)) return { status: 'not-saved', reason: 'Invalid memory arguments.' };
     const name = args.name.trim(), fact = args.fact.trim();
-    const call = async (toolName, arguments_) => decode(await client.callTool({ name: toolName, arguments: arguments_ }, undefined, { timeout: 2500 }));
+    const call = async (toolName, arguments_) => decode(await client.callTool({ name: toolName, arguments: arguments_ }, undefined, { timeout: toolName === 'search_memories' ? 2500 : 7000 }));
     let attempted = false;
     try {
         const rows = await call('search_memories', { query: name, label: args.label, search_mode: 'exact', limit: 2, depth: 0 });
@@ -59,16 +59,18 @@ async function saveMemory(client, args) {
 }
 /** Build the actual MCP handler with an injectable upstream for transport-level tests. */
 function createMemoryServer(connect, {searchTimeout = 4000} = {}) {
-    let writing = false;
+    let writing = false, uncertainWrite = false;
     const server = new Server({ name: 'nodie-reverie-readonly', version: '1.0.0' }, { capabilities: { tools: {} } });
     server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [tool, saveTool] }));
     server.setRequestHandler(CallToolRequestSchema, async request => {
         if (request.params.name === saveTool.name) {
             if (!validSave(request.params.arguments)) return { isError: true, content: [{ type: 'text', text: 'Invalid memory arguments' }] };
+            if (uncertainWrite) return { content: [{ type: 'text', text: JSON.stringify({ status: 'not-saved', reason: 'A previous write is unconfirmed. Further saves are paused until the bridge is restarted after checking stored notes.' }) }] };
             if (writing) return { content: [{ type: 'text', text: JSON.stringify({ status: 'not-saved', reason: 'Another save is in progress.' }) }] };
             writing = true;
             try {
                 const result = await saveMemory(await connect(), request.params.arguments);
+                if (result.status === 'unknown') uncertainWrite = true;
                 return { content: [{ type: 'text', text: JSON.stringify(result) }] };
             } catch {
                 return { content: [{ type: 'text', text: JSON.stringify({ status: 'not-saved', reason: 'Memory connection unavailable; nothing written.' }) }] };

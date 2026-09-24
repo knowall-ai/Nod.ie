@@ -27,3 +27,16 @@ test('exact lookup scopes a same-name identity to its category',async()=>{
  assert.equal((await saveMemory(c,args)).status,'saved');
  assert.equal(c.calls[0].arguments.label,'Person');assert.equal(c.calls[1].name,'create_memory');
 });
+
+test('an unconfirmed write blocks later mutations in the bridge',async()=>{
+ const {createMemoryServer}=require('../../unmute-service/reverie-readonly.cjs');
+ const {Client}=require('@modelcontextprotocol/sdk/client/index.js');
+ const {InMemoryTransport}=require('@modelcontextprotocol/sdk/inMemory.js');
+ let mutations=0;const upstream=mock([],()=>{mutations++;throw Error('uncertain commit');});
+ const server=createMemoryServer(async()=>upstream);const client=new Client({name:'test',version:'1'});
+ const [a,b]=InMemoryTransport.createLinkedPair();await server.connect(a);await client.connect(b);
+ try {
+  const call=async()=>JSON.parse((await client.callTool({name:'save_memory',arguments:args})).content[0].text);
+  assert.equal((await call()).status,'unknown');assert.equal((await call()).status,'not-saved');assert.equal(mutations,1);
+ }finally{await client.close();await server.close();}
+});
