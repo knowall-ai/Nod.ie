@@ -56,6 +56,11 @@ for m in [method('_generate_response'),response]:
 partials=[n for n in ast.walk(method('_generate_response')) if isinstance(n,ast.Call) and isinstance(n.func,ast.Name) and n.func.id=='partial' and n.args and ast.unparse(n.args[0])=='self._generate_response_task']
 assert len(partials)==1
 partials[0].keywords.append(ast.keyword(arg='curiosity',value=ast.Name(id='curiosity',ctx=ast.Load())))
+# Proactive visual turns must not retrieve private person notes without a user question.
+recalls=[i for i,n in enumerate(response.body) if isinstance(n,ast.Assign) and isinstance(n.value,ast.Await) and isinstance(n.value.value,ast.Call) and isinstance(n.value.value.func,ast.Name) and n.value.value.func.id=='person_messages']
+assert len(recalls)==1
+index=recalls[0]
+response.body[index]=ast.If(test=ast.UnaryOp(op=ast.Not(),operand=ast.Name(id='curiosity',ctx=ast.Load())),body=[response.body[index]],orelse=[])
 # Append after the standard camera insertion, retaining the exact originating image.
 anchors = [i for i, n in enumerate(response.body) if isinstance(n, ast.If) and ast.unparse(n.test) == 'self._scene_data is not None']
 assert len(anchors) == 1

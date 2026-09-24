@@ -17,6 +17,8 @@ function start() {
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
     const journal = new (require('./lib/event-journal').EventJournal)(path.join(require('node:os').homedir(), '.config/nodie/events/journal.json'), {timezone:env.getConfig('NODIE_TIMEZONE') || Intl.DateTimeFormat().resolvedOptions().timeZone});
+    let identityQueue=Promise.resolve();
+    const identityChange=operation=>{const result=identityQueue.then(operation);identityQueue=result.catch(()=>{});return result;};
     const debug=(source,text)=>mainWindow?.webContents.send('debug-event',{source,text});
     journal.onEvent=event=>debug('Journal',`${event.source}: ${event.subject} — ${event.kind}${event.uncertain?' (uncertain)':''}`);
     void journal.load().catch(()=>console.warn('Event journal unavailable'));
@@ -74,9 +76,9 @@ function start() {
     handle('face-cancel', () => faces.cancel());
     handle('face-status', () => faces.store.status(), true);
     handle('face-enabled', enabled => { faces.cancel(); return faces.store.configure(enabled); }, true);
-    handle('face-edit', async (id, name) => {await faces.store.edit(id,name);if(name)recorder.record({source:'face',kind:'name-confirmed',subject:name,uncertain:false});}, true);
-    handle('face-merge', (source, target) => faces.store.merge(source, target), true);
-    handle('face-forget', () => { faces.cancel(); return faces.store.forget(); }, true);
+    handle('face-edit', async (id, name) => identityChange(async()=>{await people.unlink('faces',id);await faces.store.edit(id,name);if(name)recorder.record({source:'face',kind:'name-confirmed',subject:name,uncertain:false});}), true);
+    handle('face-merge', async (source, target) => identityChange(async()=>{await people.unlink('faces',source);return faces.store.merge(source, target);}), true);
+    handle('face-forget', async () => identityChange(async()=>{ faces.cancel();await people.unlink('faces');return faces.store.forget(); }), true);
     app.on('before-quit', () => faces.cancel());
     const {SceneDelta,CuriosityLedger}=require('./lib/curiosity');
     const sceneDelta=new SceneDelta();
@@ -124,6 +126,23 @@ function start() {
         return result;
     }, true);
 
+    const people=new(require('./lib/person-registry').PersonRegistry)(path.join(require('node:os').homedir(),'.config/nodie/events/person-links.json'));
+    const linkedMemory=require('./unmute-service/linked-people.cjs');
+    const memoryOptions=()=>linkedMemory.personOptions(()=>voice.memory());
+    voice.linkedRecall=linkedMemory.createLinkedResolver(()=>voice.memory(),()=>people.read());
+    handle('person-options',async()=>{
+        const [registry,faceStatus,voiceStatus]=await Promise.all([people.read(),faces.store.status(),speakerRecognition.store.status()]);
+        let memories=[],memoryAvailable=true;try{memories=await memoryOptions();}catch{memoryAvailable=false;}
+        return {people:registry.people,faces:faceStatus.profiles.filter(p=>p.name),voices:voiceStatus.profiles.filter(p=>p.name),memories,memoryAvailable};
+    },true);
+    handle('person-save',choice=>identityChange(async()=>{
+        if(!choice||Object.keys(choice).some(k=>!['id','name','faceId','voiceId','memoryId'].includes(k)))throw Error('Invalid person link');
+        let memory=null;
+        if(choice.memoryId!==null){memory=(await memoryOptions()).find(m=>m.id===choice.memoryId);if(!memory)throw Error('Memory changed; refresh and select again');}
+        const [f,v]=await Promise.all([faces.store.status(),speakerRecognition.store.status()]);
+        return people.save({...choice,memory}, {faces:f.profiles,voices:v.profiles});
+    }),true);
+    handle('person-remove',id=>people.remove(id),true);
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
     const recognitionNames=new(require('./lib/recognition-names').RecognitionNames)({faces,voices:{store:speakerRecognition.store,forInterval:(start,end)=>liveSpeakers.forInterval(start,end)},classify:require('./lib/recognition-intent').recognitionIntent({url:env.getConfig('OLLAMA_URL'),model:env.LLM_MODEL||env.getConfig('LOCAL_LLM_MODEL')}),record:event=>recorder.record(event)});
     voice.proposeSpeakerName=async(observation,text,previousAssistant)=>{const proposal=await recognitionNames.proposeLocal(observation,text,previousAssistant);if(proposal.status==='pending')mainWindow?.webContents.send('recognition-proposal',proposal);return proposal;};
@@ -136,9 +155,9 @@ function start() {
     app.on('before-quit', () => liveSpeakers.cancel());
     handle('speaker-status', () => speakerRecognition.store.status(), true);
     handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
-    handle('speaker-edit', async (id, name) => {await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}, true);
-    handle('speaker-merge', (source, target) => speakerRecognition.store.merge(source, target), true);
-    handle('speaker-forget', () => speakerRecognition.store.forget(), true);
+    handle('speaker-edit', async (id, name) => identityChange(async()=>{await people.unlink('voices',id);await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}), true);
+    handle('speaker-merge', async (source, target) => identityChange(async()=>{await people.unlink('voices',source);return speakerRecognition.store.merge(source, target);}), true);
+    handle('speaker-forget', async () => identityChange(async()=>{await people.unlink('voices');return speakerRecognition.store.forget();}), true);
     handle('voice-cancel', () => {voice.cancel();recognitionNames.cancel();});
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {

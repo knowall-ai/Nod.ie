@@ -38,4 +38,17 @@ Reverie 0.5.2 does not expose a completion flag for empty semantic searches. The
 
 Settings > People lists learned voice profiles with their name, last-heard time and retained sample count. Rename a profile, remove it, or explicitly merge a duplicate into a chosen destination. Merges keep the destination name and both sets of voice embeddings (up to eight per person, 64 overall); matching uses the best sample instead of averaging distinct embeddings. Removal and merging require confirmation and invalidate pending observations so old recognition results cannot restore deleted identities. These actions do not alter Reverie memories.
 
-Face profiles have a separate Settings panel and are not linked to voice identities. Local voice turns can enrol speakers; background Unmute sampling matches existing profiles when the recognition backend overlay is installed.
+Face profiles have a separate Settings panel and can be explicitly linked to voice identities and a selected memory record in Settings. Local voice turns can enrol speakers; background Unmute sampling matches existing profiles when the recognition backend overlay is installed.
+
+
+== Recognition-linked person recall
+
+Settings → Linked people and memory connects named local face/voice profiles to a stable local person ID and, optionally, an existing Reverie Person record. Select the actual profiles and memory record, then click Confirm selected links. Names alone never create a link or merge people; two people can share the same display name. Selecting an existing local person adds profiles to that person. Biometric vectors remain solely in their local recognition stores; the separate owner-only `events/person-links.json` contains IDs and labels only.
+
+During user-started turns, fresh named recognition automatically supplies a small read-only person brief on the next conversation response, even when the person was not named aloud. The lookup checks the explicitly selected memory ID after an exact-name query; it never substitutes another same-named record. It supplies bounded notes, aliases and a few relationship labels, not a biography. Current face/voice matches remain fallible; the assistant must use relevant context discreetly and clarify uncertain identity. A visible face never proves who spoke.
+
+The Unmute bridge uses the existing read-only events mount and a bounded internal resolver that is not advertised as a model tool. Scene tool isolation remains in force. The desktop batch voice path uses the same resolver. Memory failures do not stop speech. A 30-second brief cache is keyed by the link revision and person IDs; unlinking invalidates the next lookup. Renaming, deleting or forgetting profiles removes affected local links without deleting Reverie memories. If a memory was renamed, refresh and explicitly reselect it. Clearing the event journal does not remove person links.
+
+Proactive visual-curiosity turns skip person-memory lookup; a room observation alone does not request personal notes.
+
+No profiles are automatically enrolled or associated with household members. Recognition enrollment still needs a confirmed face or voice label before linking; the linking screen does not infer that the sole visible person is the speaker.

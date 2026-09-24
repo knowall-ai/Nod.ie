@@ -116,7 +116,7 @@
     <div class="section">
         <h2>People — faces</h2>
         <label><input type="checkbox" id="face-enabled"> Learn and recognise faces locally</label>
-        <p>Uses selected frames only while the camera is on. Unknown profiles expire after seven days. Names are labels, not verified identities.</p>
+        <p>Uses selected frames only while the camera is on. Unknown candidates are temporary; only confirmed named profiles are saved. Names are labels, not verified identities.</p>
         <p id="face-status" role="status"></p>
         <button id="face-refresh">Refresh faces</button>
         <div id="face-profiles"></div>
@@ -126,6 +126,22 @@
         <h2>Visual curiosity</h2>
         <label>How often may Nod.ie ask about something new? <select id="curiosityLevel"><option value="off">Off</option><option value="observe">Debug observations only</option><option value="low">Low — people and animals</option><option value="normal">Normal — also held objects</option><option value="high">More often</option></select></label>
         <p>Requires the event journal, camera, microphone, speaker and Unmute conversation to be on. Waits for quiet and avoids repeating topics. Questions use the actual image; contents and identities may be uncertain.</p>
+    </div>
+    <div class="section">
+        <h2>Linked people and memory</h2>
+        <p>Explicitly connect enrolled face and voice profiles to the same person and an existing memory. Matching names alone never links them. These links guide recall, not authentication. Renaming or forgetting a recognition profile removes its links; relink it after correcting a name.</p>
+        <button id="people-refresh">Refresh people and memories</button>
+        <p id="people-status" role="status"></p><div id="people-list"></div>
+        <div class="person-link-fields">
+        <label>Person <select id="person-existing"><option value="">Create a new local person</option></select></label>
+        <label>Display name <input type="text" id="person-name" maxlength="160"></label>
+        <label>Face profile <select id="person-face"></select></label>
+        <label>Voice profile <select id="person-voice"></select></label>
+        <label>Memory record <select id="person-memory"></select></label>
+        </div>
+        <button id="person-save">Confirm selected links</button>
+    </div>
+    <div class="section">
         <h2>Event journal</h2>
         <p>Text observations only; no camera images or audio are saved. Appearance and disappearance refer to the camera view, not confirmed room entry or exit. Recognition can be wrong.</p>
         <label><input id="journal-enabled" type="checkbox"> Keep a text event journal</label>

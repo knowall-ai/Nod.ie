@@ -66,12 +66,18 @@ async function saveMemory(client, args) {
 function createMemoryServer(connect, {searchTimeout = 4000, hybrid = true} = {}) {
     let writing = false, uncertainWrite = false;
     const resolvePeople=require('./person-recall.cjs').createResolver(connect);
+    const linked=require('./linked-people.cjs'),resolveLinked=linked.createLinkedResolver(connect);
+    const linkedTool={name:'resolve_linked_people',description:'Internal read-only lookup of explicitly linked recognition profiles.',inputSchema:{type:'object',properties:{faces:{type:'array',maxItems:8,items:{type:'string'}},voices:{type:'array',maxItems:8,items:{type:'string'}}},required:['faces','voices'],additionalProperties:false}};
     let animals,animalExpiry=0;
     const animalTool={name:'recall_animals',description:'Internal read-only known-pet reference.',inputSchema:{type:'object',properties:{},additionalProperties:false}};
     const personTool={name:'resolve_people',description:'Internal read-only transcript person resolver.',inputSchema:{type:'object',properties:{transcript:{type:'string',maxLength:1200}},required:['transcript'],additionalProperties:false}};
     const server = new Server({ name: 'nodie-reverie-readonly', version: '1.0.0' }, { capabilities: { tools: {} } });
-    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [tool, saveTool, personTool, animalTool] }));
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [tool, saveTool, personTool, animalTool, linkedTool] }));
     server.setRequestHandler(CallToolRequestSchema, async request => {
+        if(request.params.name==='resolve_linked_people'){
+            if(!linked.valid(request.params.arguments))return {isError:true,content:[{type:'text',text:'Invalid recognition references'}]};
+            try{return {content:[{type:'text',text:JSON.stringify(await resolveLinked(request.params.arguments))}]};}catch{return {content:[{type:'text',text:'{"people":[],"status":"unavailable"}'}]};}
+        }
         if(request.params.name==='recall_animals'){
             if(Object.keys(request.params.arguments||{}).length)return {isError:true,content:[{type:'text',text:'Invalid arguments'}]};
             try{if(!animals||Date.now()>=animalExpiry){const rows=decode(await (await connect()).callTool({name:'search_memories',arguments:{label:'Animal',limit:20,depth:0,search_mode:'keyword'}},undefined,{timeout:2500}));if(!Array.isArray(rows))throw Error('Invalid animals');animals=rows.map(r=>({name:String(r.memory?.name||'').slice(0,160),notes:String(r.memory?.notes||'').slice(0,400)}));animalExpiry=Date.now()+30000;}return {content:[{type:'text',text:JSON.stringify({animals})}]};}catch{return {content:[{type:'text',text:'{"animals":[],"status":"unavailable"}'}]};}
