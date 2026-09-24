@@ -1,0 +1,46 @@
+= Behaviour and portability audit
+
+Audit baseline: `cb41234`, plus the pending conversational recognition work. This is a source review, not certification of every platform, model or language. Private household memory, credentials and recordings are outside the audit. Issue #57 tracks the work.
+
+== Architectural boundary
+
+Household facts (people, nicknames, relationships, pets and appearance) belong in private user memory. Per-installation choices (assistant identity, locale, timezone, endpoints, models and resource budgets) belong in validated configuration. Providers report their actual capabilities. The model interprets meaning and chooses conversational wording; code validates structured requests, freshness, permissions and confirmation before taking action. Model observations remain uncertain data, never instructions.
+
+Finite protocol actions, limits on bytes and inference concurrency, confidence thresholds, retention choices and explicit permission checks are appropriate constraints. Species, personal names, supported everyday topics and natural-language phrasing should not be protocol enums. Adding another household must not require editing source code.
+
+== Changes in this audit
+
+* `lib/vision-analysis.js`: replaces the cat/coat enum with bounded animal kind and appearance fields. No household-name mapping is introduced. Tests include dogs, parrots, rabbits and tortoiseshell cats, plus rejection of oversized and malformed output.
+* `lib/event-journal.js` and `unmute-service/journal_context.py`: the desktop records its timezone in the journal; backend readers use it instead of assuming London. An explicit IANA timezone override remains supported. Old journals without metadata use UTC on the backend until the desktop refreshes them.
+* `unmute-service/compose.override.yml`: requires the installed `LLM_MODEL` rather than forcing a workstation-specific alias; context size is configurable. Existing deployments must supply their current model when recreating the service.
+
+== Remaining architecture work
+
+[cols="1,2,3",options="header"]
+|===
+|Priority |Evidence and impact |Remedy and acceptance criteria
+|High |`main.js`, `lib/node-snapshot.js`, `lib/diagnostics.js`: Bitcoin/Docker status polling starts by default, with fixed container names and mainnet paths. Broad keywords such as channels can trigger irrelevant lookups. |Make integrations explicitly enabled capabilities with validated container/network settings. Start their background jobs and expose tools only when enabled. Test a machine with no Docker or Bitcoin services.
+|High |Pending `lib/recognition-names.js` and `modules/recognition-session.js`: naming uses the last fresh observation and retries introduction text against later windows; spoken confirmation is not tied to the introducing speaker. |Block release of this naming flow until proposals bind to the attributed introduction interval and candidate ID. Require confirmation from that candidate or the UI. Test a second speaker interrupting, TV audio and delayed observations. Align local and realtime confirmation policy.
+|High |`main.js`, `lib/web-server.js`, `renderer.js`: vision can inherit a text-only model, while static prompts claim Qwen and memory availability. |Probe provider capabilities and render context from verified configuration and status. Reject unsupported vision selections visibly. Refresh clock context per turn.
+|High |`modules/spoken-controls.js`, `SYSTEM-PROMPT.md`, `lib/local-voice.js`: assistant-name setting does not consistently govern direct address, prompts and tool descriptions. |Use one validated identity configuration across both voice modes. Test an alternative name, quotations, third-party mentions, ambiguity and negation. Preserve explicit address for device changes.
+|High |`lib/event-journal.js`, `unmute-service/journal_context.py`, `unmute-service/node_context.py`: English regexes gate history and node access, and date handling has a narrow grammar. |Expose bounded read-only capabilities with structured date ranges. Let the conversation model resolve intent and ask about ambiguous dates. Test paraphrases, non-English requests, timezone boundaries and unrelated questions without broad private-context injection.
+|High |Pending `modules/recognition-session.js`: English introduction and yes/no patterns restrict enrollment; sole-profile naming cannot disambiguate several unfamiliar people. |Use typed proposal/confirmation intents with stable candidate IDs and explicit selection. Keep profile epochs, freshness and separate confirmation checks. Test multilingual names and several people; never silently link a face to a voice.
+|Medium |`lib/local-voice.js` forces English STT/TTS; `voice/server.py` exposes four voices and selects English pronunciation. |Declare provider-supported languages and voices, validate configured selections, and report unsupported choices. Selecting a language must select a compatible model; configuration alone does not add model capability.
+|Medium |`unmute-service/person-recall.cjs` uses English-oriented phonetic substitutions, whitespace tokenisation and a 200-person index. |Use locale-aware candidate retrieval with explicit truncation, keeping aliases as user data. Test short names, non-Latin scripts, ambiguous names and indices above the bound. Never auto-merge phonetic matches.
+|Medium |`lib/event-journal.js` groups observations by description, collapsing similar animals/people and splitting unstable wording. |Use temporal object tracks and separately confirmed memory associations. Validate multiple similar animals, occlusion and camera movement. Do not claim identification from coat colour alone.
+|Medium |`unmute-service/compose.override.yml` assumes an external base stack; backend preparation patches a particular upstream source layout. |Provide a versioned, reproducible standalone deployment and explicit provider contracts. Verify a clean checkout on another machine without private infrastructure; fail clearly on incompatible upstream revisions.
+|Medium |Local and realtime modes expose different capabilities; static context strings can drift from implementation. |Build context from a shared capability manifest and verified runtime status. Contract-test camera, memory, recognition and control availability in each mode.
+|Medium |`main.js`, recognition stores and helpers: fixed `~/.config/nodie` data roots and POSIX virtualenv paths limit Windows/macOS and packaged installs. |Centralise data-path resolution and helper configuration with platform adapters. Test XDG overrides, Windows paths and packaged assets without moving existing data silently.
+|Medium |Recognition stores enforce model hashes and profile caps without a clear user-facing migration/full-store flow. |Keep hash validation and bounded storage, but expose capacity status and explicit re-enrollment when models change. Never reinterpret old vectors using a different model.
+|Low |Bundled portrait calibration, model manifests, selected TTS assets and Linux-specific service helpers. |Keep these as named, documented provider/asset presets. Add extension points rather than claiming every image, model or OS is supported. Retain model hashes, licenses and safe defaults.
+|===
+
+== Validation limits
+
+General animal descriptions are supported by the event schema; individual pet recognition is not proven by these tests. Existing event records remain readable. No biometric matching threshold, permission boundary or personal memory is changed by this audit. The broader refactors above remain outstanding and should be delivered as focused reviewed changes, not represented as completed by removing the cat enum.
+
+== Independent Opus 5.5 review
+
+Claude Code CLI completed a read-only review using the requested `claude-opus-5-5` model. It inspected active production paths and the pending recognition work, without running tests or reading private configuration, credentials or recordings. The raw review is preserved in `reviews/2026-09-24-opus-portability.md`; its baseline findings predate the fixes in this change. Findings are review evidence, not proof of live behavior. In particular, author branding and relationship examples are not themselves household identity mappings, and CPU support already exists for several services despite GPU-specific deployment components.
+
+The recommended sequence is configuration and capability foundations, optional integrations, model capability validation, safe recognition enrollment, multilingual intent handling, then a standalone reproducible deployment. The current fixes address only the explicitly listed items above.
