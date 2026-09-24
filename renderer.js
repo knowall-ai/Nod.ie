@@ -526,7 +526,7 @@ Streaming voice trial: the speech transport is Unmute with Qwen. The current loc
                 this.state.avatarEnabled = config.AVATAR_ENABLED;
                 this.state.avatarManager?.setEnabled(config.AVATAR_ENABLED);
                 this.stopMicrophone(); this.stopPlayback();
-                if (this.localVoice) { this.localVoice.cancel(); this.localVoice.initialize(); } else this.connectToUnmute();
+                if (this.localVoice) { const listening = this.localVoice.listeningEnabled; this.localVoice.cancel(); this.localVoice.initialize(listening).catch(error => this.showNotification(error.message, 'error')); } else this.connectToUnmute();
             });
         }
         window.addEventListener('beforeunload', () => this.cleanup());

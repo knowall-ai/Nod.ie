@@ -47,7 +47,7 @@ To roll back, restore `VOICE_MODE=local`, stop the two Unmute speech containers,
 The legacy Unmute tool configuration is separate from the current local voice adapter.
 Speaker recognition PR #29, bounded local history, Reverie integration and voice-controlled device actions must be verified separately; changing the speech transport does not automatically connect them.
 
-The voice trial mounts only the read-only Reverie bridge instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands remain disconnected; Reverie recall is supplied through the bounded read-only bridge. Microphone capture starts off after restart.
+The voice trial mounts only the read-only Reverie bridge instead of starting legacy tool servers and disables periodic silence prompts. Buttons still control the microphone and speaker; spoken device commands remain disconnected; Reverie recall is supplied through the bounded read-only bridge. Desktop microphone capture starts after a healthy connection; browser capture starts off and requires its visible control.
 
 Warm synthetic testing on this host produced first audio approximately 1–1.5 seconds after the utterance and interruption detection in 0.5–0.6 seconds. These are server packet timings, not a physical speaker/microphone latency guarantee.
 

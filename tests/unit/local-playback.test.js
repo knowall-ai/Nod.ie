@@ -50,3 +50,13 @@ test('spoken microphone-off prevents resuming after the acknowledgement', async 
     await new Promise(resolve => setTimeout(resolve, 300));
     assert.equal(starts, 0);
 });
+
+test('local initialization preserves explicit listening intent and cancels stale health results',async()=>{
+ let health,starts=0;const context={window:{nodie:{voiceHealth:()=>new Promise(r=>{health=r;}),voiceCancel:async()=>{}}},document:{getElementById:()=>null},clearTimeout,clearInterval};
+ vm.runInNewContext(fs.readFileSync('modules/local-voice-session.js','utf8'),context);
+ const renderer={state:{isMuted:true},setStatus(){},updateWSStatus(){}};
+ const session=new context.window.LocalVoiceSession(renderer);session.toggle=async()=>{starts++;};
+ let pending=session.initialize(true);health({ready:true});await pending;assert.equal(starts,1);
+ pending=session.initialize(false);health({ready:true});await pending;assert.equal(starts,1);
+ pending=session.initialize(true);session.cancel();health({ready:true});await pending;assert.equal(starts,1);assert.equal(renderer.state.isMuted,true);
+});
