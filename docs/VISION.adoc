@@ -78,7 +78,7 @@ The current presence tracker groups equal descriptions. It cannot distinguish tw
 
 == Recognition confirmation and debug styling
 
-An explicit introduction can offer a local face or voice label. Confirm or cancel using the on-screen prompt; neither a model statement nor a nearby person's spoken confirmation saves a label. The prompt uses the same 32 px button height, 8 px radius and spacing, and 12 px inner padding as the debug controls. In compact mode its buttons lie inside the avatar's native input region. Fullscreen debug uses consistent 24 px outer insets and a slim amber scrollbar with a transparent track; forced-colour mode preserves system scroll colours.
+An explicit introduction can offer a local face or voice label. Check or correct the name spelling, then confirm or cancel using the on-screen prompt. A correction labels the same captured profile and never selects a different face or voice; neither a model statement nor a nearby person's spoken confirmation saves a label. The prompt uses the same 32 px button height, 8 px radius and spacing, and 12 px inner padding as the debug controls. In compact mode its buttons lie inside the avatar's native input region. Fullscreen debug uses consistent 24 px outer insets and a slim amber scrollbar with a transparent track; forced-colour mode preserves system scroll colours.
 
 Enable People — faces and People — voices separately in Settings. Face matching also needs the camera enabled; voice matching needs the microphone enabled and the local diarization service healthy. This is fallible recognition of enrolled local profiles, not identification of arbitrary people from the internet. Do not interpret an empty profile list as a malfunction before enrollment.
 

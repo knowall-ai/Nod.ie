@@ -354,6 +354,9 @@ body.fullscreen #circle,body.fullscreen #avatar-controls { pointer-events:auto; 
 #recognition-confirm span { display:block;overflow-wrap:anywhere;margin:0 0 8px;max-height:72px;overflow:auto; }
 #recognition-confirm button,#debug-clear,#control-debug { box-sizing:border-box;min-height:32px;padding:4px 12px;border:1px solid #a97630;border-radius:8px;background:#202a35;color:#f5c77e;font:12px/1.5 system-ui,sans-serif;cursor:pointer; }
 #recognition-confirm button { min-width:80px;margin:0; }
+#recognition-confirm label { display:block;text-align:left;margin:0 0 8px; }
+#recognition-confirm input { display:block;box-sizing:border-box;width:100%;min-height:32px;margin-top:4px;padding:4px 8px;border:1px solid #a97630;border-radius:8px;background:#202a35;color:#fff;font:inherit; }
+#recognition-confirm input:focus-visible { outline:2px solid #f5a623;outline-offset:2px; }
 #recognition-confirm button+button { margin-left:8px; }
 #recognition-confirm button:hover,#debug-clear:hover { background:#36414d; }
 #recognition-confirm button:focus-visible,#debug-clear:focus-visible,#control-debug:focus-visible { outline:2px solid #f5a623;outline-offset:2px; }

@@ -14,3 +14,38 @@ test('unanswered expired proposals never block a later introduction',async()=>{c
 test('a visible unknown face cannot prevent a late voice introduction retry',async()=>{const f=fixture();f.live.observations=[];f.names.faces.lastObservation={receivedAt:Date.now(),faces:[{id:'face',name:null,uncertain:false}]};assert.equal((await f.names.propose(turn)).status,'awaiting-observation');f.live.observations=[f.observation];assert.equal((await f.names.propose(turn)).status,'pending');});
 test('late voice-window retries reuse the bounded classifier result',async()=>{const f=fixture();let calls=0;f.names.classify=async()=>{calls++;return {kind:'voice',name:'Élodie'};};f.live.observations=[];f.names.faces.lastObservation={receivedAt:Date.now(),faces:[{id:'face',name:null,uncertain:false}]};assert.equal((await f.names.propose(turn)).status,'awaiting-observation');assert.equal((await f.names.propose(turn)).status,'awaiting-observation');f.live.observations=[f.observation];assert.equal((await f.names.propose(turn)).status,'pending');assert.equal(calls,1);});
 test('one confirmed candidate spanning adjacent windows can label an introduction',()=>{const f=fixture();f.live.observations.push({...f.observation,interval:{start:4,end:8}});assert.ok(f.live.forInterval(3,5));f.live.observations[1]={...f.live.observations[1],speakers:[{speaker:0,id:'different'}]};assert.equal(f.live.forInterval(3,5),null);});
+
+test('spelling correction saves the same captured voice and journals the corrected name',async()=>{
+ const f=fixture(),events=[];f.names.record=e=>events.push(e);
+ const p=await f.names.propose(turn);
+ f.live.observations=[{...f.observation,speakers:[{id:'replacement',speaker:0}]}];
+ const result=await f.names.confirm(p.token,true,'  Zephie  ');
+ assert.equal(result.name,'Zephie');assert.equal(result.status,'saved');
+ assert.deepEqual(f.saved.map(s=>({id:s.id,name:s.name})),[{id:'original',name:'Zephie'}]);
+ assert.equal(events[0].subject,'Zephie');
+});
+test('invalid corrections keep the proposal available and never write a label',async()=>{
+ for(const value of ['', '   ', 'a'.repeat(81), 'Name\nOther', '\u202eName', null, {}, 42]){
+  const f=fixture(),p=await f.names.propose(turn);
+  assert.equal((await f.names.confirm(p.token,true,value)).status,'invalid-name');assert.equal(f.saved.length,0);
+  assert.equal((await f.names.confirm(p.token,true,'Élodie')).status,'saved');
+ }
+});
+test('corrected labels still require the live token, explicit acceptance and unexpired observation',async()=>{
+ for(const mode of ['wrong-token','cancel','expired']){
+  const f=fixture(),p=await f.names.propose(turn);if(mode==='expired')f.advance();
+  await f.names.confirm(mode==='wrong-token'?'other':p.token,mode!=='cancel','Zephie');
+  assert.equal(f.saved.length,0);
+ }
+});
+test('a correction cannot rename a replacement face',async()=>{
+ const f=fixture();let writes=0;
+ f.names.faces={lastObservation:{receivedAt:Date.now(),faces:[{id:'face-a',name:null,uncertain:false}]},store:{nameObserved:async()=>{writes++;return true;}}};
+ f.names.classify=async()=>({kind:'face',name:'Misheard'});
+ const p=await f.names.propose(turn);f.names.faces.lastObservation.faces=[{id:'face-b'}];
+ assert.equal((await f.names.confirm(p.token,true,'Correct spelling')).status,'not-saved');assert.equal(writes,0);
+});
+test('local-mode introductions accept a correction and Unicode joiners remain valid',async()=>{
+ const f=fixture(),p=await f.names.proposeLocal(f.observation,turn.text);
+ const name='न\u200dदी';assert.equal((await f.names.confirm(p.token,true,name)).status,'saved');assert.equal(f.saved[0].name,name);
+});
