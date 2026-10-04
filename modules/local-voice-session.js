@@ -77,7 +77,7 @@ class LocalVoiceSession {
             else if (outcome === 'no-speech') this.resetQuietRecording();
         }, 50);
     }
-    finish() { clearInterval(this.endpointTimer); this.endpointTimer = null; clearTimeout(this.limitTimer); if (this.recorder?.state === 'recording') this.recorder.stop(); }
+    finish() { clearInterval(this.endpointTimer); this.endpointTimer = null; clearTimeout(this.limitTimer); if (['recording', 'paused'].includes(this.recorder?.state)) this.recorder.stop(); }
     releaseMicrophone() {
         clearInterval(this.endpointTimer); this.endpointTimer = null;
         this.stream?.getTracks().forEach(t => t.stop()); this.stream = null;

@@ -166,6 +166,19 @@
         </div>
         <button id="person-save">Confirm selected links</button>
     </div>
+    <section class="section" id="recognition-calibration" aria-labelledby="calibration-title">
+        <h2 id="calibration-title">Recognition calibration</h2>
+        <p>Add varied samples to an already named profile, or test recognition without saving. These are fallible matches, not verified identities. Face and voice links remain separate unless you confirm them.</p>
+        <div class="person-link-fields">
+            <label>Sample type <select id="calibration-kind"><option value="face">Face</option><option value="voice">Voice</option></select></label>
+            <label>Named profile <select id="calibration-profile"><option value="">Choose a named profile</option></select></label>
+        </div>
+        <p id="calibration-counts"></p><p id="calibration-instructions"></p>
+        <div class="calibration-actions"><button id="calibration-collect">Capture another sample</button><button id="calibration-test">Test recognition only</button><button id="calibration-refresh">Refresh profiles</button></div>
+        <p id="calibration-status" role="status"></p><div id="calibration-preview"></div>
+        <div class="calibration-actions"><button id="calibration-confirm" class="btn-primary" hidden>Confirm sample</button><button id="calibration-cancel" disabled>Discard / cancel capture</button></div>
+        <p>Only confirmed embeddings are saved locally. Camera images and calibration recordings stay in memory and are discarded. Analysis time excludes the four-second voice capture.</p>
+    </section>
     <div class="section">
         <h2>Event journal</h2>
         <p>Text observations only; no camera images or audio are saved. Appearance and disappearance refer to the camera view, not confirmed room entry or exit. Recognition can be wrong.</p>
@@ -185,5 +198,6 @@
     <script src="modules/person-link-settings.js"></script>
     <script src="modules/face-introduction-settings.js"></script>
     <script src="modules/voice-introduction-settings.js"></script>
+    <script src="modules/calibration-settings.js"></script>
 </body>
 </html>

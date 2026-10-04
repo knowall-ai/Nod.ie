@@ -58,7 +58,7 @@ class FrameEngine:
                 if ok and len(encoded) <= 8000:
                     thumbnail = base64.b64encode(encoded).decode('ascii')
             result.append({'box': box, 'vector': (vector / norm).tolist(), 'thumbnail': thumbnail})
-        return {'model': self.model_id, 'faces': result}
+        return {'model': self.model_id, 'faces': result, 'quality': {'detectedFaces': 0 if faces is None else len(faces)}}
 
 if __name__ == '__main__':
     try:

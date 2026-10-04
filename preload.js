@@ -6,6 +6,15 @@ const subscribe = (channel, callback) => {
 };
 contextBridge.exposeInMainWorld('nodie', {
     platform: 'electron',
+    calibrationStatus:()=>ipcRenderer.invoke('calibration-status'),
+    beginCalibration:choice=>ipcRenderer.invoke('calibration-begin',choice),
+    submitCalibration:(token,body)=>ipcRenderer.invoke('calibration-sample',token,body),
+    calibrationFailure:(token,code)=>ipcRenderer.invoke('calibration-failure',token,code),
+    confirmCalibration:(token,accepted)=>ipcRenderer.invoke('calibration-confirm',token,accepted),
+    cancelCalibration:()=>ipcRenderer.invoke('calibration-cancel'),
+    onCalibrationChanged:callback=>subscribe('calibration-changed',callback),
+    onCalibrationCapture:callback=>subscribe('calibration-capture-request',callback),
+    onCalibrationCancelled:callback=>subscribe('calibration-cancelled',callback),
     personOptions:()=>ipcRenderer.invoke('person-options'),
     savePerson:choice=>ipcRenderer.invoke('person-save',choice),
     removePerson:id=>ipcRenderer.invoke('person-remove',id),
