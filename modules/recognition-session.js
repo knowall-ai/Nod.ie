@@ -1,4 +1,17 @@
 /** Uses the STT audio clock and never opens another microphone. */
+function speakerPhrases(words){
+ const phrases=[];
+ for(const word of (Array.isArray(words)?words:[]).slice(-50)){
+  if(typeof word.text!=='string'||!Number.isFinite(word.start)||word.start<0||!Number.isFinite(word.end)||word.end<=word.start||word.end-word.start>3)continue;
+  const possible=word.attribution==='possible-match'&&typeof word.profile==='string'&&Boolean(word.profile);
+  const profile=possible?word.profile:null,name=possible&&typeof word.name==='string'&&word.name?word.name:null;
+  const label=possible?(name?`Possible match: ${name}`:'Unknown voice (possible match)'):'Unattributed';
+  const previous=phrases.at(-1);
+  if(previous&&previous.label===label&&previous.profile===profile&&word.start>=previous.end&&word.start-previous.end<=1){previous.text+=' '+word.text.slice(0,200);previous.end=word.end;}
+  else phrases.push({profile,label,text:word.text.slice(0,200),start:word.start,end:word.end});
+ }
+ return phrases;
+}
 class RecognitionSession {
  constructor(renderer){this.renderer=renderer;this.generation=0;this.words=[];this.turns=[];this.askedFaces=new Map();this.logged=new Set();this.completedProposals=new Map();this.createPrompt();}
  send(session){this.renderer.state.wsHandler?.send({type:'session.update',session:{allow_recording:false,...session}});}
@@ -12,9 +25,14 @@ class RecognitionSession {
   if(data.type==='nodie.word_end'){const word=this.words.at(-1)||this.turns.at(-1)?.words.at(-1);if(word&&Number.isFinite(data.end_time)&&data.end_time>word.start)word.end=data.end_time;this.schedule();return;}
   if(data.type==='nodie.attributed_words'){
    this.renderer.transcript?.attribute?.(data.words);
-   for(const word of data.words||[]){for(const target of [...this.words,...this.turns.flatMap(t=>t.words)])if(target.start===word.start&&target.text===word.text)Object.assign(target,word);
-    const key=word.start+':'+(word.profile||'?');if(this.logged.has(key))continue;this.logged.add(key);if(this.logged.size>200)this.logged.delete(this.logged.values().next().value);this.renderer.debugStream?.add('Speaker words',`${word.name||(word.profile?'Unknown speaker':'Unattributed')}: ${word.text}`);
-   }this.schedule();return;
+   const fresh=[];
+   for(const word of (Array.isArray(data.words)?data.words:[]).slice(-50)){
+    for(const target of [...this.words,...this.turns.flatMap(t=>t.words)])if(target.start===word.start&&target.text===word.text)Object.assign(target,word);
+    const key=JSON.stringify([word.start,word.end,word.text,word.profile||null,word.attribution,word.name||null]);
+    if(this.logged.has(key))continue;this.logged.add(key);if(this.logged.size>200)this.logged.delete(this.logged.values().next().value);fresh.push(word);
+   }
+   for(const phrase of speakerPhrases(fresh))this.renderer.debugStream?.add('Speaker phrases',`${phrase.label}: ${phrase.text}`);
+this.schedule();return;
   }
   if(data.type==='response.text.delta'&&typeof data.delta==='string')this.assistantText=((this.assistantText||'')+data.delta).slice(-2000);
   if(data.type==='conversation.item.input_audio_transcription.delta'&&typeof data.delta==='string'&&Number.isFinite(data.start_time)){if(!this.words.length)this.previousAssistant=this.assistantText||'';this.words.push({text:data.delta,start:data.start_time});this.words=this.words.slice(-100);}
@@ -25,7 +43,7 @@ class RecognitionSession {
  async analyse(data){if(!this.enabled||this.busy||typeof data.audio!=='string'||data.audio.length>350000||!Number.isFinite(data.start_time)||!Number.isFinite(data.end_time)||data.start_time<0||data.end_time<=data.start_time||data.end_time-data.start_time>5)return;const generation=this.generation;this.busy=true;try{const bytes=Uint8Array.from(atob(data.audio),c=>c.charCodeAt(0));const observation=await window.nodie.analyseSpeakers(bytes,{start:data.start_time,end:data.end_time});if(generation!==this.generation||!this.enabled||!observation)return;this.send({speaker_observation:{...observation,start_time:data.start_time,end_time:data.end_time}});this.schedule();}catch{}finally{this.busy=false;}}
  faces(result){const faces=result?.state==='ready'?result.faces:[];this.send({face_observation:faces.map(f=>{const mayAskName=!f.name&&!f.uncertain&&f.id&&Date.now()-(this.askedFaces.get(f.id)||0)>300000;if(mayAskName)this.askedFaces.set(f.id,Date.now());return {profileId:f.name&&!f.uncertain?f.id:null,name:f.name||null,uncertain:true,mayAskName:Boolean(mayAskName)};})});}
  async propose(){if(this.proposing||this.pending||this.speaking)return;const turn=this.turns.find(t=>!t.attempted&&Date.now()-t.at<15000&&t.words.every(w=>Number.isFinite(w.end)));if(!turn)return;turn.attempted=true;const generation=this.generation;this.proposing=true;try{const result=await window.nodie.proposeRecognitionName({text:turn.words.map(w=>w.text).join(' ').slice(0,2000),start:turn.words[0].start,end:turn.words.at(-1).end,previousAssistant:turn.previousAssistant});if(['awaiting-observation','deferred'].includes(result.status))turn.attempted=false;if(generation!==this.generation||result.status!=='pending')return;this.showPrompt(result);}catch{}finally{this.proposing=false;}}
- showPrompt(result){this.releaseConfirmation();this.pending=result;clearTimeout(this.expiry);if(this.completedProposals.has(result.token)){this.result(this.completedProposals.get(result.token));return;}if(result.selectionInSettings){this.expiry=setTimeout(()=>{if(this.pending===result)void this.confirm(false);},60000);this.prompt.hidden=true;this.send({recognition_feedback:{status:'pending',kind:result.kind,name:result.name}});return;}this.nameInput.value=result.name;clearTimeout(this.expiry);this.expiry=setTimeout(()=>{if(this.pending===result)void this.confirm(false);},60000);this.label.textContent=`Name ${result.kind==='face'?'the sole person visible when introduced':'the voice in that introduction'}. Check the spelling, then confirm to save.`;this.prompt.hidden=false;this.send({recognition_feedback:{status:'pending',kind:result.kind,name:result.name}});}
+ showPrompt(result){this.releaseConfirmation();this.pending=result;clearTimeout(this.expiry);if(this.completedProposals.has(result.token)){this.result(this.completedProposals.get(result.token));return;}if(result.selectionInSettings||result.confirmationInSettings){this.expiry=setTimeout(()=>{if(this.pending===result)void this.confirm(false);},60000);this.prompt.hidden=true;this.send({recognition_feedback:{status:'pending',kind:result.kind,name:result.name}});return;}this.nameInput.value=result.name;clearTimeout(this.expiry);this.expiry=setTimeout(()=>{if(this.pending===result)void this.confirm(false);},60000);this.label.textContent=`Name ${result.kind==='face'?'the sole person visible when introduced':'the voice in that introduction'}. Check the spelling, then confirm to save.`;this.prompt.hidden=false;this.send({recognition_feedback:{status:'pending',kind:result.kind,name:result.name}});}
  result(result){
   if(!result?.token)return;
   // Settings may finish or close before the proposal IPC response reaches this window.
@@ -52,6 +70,6 @@ class RecognitionSession {
  createPrompt(){this.prompt=document.createElement('div');this.prompt.id='recognition-confirm';this.prompt.hidden=true;this.prompt.setAttribute('role','alertdialog');this.prompt.setAttribute('aria-label','Confirm recognition label');this.label=document.createElement('span');this.prompt.append(this.label);const field=document.createElement('label');field.textContent='Name';this.nameInput=document.createElement('input');this.nameInput.type='text';this.nameInput.maxLength=80;this.nameInput.required=true;this.nameInput.autocomplete='off';this.nameInput.setAttribute('aria-label','Correct the name spelling');field.append(this.nameInput);this.prompt.append(field);for(const [text,value] of [['Confirm',true],['Cancel',false]]){const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=()=>void this.confirm(value);if(value)this.confirmButton=b;else this.cancelButton=b;this.prompt.append(b);}document.body.append(this.prompt);}
 }
 if(typeof window!=='undefined')window.RecognitionSession=RecognitionSession;
-if(typeof module!=='undefined')module.exports={RecognitionSession};
+if(typeof module!=='undefined')module.exports={RecognitionSession,speakerPhrases};
 
 if(typeof window!=='undefined')window.addEventListener('DOMContentLoaded',()=>{if(window.NodieRenderer&&window.nodie?.proposeRecognitionName){const r=window.NodieRenderer;r.recognition ||= new RecognitionSession(r);window.nodie.onRecognitionProposal?.(p=>r.recognition.showPrompt(p));window.nodie.onRecognitionResult?.(p=>r.recognition.result(p));}});

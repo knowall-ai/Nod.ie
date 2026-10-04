@@ -49,8 +49,7 @@ function start() {
         settingsWindow = secureWindow({ width: 780, height: 850, parent: mainWindow, title: 'Nod.ie Settings' }, 'settings.html');
         settingsWindow.on('closed', () => {
             settingsWindow = null;
-            const p=recognitionNames.pending;
-            if(p?.kind==='face'){recognitionNames.cancel();mainWindow?.webContents.send('recognition-result',{token:p.token,status:'cancelled',kind:'face',name:p.name});}
+            cancelIntroduction();
         });
     }
     function shortcuts() {
@@ -149,21 +148,23 @@ function start() {
     handle('person-remove',id=>people.remove(id),true);
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
     const recognitionNames=new(require('./lib/recognition-names').RecognitionNames)({faces,voices:{store:speakerRecognition.store,forInterval:(start,end)=>liveSpeakers.forInterval(start,end)},classify:require('./lib/recognition-intent').recognitionIntent({url:env.getConfig('OLLAMA_URL'),model:env.LLM_MODEL||env.getConfig('LOCAL_LLM_MODEL')}),record:event=>recorder.record(event)});
-    voice.proposeSpeakerName=async(observation,text,previousAssistant)=>{const proposal=await recognitionNames.proposeLocal(observation,text,previousAssistant);if(proposal.status==='pending')mainWindow?.webContents.send('recognition-proposal',proposal);return proposal;};
+    const cancelIntroduction=()=>{const pending=recognitionNames.pending;recognitionNames.cancel();settingsWindow?.webContents.send('introduction-changed');if(pending)mainWindow?.webContents.send('recognition-result',{token:pending.token,status:'cancelled',kind:pending.kind,name:pending.name});};
+    const presentIntroduction=result=>{if(result.selectionInSettings||result.confirmationInSettings){showSettings();settingsWindow?.webContents.send('introduction-changed');}return result;};
+    voice.proposeSpeakerName=async(observation,text,previousAssistant)=>{const proposal=presentIntroduction(await recognitionNames.proposeLocal(observation,text,previousAssistant));if(proposal.status==='pending')mainWindow?.webContents.send('recognition-proposal',proposal);return proposal;};
     handle('recognition-propose',async turn=>{
         const result=await recognitionNames.propose(turn);
-        if(result.selectionInSettings){showSettings();settingsWindow?.webContents.send('face-introduction-changed');}
-        return result;
+        return presentIntroduction(result);
     });
     handle('face-introduction',()=>recognitionNames.selection(),true);
+    handle('voice-introduction',()=>recognitionNames.voiceSelection(),true);
     handle('recognition-confirm',async(token,accepted,name,faceId)=>{
-        const face=recognitionNames.pending?.kind==='face';
+        const pending=recognitionNames.pending;
         const result=await recognitionNames.confirm(token,accepted,name,faceId);
-        if(face&&!['invalid-name','select-face'].includes(result.status))mainWindow?.webContents.send('recognition-result',{...result,token});
-        settingsWindow?.webContents.send('face-introduction-changed');
+        if(pending?.token===token&&!['invalid-name','select-face'].includes(result.status))mainWindow?.webContents.send('recognition-result',{...result,token,kind:result.kind||pending.kind,name:result.name||pending.name});
+        settingsWindow?.webContents.send('introduction-changed');
         return result;
     });
-    handle('recognition-cancel',()=>{recognitionNames.cancel();settingsWindow?.webContents.send('face-introduction-changed');});
+    handle('recognition-cancel',cancelIntroduction);
     handle('speaker-analyse',(audio,interval)=>recorder.capture(()=>liveSpeakers.analyse(audio,interval),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
     handle('speaker-cancel', () => liveSpeakers.cancel());
     handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
@@ -173,7 +174,7 @@ function start() {
     handle('speaker-edit', async (id, name) => identityChange(async()=>{await people.unlink('voices',id);await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}), true);
     handle('speaker-merge', async (source, target) => identityChange(async()=>{await people.unlink('voices',source);return speakerRecognition.store.merge(source, target);}), true);
     handle('speaker-forget', async () => identityChange(async()=>{await people.unlink('voices');return speakerRecognition.store.forget();}), true);
-    handle('voice-cancel', () => {voice.cancel();recognitionNames.cancel();});
+    handle('voice-cancel', () => {voice.cancel();cancelIntroduction();});
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
         let stage = 'validation';

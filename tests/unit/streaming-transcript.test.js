@@ -83,6 +83,12 @@ test('Unmute word events match upstream STT and spoken TTS spacing',async t=>{
 });
 test('late attribution updates completed user words and survives restart',async t=>{
  const {store,transcript:s}=await fixture(t,{wordDeltas:true});s.event({type:'conversation.item.input_audio_transcription.delta',delta:'Hello',start_time:1});s.event({type:'response.created'});await s.queue;
- s.attribute([{text:'Hello',start:1,end:1.4,name:'Example',attribution:'possible-match'}]);await s.queue;
+ s.attribute([{text:'Hello',start:1,end:1.4,name:'Example',profile:'voice-profile',attribution:'possible-match'}]);await s.queue;
  assert.deepEqual((await new ConversationHistory(store.file).load()).turns[0].words,[{text:'Hello',start:1,end:1.4,speaker:'Example',attribution:'possible-match'}]);
+});
+
+test('unattributed words never persist an accompanying name as the speaker',async t=>{
+ const {store,transcript:s}=await fixture(t,{wordDeltas:true});s.event({type:'conversation.item.input_audio_transcription.delta',delta:'Overlap',start_time:1});
+ s.attribute([{text:'Overlap',start:1,end:1.4,name:'Example',profile:'voice-profile',attribution:'unattributed'}]);await s.finish();
+ const word=(await store.load()).turns[0].words[0];assert.equal(word.speaker,null);assert.equal(word.attribution,'unattributed');
 });

@@ -26,6 +26,18 @@
         <button id="face-introduction-link" hidden>Link this face to a person and memory</button>
     </section>
 
+    <section class="section" id="voice-introduction" hidden aria-labelledby="voice-introduction-title">
+        <h2 id="voice-introduction-title">Introduce your voice</h2>
+        <div id="voice-introduction-form">
+            <p>This labels the sole voice sampled during your introduction. Check the spelling before saving. A person visible on camera does not identify the speaker.</p>
+            <p id="voice-introduction-heard"></p>
+            <label class="voice-introduction-name">Name <input id="voice-introduction-name" type="text" maxlength="80" required autocomplete="off"></label>
+            <div class="voice-introduction-actions"><button id="voice-introduction-confirm" type="button" class="btn-primary">Confirm voice and name</button><button id="voice-introduction-cancel" type="button">Cancel voice introduction</button></div>
+        </div>
+        <p id="voice-introduction-status" role="status"></p>
+        <button id="voice-introduction-link" hidden>Link this voice to a person and memory</button>
+    </section>
+
     <div class="section">
         <h2>Avatar Settings</h2>
         
@@ -172,5 +184,6 @@
     <script src="settings.js"></script>
     <script src="modules/person-link-settings.js"></script>
     <script src="modules/face-introduction-settings.js"></script>
+    <script src="modules/voice-introduction-settings.js"></script>
 </body>
 </html>

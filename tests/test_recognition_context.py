@@ -21,4 +21,11 @@ class RecognitionTests(unittest.TestCase):
   w=m.AudioWindows();w.observe(self.observation());messages=[{'role':'system','content':'Policy'},{'role':'user','content':'hello'}];first=m.recognition_messages(messages,w);second=m.recognition_messages(messages,w);self.assertIn('"mayAskName": true',first[-2]['content']);self.assertNotIn('"mayAskName": true',second[-2]['content']);self.assertEqual(len(messages),2)
  def test_clock_restart_discards_previous_identity(self):
   w=m.AudioWindows();w.audio(np.zeros(24000),24000,10);w.observe(self.observation());w.word('old',1);w.audio(np.zeros(24000),24000,1);self.assertEqual(w.observations,[]);self.assertEqual(w.words,[])
+ def test_uncertain_and_duplicate_overlap_never_become_a_named_word(self):
+  for mode in ['uncertain','duplicate']:
+   w=m.AudioWindows();o=self.observation()
+   if mode=='uncertain':o['speakers'][0]['uncertain']=True
+   else:o['segments'].append({'speaker':1,'start':0,'end':2})
+   w.observe(o);w.word('ambiguous',.2);w.end_word(.8)
+   self.assertEqual(w.attributed()[0]['attribution'],'unattributed');self.assertIsNone(w.attributed()[0]['name'])
 if __name__=='__main__':unittest.main()

@@ -95,3 +95,18 @@ test('only a successful confirmation returns the captured profile ID for guided 
  const rejected=multipleFacesFixture(),q=await rejected.names.propose(turn);rejected.names.faces.store.nameObserved=async()=>false;
  assert.equal((await rejected.names.confirm(q.token,true,'Robin','face-b')).profileId,undefined);
 });
+test('Settings exposes bounded voice-introduction text without voice features or face choices',async()=>{
+ const f=fixture(),p=await f.names.propose({...turn,text:'Hello, I am Robin. '+ 'x'.repeat(1000)});
+ assert.equal(p.confirmationInSettings,true);const selection=f.names.voiceSelection();assert.equal(selection.heard.length,300);
+ assert.deepEqual(Object.keys(selection).sort(),['expiresAt','heard','name','token']);assert.equal(f.names.selection(),null);
+ await f.names.confirm(p.token,false);assert.equal(f.names.voiceSelection(),null);
+});
+test('uncertain, multiple, uncovered or cross-speaker local voice samples cannot offer naming',async()=>{
+ for(const change of ['uncertain','multiple','uncovered','cross-speaker']){
+  const f=fixture();if(change==='uncertain')f.observation.speakers[0].uncertain=true;
+  if(change==='multiple')f.observation.speakers.push({id:'other',speaker:1});
+  if(change==='uncovered')f.observation.segments=[];
+  if(change==='cross-speaker')f.observation.segments.push({speaker:1,start:0,end:3});
+  assert.equal((await f.names.proposeLocal(f.observation,turn.text)).status,'not-saved');assert.equal(f.saved.length,0);
+ }
+});

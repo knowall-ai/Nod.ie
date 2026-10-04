@@ -98,3 +98,8 @@ pre:empty { display: none; }
 
 #face-introduction-link[hidden] { display: none; }
 #people-list button { margin-left: 8px; }
+
+#voice-introduction[hidden], #voice-introduction-form[hidden], #voice-introduction-link[hidden] { display: none; }
+.voice-introduction-name { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+.voice-introduction-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#voice-introduction-heard { overflow-wrap: anywhere; }

@@ -17,7 +17,7 @@ class FaceIntroductionSettings {
         if(this.confirmation===confirmation){this.confirmation=null;this.saving=false;this.confirmButton.disabled=false;this.cancelButton.disabled=false;this.name.disabled=false;this.choices.inert=false;}
     }
     stop() {++this.generation;this.refreshQueued=false;this.releaseConfirmation();this.clear();this.unsubscribe?.();}
-    start() {this.unsubscribe=this.api.onFaceIntroductionChanged?.(()=>void this.refresh());void this.refresh();}
+    start() {this.unsubscribe=this.api.onIntroductionChanged?.(()=>void this.refresh());void this.refresh();}
     async refresh(preserveFeedback=false) {
         if(this.saving){this.refreshQueued=true;return;}
         const generation=++this.generation;
