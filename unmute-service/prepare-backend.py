@@ -160,3 +160,4 @@ if args.with_speakers or (output / 'chatbot.py').exists():
 
 import subprocess, sys
 subprocess.run([sys.executable,str(Path(__file__).with_name("prepare-curiosity.py"))],check=True)
+subprocess.run([sys.executable,str(Path(__file__).with_name("prepare-interruption.py"))],check=True)

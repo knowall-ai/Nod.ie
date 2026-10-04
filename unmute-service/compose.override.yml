@@ -34,6 +34,7 @@ services:
       - ${NODIE_UNMUTE_DIR:?}/journal_context.py:/app/unmute/journal_context.py:ro
       - ${NODIE_UNMUTE_DIR:?}/scene_context.py:/app/unmute/scene_context.py:ro
       - ${NODIE_UNMUTE_DIR:?}/curiosity_context.py:/app/unmute/curiosity_context.py:ro
+      - ${NODIE_UNMUTE_DIR:?}/interruption_context.py:/app/unmute/interruption_context.py:ro
       - ${NODIE_UNMUTE_DIR:?}/ollama_warmup.py:/app/unmute/ollama_warmup.py:ro
       - ${NODIE_UNMUTE_DIR:?}/generated/llm_utils.py:/app/unmute/llm/llm_utils.py:ro
       - ${NODIE_UNMUTE_DIR:?}/generated/system_prompt.py:/app/unmute/llm/system_prompt.py:ro
