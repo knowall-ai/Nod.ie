@@ -14,7 +14,7 @@ class StreamingTranscript {
     }
     attribute(words){
         if(!Array.isArray(words))return;
-        for(const turn of this.recentTurns){let changed=false;for(const word of turn.words||[]){const match=words.find(w=>w.start===word.start&&w.text===word.text);if(!match||!Number.isFinite(match.end)||match.end<word.start||match.end-word.start>5)continue;word.end=match.end;const possible=match.attribution==='possible-match'&&typeof match.profile==='string'&&Boolean(match.profile);word.speaker=possible?match.name||null:null;word.attribution=possible?'possible-match':'unattributed';changed=true;}if(changed)this.save(turn);}
+        for(const turn of this.recentTurns){let changed=false;for(const word of turn.words||[]){const match=words.find(w=>w.start===word.start&&w.text===word.text);if(!match||!Number.isFinite(match.end)||match.end<word.start||match.end-word.start>5)continue;word.end=match.end;const possible=match.attribution==='possible-match'&&typeof match.profile==='string'&&Boolean(match.profile);word.speaker=possible?match.name||null:null;word.attribution=possible?'possible-match':'unattributed';word.profile=possible?match.profile:null;const reasons=['matched','unfinished','invalid-time','overlap','speaker-change','uncertain','uncovered','no-observation','conflicting-observation'];if(reasons.includes(match.reason))word.reason=match.reason;else delete word.reason;changed=true;}if(changed)this.save(turn);}
     }
     event(data) {
         if (['response.created', 'response.audio.done', 'response.done', 'unmute.interrupted_by_vad'].includes(data.type)) this.finish();

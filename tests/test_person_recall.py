@@ -56,4 +56,21 @@ class RecallTests(unittest.IsolatedAsyncioTestCase):
   state=types.SimpleNamespace(observed_at=time.monotonic(),observations=[{'speakers':[{'id':'id','name':'Alex','uncertain':True}]}])
   await m.person_messages([{'role':'system','content':'Policy'},{'role':'user','content':'Hello'}],manager,recognition_state=state)
   self.assertNotIn('reverie.resolve_linked_people',calls)
+ async def test_recent_speaker_presence_without_word_attribution_never_recalls_voice(self):
+  import time
+  calls=[]
+  async def execute(name,args):calls.append((name,args));return '{"people":[]}'
+  manager=types.SimpleNamespace(available_tools={'reverie.resolve_people':{},'reverie.resolve_linked_people':{}},execute_tool=execute)
+  state=types.SimpleNamespace(observed_at=time.monotonic(),observations=[{'speakers':[{'id':'old','name':'Alex','uncertain':False}]}],voice_profiles_for=lambda text:[])
+  await m.person_messages([{'role':'system','content':'Policy'},{'role':'user','content':'Someone else now'}],manager,recognition_state=state)
+  self.assertNotIn('reverie.resolve_linked_people',[name for name,args in calls])
+ async def test_current_word_profiles_drive_linked_voice_recall(self):
+  import time
+  calls=[];utterances=[]
+  async def execute(name,args):calls.append((name,args));return '{"people":[]}'
+  def attributed(text):utterances.append(text);return ['word-backed-profile']
+  manager=types.SimpleNamespace(available_tools={'reverie.resolve_people':{},'reverie.resolve_linked_people':{}},execute_tool=execute)
+  state=types.SimpleNamespace(observed_at=time.monotonic(),observations=[{'speakers':[]}],voice_profiles_for=attributed)
+  await m.person_messages([{'role':'system','content':'Policy'},{'role':'user','content':'Current words'}],manager,recognition_state=state)
+  self.assertEqual(utterances,['Current words']);self.assertEqual(calls[-1],('reverie.resolve_linked_people',{'faces':[],'voices':['word-backed-profile']}))
 if __name__=='__main__':unittest.main()

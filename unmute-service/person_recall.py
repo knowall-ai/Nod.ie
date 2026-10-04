@@ -17,7 +17,7 @@ async def person_messages(messages, manager, transcript_messages=None, include_a
     if faces and time.monotonic()-faces[1]<15:
         recognised['faces']=[f['profileId'] for f in faces[0] if f.get('profileId') and f.get('name')][:8]
     if recognition_state and time.monotonic()-recognition_state.observed_at<8 and recognition_state.observations:
-        recognised['voices']=[p['id'] for p in recognition_state.observations[-1]['speakers'] if p.get('id') and p.get('name') and not p.get('uncertain',True)][:8]
+        recognised['voices']=recognition_state.voice_profiles_for(latest) if hasattr(recognition_state,'voice_profiles_for') else []
     try:
         # Let a cancelled stdio lookup finish consuming its own response before a
         # new response can query the same MCP stream. No background write tool.
