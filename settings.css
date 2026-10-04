@@ -95,3 +95,6 @@ pre:empty { display: none; }
 .face-introduction-choice input { accent-color:#bd7100; }
 .face-introduction-actions { display:flex;flex-wrap:wrap;gap:10px;margin-top:16px; }
 #face-introduction-name { display:block;margin-top:8px; }
+
+#face-introduction-link[hidden] { display: none; }
+#people-list button { margin-left: 8px; }

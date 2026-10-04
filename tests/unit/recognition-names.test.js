@@ -89,3 +89,9 @@ test('seeing several faces never changes a self-introduction into a face label',
  const p=await f.names.propose(turn);assert.equal(p.kind,'voice');assert.equal(f.names.selection(),null);
  await f.names.confirm(p.token,true,'Speaker','face-b');assert.equal(f.saved[0].id,'original');
 });
+test('only a successful confirmation returns the captured profile ID for guided linking',async()=>{
+ const f=multipleFacesFixture(),p=await f.names.propose(turn);
+ assert.equal((await f.names.confirm(p.token,true,'Robin','face-b')).profileId,'face-b');
+ const rejected=multipleFacesFixture(),q=await rejected.names.propose(turn);rejected.names.faces.store.nameObserved=async()=>false;
+ assert.equal((await rejected.names.confirm(q.token,true,'Robin','face-b')).profileId,undefined);
+});
