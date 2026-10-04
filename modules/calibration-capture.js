@@ -21,6 +21,7 @@ class CalibrationCapture {
   if(r.state.isMuted||!stream?.getAudioTracks().some(t=>t.readyState==='live'))throw Error('microphone-off');
   if(r.isAssistantSpeaking||r.streamingLips?.sources.size)throw Error('assistant-speaking');
   const normal=local?.recorder,localGeneration=local?.generation,paused=capture?.isPaused;
+  const deviceChanged=()=>r.state.isMuted||!stream.getAudioTracks().some(t=>t.readyState==='live')||(capture?r.state.audioCapture!==capture:local?.stream!==stream||local.generation!==localGeneration||local.recorder!==normal||normal?.state!=='paused');
   if(capture)capture.pause();
   else if(normal?.state==='recording'){normal.pause();clearInterval(local.endpointTimer);local.endpointTimer=null;}
   let released=false;
@@ -34,8 +35,8 @@ class CalibrationCapture {
     recorder.ondataavailable=e=>{bytes+=e.data.size;if(bytes>256000)finish(Error('capture-unavailable'));else if(e.data.size)chunks.push(e.data);};
     recorder.onerror=()=>finish(Error('capture-unavailable'));recorder.onstop=()=>finish();
     try{recorder.start(250);}catch{finish(Error('capture-unavailable'));return;}timer=setTimeout(()=>recorder.stop(),this.durationMs);
-    watch=setInterval(()=>{if(r.state.isMuted||!stream.getAudioTracks().some(t=>t.readyState==='live')||(capture?r.state.audioCapture!==capture:local?.stream!==stream))finish(Error('device-changed'));else if(r.isAssistantSpeaking||r.streamingLips?.sources.size)finish(Error('assistant-speaking'));},100);
-   }).then(async blob=>{guard.controller.signal.throwIfAborted();if(r.isAssistantSpeaking||r.streamingLips?.sources.size)throw Error('assistant-speaking');return new Uint8Array(await blob.arrayBuffer());});
+    watch=setInterval(()=>{if(deviceChanged())finish(Error('device-changed'));else if(r.isAssistantSpeaking||r.streamingLips?.sources.size)finish(Error('assistant-speaking'));},100);
+   }).then(async blob=>{guard.controller.signal.throwIfAborted();if(deviceChanged())throw Error('device-changed');if(r.isAssistantSpeaking||r.streamingLips?.sources.size)throw Error('assistant-speaking');return new Uint8Array(await blob.arrayBuffer());});
   }finally{guard.release();}
  }
  async capture(request){

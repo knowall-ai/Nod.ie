@@ -26,6 +26,23 @@ test('recognition testing never writes either profile store, creates candidates 
  for(const kind of ['face','voice']){const p=await c.begin({kind,profileId:id,mode:'test'});await c.submit(p.token,body);assert.equal(c.view().phase,'complete');assert.equal(c.view().report.match.selected,true);assert.equal(c.pending,null);assert.deepEqual(await c.confirm(p.token,true),{saved:false});}
  assert.deepEqual(await Promise.all([fs.readFile(faces.file,'utf8'),fs.readFile(voices.file,'utf8')]),before);assert.equal(faces.candidates,undefined);assert.equal(voices.candidates,undefined);
 });
+test('unnamed competitors prevent a named calibration match and block collecting their samples',async t=>{
+ for(const kind of ['face','voice']){
+  const {c,faces,voices,body,rawFace,rawVoice}=await fixture(t),store=kind==='face'?faces:voices,size=kind==='face'?128:512;
+  const data=await store.read(),profile=data.profiles[0];
+  if(kind==='face'){profile.vectors=[vector(size,.9)];rawFace.faces[0].vector=vector(size);}
+  else{profile.vector=vector(size,.9);rawVoice.speakers[0].embedding=vector(size);}
+  data.profiles.push({...profile,id:'22222222-2222-2222-2222-222222222222',name:null,lastSeen:Date.now(),...(kind==='face'?{vectors:[vector(size,.95)]}:{vector:vector(size,.95)})});await store.write(data);
+  const observed=await store.observe(kind==='face'?rawFace:rawVoice,data.epoch,undefined,{enrol:false});
+  assert.equal((kind==='face'?observed.faces:observed.speakers)[0].uncertain,true);
+  const before=await fs.readFile(store.file,'utf8');
+  const testing=await c.begin({kind,profileId:id,mode:'test'});await c.submit(testing.token,body);
+  assert.equal(c.view().phase,'complete');assert.equal(c.view().report.match,null);assert.match(c.view().report.message,/Uncertain/);
+  const collecting=await c.begin({kind,profileId:id,mode:'collect'});await c.submit(collecting.token,body);
+  assert.equal(c.view().phase,'rejected');assert.deepEqual(await c.confirm(collecting.token,true),{saved:false});
+  assert.equal(await fs.readFile(store.file,'utf8'),before);
+ }
+});
 test('multiple/poor faces, overlap, short voices and inconsistent clean coverage are rejected',async t=>{
  for(const variant of ['multiple-face','blurry-face','overlap','short','inflated-clean']){
   const {c,rawFace,rawVoice,body}=await fixture(t);let kind='voice';

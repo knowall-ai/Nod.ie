@@ -1,4 +1,4 @@
-const test=require('node:test'),assert=require('node:assert/strict');
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const {CalibrationCapture}=require('../../modules/calibration-capture');
 class Recorder{
  static isTypeSupported(){return true;}
@@ -41,4 +41,19 @@ test('camera encoding that stalls is cancelled and its canvas pixels are discard
  r.controls={cameraSource:{active:true,generation:1,video:{readyState:2,videoWidth:1920,videoHeight:1080}}};c.doc={createElement:()=>canvas};
  const pending=c.capture({token:'one',kind:'face'});t.mock.timers.tick(10001);await pending;
  assert.equal(canvas.width,0);assert.equal(canvas.height,0);assert.equal(calls.length,0);assert.equal(c.active,false);
+});
+test('the real local microphone button stops a paused conversation recorder and discards calibration',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','setInterval']});
+ const sandbox={window:{},setTimeout,clearTimeout,setInterval,clearInterval};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../../modules/local-voice-session.js'),'utf8'),sandbox);
+ const {c,r,track,calls,failures}=fixture(t);r.state.audioCapture=null;
+ const local=r.localVoice=new sandbox.window.LocalVoiceSession(r);local.state='recording';local.generation=1;
+ local.stream={getAudioTracks:()=>[track],getTracks:()=>[{stop(){track.readyState='ended';}}]};
+ let stops=0,resumes=0;
+ local.recorder={state:'recording',pause(){this.state='paused';},resume(){this.state='recording';resumes++;},stop(){this.state='inactive';stops++;local.releaseMicrophone();}};
+ local.startEndpointDetection=()=>{throw Error('A stopped microphone must not resume endpoint detection');};
+ const pending=c.capture({token:'local',kind:'voice'});assert.equal(local.recorder.state,'paused');
+ t.mock.timers.tick(3999);local.toggle();assert.equal(stops,1);assert.equal(r.state.isMuted,true);assert.equal(track.readyState,'ended');
+ t.mock.timers.tick(2);await pending;
+ assert.equal(calls.length,0);assert.equal(failures[0][1],'device-changed');assert.equal(resumes,0);assert.equal(c.active,false);
 });
