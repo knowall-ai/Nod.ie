@@ -133,6 +133,8 @@ function start() {
     const people=new(require('./lib/person-registry').PersonRegistry)(path.join(require('node:os').homedir(),'.config/nodie/events/person-links.json'));
     const linkedMemory=require('./unmute-service/linked-people.cjs');
     const memoryOptions=()=>linkedMemory.personOptions(()=>voice.memory());
+    voice.nameHints=new(require('./lib/transcription-name-hints').TranscriptionNameHints)({profiles:async()=>{const data=await Promise.all([faces.store.read(),speakerRecognition.store.read()]);return data.flatMap(d=>d.profiles).filter(p=>p.name).sort((a,b)=>b.lastSeen-a.lastSeen).map(p=>p.name);},memory:()=>voice.memoryClient});
+    voice.nameHintsEnabled=()=>config().LOCAL_STT_NAME_HINTS;
     voice.linkedRecall=linkedMemory.createLinkedResolver(()=>voice.memory(),()=>people.read());
     handle('person-options',async()=>{
         const [registry,faceStatus,voiceStatus]=await Promise.all([people.read(),faces.store.status(),speakerRecognition.store.status()]);

@@ -109,6 +109,8 @@ class LocalVoiceSession {
     debugTurn(result){
         const debug=this.renderer.debugStream;if(!debug)return;
         debug.add('Heard',result.transcript);
+        const hints=result.transcriptionHints;
+        if(hints)debug.add('Transcription hints',hints.state==='applied'?`${hints.count} saved name hints used; spelling remains uncertain.`:hints.state==='disabled'?'Saved name hints are off.':hints.state==='unsupported'?'Speech provider does not support name hints.':hints.state==='non-local'?'Name hints require an on-computer speech service.':'No saved name hints available.');
         const count=result.conversationContext?.recentQuestions?.length;
         if(count)debug.add('Conversation context',`${count} recent assistant question${count===1?'':'s'} included to avoid uninvited repetition.`);
         const attribution=result.wordAttribution;
