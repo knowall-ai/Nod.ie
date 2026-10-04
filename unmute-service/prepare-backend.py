@@ -6,6 +6,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('unmute_root', type=Path)
 parser.add_argument('--with-speakers', action='store_true')
 args = parser.parse_args()
+import subprocess, sys
+subprocess.run([sys.executable, str(Path(__file__).with_name('prepare-instructions.py')), str(args.unmute_root)], check=True)
 source = (args.unmute_root / 'unmute/llm/llm_utils.py').read_text()
 needle = '"temperature": self.temperature,'
 if source.count(needle) != 1:

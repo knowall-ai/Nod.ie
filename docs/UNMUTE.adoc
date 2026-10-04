@@ -26,6 +26,9 @@ curl --fail http://127.0.0.1:11434/api/create \
 
 The alias shares Qwen's weights and fixes its context size for the OpenAI-compatible API.
 The backend adapter requests no reasoning output.
+The generated `system_prompt.py` adapter passes Nodie's constant instructions once, followed by the explicitly selected language instruction. It replaces the inherited default with the application's prompt and removes the legacy wrapper for constant sessions. That wrapper added conflicting transcription-completion, memory-saving, reasoning and conversation advice around the application policy. Tool schemas and current camera/recognition context continue through their existing adapters; removing the wrapper does not remove tool support or validate recognition as identity. Other explicitly selected Unmute instruction modes remain unchanged.
+
+Run `python3 tests/test_instruction_adapter.py` to check explicit/default policies, language handling, unsupported upstream layouts and the generated method when available. The manual conversation evaluation can use the full assembled system prompt via `--prompt`; checks using only `SYSTEM-PROMPT.md` cannot establish runtime behavior when another wrapper is present. Wrapper removal reduces conflicting context but does not guarantee accurate transcription, interruption recovery or absence of repeated questions.
 The renderer's model setting alone cannot select the model in this installed Unmute version: its backend environment selects it.
 
 Set `NODIE_UNMUTE_DIR` to the absolute `unmute-service` directory, then apply `compose.override.yml` after the existing ai-stack Compose file.
