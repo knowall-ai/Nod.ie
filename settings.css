@@ -103,3 +103,7 @@ pre:empty { display: none; }
 .voice-introduction-name { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
 .voice-introduction-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 #voice-introduction-heard { overflow-wrap: anywhere; }
+
+.calibration-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#calibration-confirm[hidden] { display: none; }
+#calibration-preview img { display: block; width: 96px; height: 96px; margin: 12px 0; border-radius: 9px; }

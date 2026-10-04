@@ -18,6 +18,7 @@ class CuriositySession {
         const r = this.renderer;
         if (!r.state.isConnected || r.localVoice || !r.visionContext?.active) return 'camera or conversation unavailable';
         if (r.state.isMuted || r.state.speakerMuted) return 'microphone or speaker muted';
+        if (r.calibration?.active) return 'calibration capture active';
         if (r.recognition?.pending) return 'introduction confirmation open';
         if (r.isAssistantSpeaking || r.streamingLips?.sources.size || this.now() - this.lastActivity < 20000) return 'conversation active';
         if (this.now() - this.started < 60000) return 'settling after camera/session start';

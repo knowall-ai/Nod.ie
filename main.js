@@ -32,8 +32,8 @@ function start() {
     const config = () => normalize({ ...env, ...Object.fromEntries(Object.entries(aliases).map(([key, alias]) => [key, store.get(alias) ?? env[key]])) });
     const isLocalFrame = (event, file) => event.senderFrame === event.sender.mainFrame && event.senderFrame.url === pathToFileURL(path.join(__dirname, file)).href;
     const trusted = event => [mainWindow, settingsWindow].some(win => win && !win.isDestroyed() && event.sender === win.webContents) && (isLocalFrame(event, 'index.html') || isLocalFrame(event, 'settings.html'));
-    const handle = (channel, callback, settingsOnly = false) => ipcMain.handle(channel, (event, ...args) => {
-        if (!trusted(event) || (settingsOnly && event.sender !== settingsWindow?.webContents)) throw new Error('Untrusted IPC sender');
+    const handle = (channel, callback, settingsOnly = false, mainOnly = false) => ipcMain.handle(channel, (event, ...args) => {
+        if (!trusted(event) || (settingsOnly && event.sender !== settingsWindow?.webContents) || (mainOnly && event.sender !== mainWindow?.webContents)) throw new Error('Untrusted IPC sender');
         return callback(...args);
     });
     function secureWindow(options, file) {
@@ -49,7 +49,7 @@ function start() {
         settingsWindow = secureWindow({ width: 780, height: 850, parent: mainWindow, title: 'Nod.ie Settings' }, 'settings.html');
         settingsWindow.on('closed', () => {
             settingsWindow = null;
-            cancelIntroduction();
+            cancelIntroduction();cancelCalibration();
         });
     }
     function shortcuts() {
@@ -75,7 +75,7 @@ function start() {
     const vision = new (require('./lib/vision-analysis').VisionAnalysis)({ url: env.getConfig('OLLAMA_URL', 'http://127.0.0.1:11434'), model: env.getConfig('LOCAL_VISION_MODEL', env.LLM_MODEL || 'nodie-qwen3.5:9b') });
     const faces = new (require('./lib/face-recognition').FaceRecognition)();
     const recorder=new(require('./lib/journal-recorder').JournalRecorder)(journal,debug);
-    handle('face-analyse',image=>recorder.capture(()=>faces.analyse(image),result=>{debug('Face',result.state==='ready'?result.faces.map(f=>f.name?`Possible match: ${f.name}`:'Unknown person').join('; ')||'No usable face':result.state);return result.state==='ready'?result.faces.map(f=>({source:'face',kind:f.name?'recognised':'observed',subject:f.name||'Unknown person',uncertain:true})):[];}));
+    handle('face-analyse',image=>calibration.active?{state:'calibrating',faces:[]}:recorder.capture(()=>faces.analyse(image),result=>{debug('Face',result.state==='ready'?result.faces.map(f=>f.name?`Possible match: ${f.name}`:'Unknown person').join('; ')||'No usable face':result.state);return result.state==='ready'?result.faces.map(f=>({source:'face',kind:f.name?'recognised':'observed',subject:f.name||'Unknown person',uncertain:true})):[];}));
     handle('face-cancel', () => faces.cancel());
     handle('face-status', () => faces.store.status(), true);
     handle('face-enabled', enabled => { faces.cancel(); return faces.store.configure(enabled); }, true);
@@ -98,6 +98,7 @@ function start() {
         return {token:curiosityCandidate.token,capturedAt};
     };
     handle('curiosity-claim',async token=>{
+        if(calibration.active)return {reason:'calibration active'};
         const c=curiosityCandidate;
         if(!c||c.token!==token||Date.now()-Date.parse(c.capturedAt)>20000)return {reason:'observation expired'};
         curiosityCandidate=null;
@@ -147,6 +148,21 @@ function start() {
     }),true);
     handle('person-remove',id=>people.remove(id),true);
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
+    const calibration=new(require('./lib/recognition-calibration').RecognitionCalibration)({faces:faces.store,voices:speakerRecognition.store,extractFace:(image,signal)=>faces.analyseFrame(image,signal),extractVoice:(audio,signal)=>speakerRecognition.extract(audio,signal),notify:()=>{settingsWindow?.webContents.send('calibration-changed');const op=calibration.view();if(op?.report)debug('Calibration',`${op.kind}: ${op.report.message}${op.report.latencyMs!==undefined?' · '+op.report.latencyMs+' ms':''}`);}});
+    speakerRecognition.calibrating=()=>calibration.active;
+    const cancelCalibration=()=>{calibration.cancel();faces.cancel({keepIdleWorker:true});mainWindow?.webContents.send('calibration-cancelled');};
+    handle('calibration-status',()=>calibration.status(),true);
+    handle('calibration-begin',async choice=>{
+        cancelIntroduction();cancelCalibration();liveSpeakers.cancel();
+        const pending=await calibration.begin(choice);
+        if(pending)mainWindow?.webContents.send('calibration-capture-request',{token:pending.token,kind:pending.kind});
+        return pending;
+    },true);
+    handle('calibration-sample',(token,body)=>calibration.submit(token,body),false,true);
+    handle('calibration-failure',(token,code)=>calibration.failure(token,code),false,true);
+    handle('calibration-confirm',(token,accepted)=>identityChange(()=>calibration.confirm(token,accepted)),true);
+    handle('calibration-cancel',cancelCalibration);
+    app.on('before-quit',cancelCalibration);
     const recognitionNames=new(require('./lib/recognition-names').RecognitionNames)({faces,voices:{store:speakerRecognition.store,forInterval:(start,end)=>liveSpeakers.forInterval(start,end)},classify:require('./lib/recognition-intent').recognitionIntent({url:env.getConfig('OLLAMA_URL'),model:env.LLM_MODEL||env.getConfig('LOCAL_LLM_MODEL')}),record:event=>recorder.record(event)});
     const cancelIntroduction=()=>{const pending=recognitionNames.pending;recognitionNames.cancel();settingsWindow?.webContents.send('introduction-changed');if(pending)mainWindow?.webContents.send('recognition-result',{token:pending.token,status:'cancelled',kind:pending.kind,name:pending.name});};
     const presentIntroduction=result=>{if(result.selectionInSettings||result.confirmationInSettings){showSettings();settingsWindow?.webContents.send('introduction-changed');}return result;};
@@ -165,7 +181,7 @@ function start() {
         return result;
     });
     handle('recognition-cancel',cancelIntroduction);
-    handle('speaker-analyse',(audio,interval)=>recorder.capture(()=>liveSpeakers.analyse(audio,interval),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
+    handle('speaker-analyse',(audio,interval)=>calibration.active?null:recorder.capture(()=>liveSpeakers.analyse(audio,interval),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
     handle('speaker-cancel', () => liveSpeakers.cancel());
     handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
     app.on('before-quit', () => liveSpeakers.cancel());

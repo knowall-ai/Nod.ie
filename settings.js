@@ -113,7 +113,7 @@ async function loadFaces() {
     if (!status.profiles.length) el('face-profiles').textContent = 'No face profiles learned yet.';
     for (const profile of status.profiles) {
         const row = document.createElement('div');
-        const label = document.createElement('p'); label.textContent = `${profile.name || 'Unfamiliar face'} (${profile.id.slice(0, 8)}) — last seen ${new Date(profile.lastSeen).toLocaleString()}`;
+        const label = document.createElement('p'); label.textContent = `${profile.name || 'Unfamiliar face'} (${profile.id.slice(0, 8)}) · ${profile.faceSamples || 1} face sample(s) — last seen ${new Date(profile.lastSeen).toLocaleString()}`;
         const input = document.createElement('input'); input.type = 'text'; input.value = profile.name || ''; input.maxLength = 80; input.setAttribute('aria-label', 'Face profile name');
         const save = document.createElement('button'); save.textContent = 'Save name'; save.onclick = () => api.faceEdit(profile.id, input.value).then(loadFaces).catch(error);
         const remove = document.createElement('button'); remove.textContent = 'Forget'; remove.onclick = () => { if (confirm('Forget this face profile?')) api.faceEdit(profile.id, null).then(loadFaces).catch(error); };
