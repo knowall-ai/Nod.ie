@@ -5,7 +5,7 @@ function speakerPhrases(words){
   if(typeof word.text!=='string'||!Number.isFinite(word.start)||word.start<0||!Number.isFinite(word.end)||word.end<=word.start||word.end-word.start>3)continue;
   const possible=word.attribution==='possible-match'&&typeof word.profile==='string'&&Boolean(word.profile);
   const profile=possible?word.profile:null,name=possible&&typeof word.name==='string'&&word.name?word.name:null;
-  const reasons={'overlap':'overlapping voices','speaker-change':'speaker change','uncertain':'uncertain voice match','uncovered':'incomplete audio coverage','no-observation':'no recent audio evidence','conflicting-observation':'conflicting voice evidence'};
+  const reasons={'overlap':'overlapping voices','speaker-change':'speaker change','uncertain':'uncertain voice match','uncertain-transcription':'uncertain transcription','uncovered':'incomplete audio coverage','no-observation':'no recent audio evidence','conflicting-observation':'conflicting voice evidence'};
   const label=possible?(name?`Possible match: ${name}`:'Unknown voice (possible match)'):(reasons[word.reason]?`Unattributed (${reasons[word.reason]})`:'Unattributed');
   const previous=phrases.at(-1);
   if(previous&&previous.label===label&&previous.profile===profile&&word.start>=previous.end&&word.start-previous.end<=1){previous.text+=' '+word.text.slice(0,200);previous.end=word.end;}
@@ -70,7 +70,7 @@ this.schedule();return;
  }
  createPrompt(){this.prompt=document.createElement('div');this.prompt.id='recognition-confirm';this.prompt.hidden=true;this.prompt.setAttribute('role','alertdialog');this.prompt.setAttribute('aria-label','Confirm recognition label');this.label=document.createElement('span');this.prompt.append(this.label);const field=document.createElement('label');field.textContent='Name';this.nameInput=document.createElement('input');this.nameInput.type='text';this.nameInput.maxLength=80;this.nameInput.required=true;this.nameInput.autocomplete='off';this.nameInput.setAttribute('aria-label','Correct the name spelling');field.append(this.nameInput);this.prompt.append(field);for(const [text,value] of [['Confirm',true],['Cancel',false]]){const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=()=>void this.confirm(value);if(value)this.confirmButton=b;else this.cancelButton=b;this.prompt.append(b);}document.body.append(this.prompt);}
 }
-if(typeof window!=='undefined')window.RecognitionSession=RecognitionSession;
+if(typeof window!=='undefined'){window.RecognitionSession=RecognitionSession;window.speakerPhrases=speakerPhrases;}
 if(typeof module!=='undefined')module.exports={RecognitionSession,speakerPhrases};
 
 if(typeof window!=='undefined')window.addEventListener('DOMContentLoaded',()=>{if(window.NodieRenderer&&window.nodie?.proposeRecognitionName){const r=window.NodieRenderer;r.recognition ||= new RecognitionSession(r);window.nodie.onRecognitionProposal?.(p=>r.recognition.showPrompt(p));window.nodie.onRecognitionResult?.(p=>r.recognition.result(p));}});

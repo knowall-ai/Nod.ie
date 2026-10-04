@@ -93,6 +93,7 @@ class LocalVoiceSession {
             const result = await window.nodie.voiceTurn(audio);
             if (generation !== this.generation) return;
             this.emptyTurns = 0;
+            this.debugTurn(result);
             if(window.SpokenControls){this.renderer.spokenControls ||= new window.SpokenControls(this.renderer);if(await this.renderer.spokenControls.accept(result.transcript)){this.state='idle';this.status('');this.resumeListening();return;}}
             if (result.controls) this.renderer.controls.applyVoiceControls(result.controls);
             if (result.silent) { this.state = 'idle'; this.status(''); this.resumeListening(); return; }
@@ -104,6 +105,14 @@ class LocalVoiceSession {
                 else { this.listeningEnabled = false; this.status(error.message); }
             }
         }
+    }
+    debugTurn(result){
+        const debug=this.renderer.debugStream;if(!debug)return;
+        debug.add('Heard',result.transcript);
+        const attribution=result.wordAttribution;
+        if(attribution?.state==='timed'){
+            for(const phrase of window.speakerPhrases?.(attribution.words)||[])debug.add('Speaker phrases',`${phrase.start.toFixed(2)}–${phrase.end.toFixed(2)}s · ${phrase.label}: ${phrase.text}`);
+        }else debug.add('Speaker phrases','Word attribution unavailable: '+(attribution?.reason==='inconsistent-transcript'?'word timings differ from the transcript':attribution?.reason==='invalid-timestamps'?'invalid word timings':'provider did not supply word timings'));
     }
     async playReply(result, generation, useVideo = true) {
         if (generation !== this.generation) return;
@@ -130,7 +139,10 @@ class LocalVoiceSession {
             } else { this.state = 'idle'; this.listeningEnabled = false; this.status('Playback failed'); }
         };
         player.onerror = failed;
-        try { await player.play(); } catch { failed(); }
+        try {
+            await player.play();
+            if(this.player===player&&generation===this.generation&&!player.muted&&!result.silent)this.renderer.debugStream?.add('Said',result.reply);
+        } catch { failed(); }
     }
     releasePlayback() {
         if (this.player) {
