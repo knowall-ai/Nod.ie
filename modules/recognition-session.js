@@ -4,7 +4,8 @@ class RecognitionSession {
  send(session){this.renderer.state.wsHandler?.send({type:'session.update',session:{allow_recording:false,...session}});}
  start(){this.stop();const generation=this.generation;const update=async()=>{try{const status=await window.nodie.liveSpeakerStatus();if(generation!==this.generation)return;const enabled=Boolean(status.enabled)&&!this.renderer.state.isMuted;if(this.enabled&&!enabled){window.nodie.cancelRecognition?.().catch(()=>{});this.clearPrompt();}this.enabled=enabled;this.send({speaker_tracking_enabled:enabled});}catch{this.enabled=false;this.send({speaker_tracking_enabled:false});}};void update();this.poll=setInterval(update,5000);}
  stop(){++this.generation;clearInterval(this.poll);clearTimeout(this.attemptTimer);this.enabled=false;this.words=[];this.turns=[];this.assistantText='';this.previousAssistant='';this.logged=new Set();this.speaking=false;this.clearPrompt();this.send({speaker_tracking_enabled:false,speaker_observation:null,face_observation:null,recognition_feedback:null});window.nodie?.cancelRecognition?.().catch(()=>{});window.nodie?.cancelSpeakers?.().catch(()=>{});}
- releaseConfirmation(confirmation=this.confirming){if(!confirmation)return;clearTimeout(confirmation.timer);confirmation.cancel?.();if(this.confirming===confirmation)this.confirming=null;}
+ confirmationBusy(busy){this.prompt?.setAttribute?.('aria-busy',String(busy));for(const element of [this.confirmButton,this.cancelButton,this.nameInput])if(element)element.disabled=busy;}
+ releaseConfirmation(confirmation=this.confirming){if(!confirmation)return;clearTimeout(confirmation.timer);confirmation.cancel?.();if(this.confirming===confirmation){this.confirming=null;this.confirmationBusy(false);if(this.pending===confirmation.pending&&this.label)this.label.textContent=confirmation.label;}}
  clearPrompt(){this.releaseConfirmation();clearTimeout(this.expiry);this.pending=null;if(this.prompt)this.prompt.hidden=true;if(this.nameInput)this.nameInput.value='';}
  event(data){
   if(data.type==='nodie.speaker_audio'){void this.analyse(data);return;}
@@ -28,7 +29,7 @@ class RecognitionSession {
  async confirm(accepted){
   const pending=this.pending;if(!pending||this.confirming)return;
   if(accepted&&!this.nameInput.reportValidity())return;
-  const name=this.nameInput.value.trim(),generation=this.generation,confirmation={pending};this.confirming=confirmation;
+  const name=this.nameInput.value.trim(),generation=this.generation,confirmation={pending,label:this.label.textContent};this.confirming=confirmation;this.confirmationBusy(true);this.label.textContent='Saving the name…';
   const deadline=new Promise((_,reject)=>{confirmation.cancel=()=>reject(Error('Confirmation superseded'));confirmation.timer=setTimeout(()=>reject(Error('Confirmation timed out')),10000);});
   try{
    const result=await Promise.race([window.nodie.confirmRecognitionName(pending.token,accepted,accepted?name:undefined),deadline]);
@@ -40,7 +41,7 @@ class RecognitionSession {
   }catch{if(generation===this.generation&&this.pending===pending){this.clearPrompt();this.renderer.showNotification('Name confirmation could not be completed. Check saved profiles before trying again.','error');}}
   finally{this.releaseConfirmation(confirmation);}
  }
- createPrompt(){this.prompt=document.createElement('div');this.prompt.id='recognition-confirm';this.prompt.hidden=true;this.prompt.setAttribute('role','alertdialog');this.prompt.setAttribute('aria-label','Confirm recognition label');this.label=document.createElement('span');this.prompt.append(this.label);const field=document.createElement('label');field.textContent='Name';this.nameInput=document.createElement('input');this.nameInput.type='text';this.nameInput.maxLength=80;this.nameInput.required=true;this.nameInput.autocomplete='off';this.nameInput.setAttribute('aria-label','Correct the name spelling');field.append(this.nameInput);this.prompt.append(field);for(const [text,value] of [['Confirm',true],['Cancel',false]]){const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=()=>void this.confirm(value);this.prompt.append(b);}document.body.append(this.prompt);}
+ createPrompt(){this.prompt=document.createElement('div');this.prompt.id='recognition-confirm';this.prompt.hidden=true;this.prompt.setAttribute('role','alertdialog');this.prompt.setAttribute('aria-label','Confirm recognition label');this.label=document.createElement('span');this.prompt.append(this.label);const field=document.createElement('label');field.textContent='Name';this.nameInput=document.createElement('input');this.nameInput.type='text';this.nameInput.maxLength=80;this.nameInput.required=true;this.nameInput.autocomplete='off';this.nameInput.setAttribute('aria-label','Correct the name spelling');field.append(this.nameInput);this.prompt.append(field);for(const [text,value] of [['Confirm',true],['Cancel',false]]){const b=document.createElement('button');b.type='button';b.textContent=text;b.onclick=()=>void this.confirm(value);if(value)this.confirmButton=b;else this.cancelButton=b;this.prompt.append(b);}document.body.append(this.prompt);}
 }
 if(typeof window!=='undefined')window.RecognitionSession=RecognitionSession;
 if(typeof module!=='undefined')module.exports={RecognitionSession};

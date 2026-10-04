@@ -3,7 +3,7 @@ const {RecognitionSession}=require('../../modules/recognition-session');
 function fixture(t){
  const savedWindow=global.window;t.after(()=>{global.window=savedWindow;session.clearPrompt();});
  const replies=[],notices=[],session=Object.create(RecognitionSession.prototype);
- Object.assign(session,{generation:0,pending:{token:'first',kind:'voice',name:'Robin'},prompt:{hidden:false},label:{},nameInput:{value:'Robin',reportValidity:()=>true},renderer:{showNotification:text=>notices.push(text)},send:()=>{},schedule:()=>{}});
+ Object.assign(session,{generation:0,pending:{token:'first',kind:'voice',name:'Robin'},prompt:{hidden:false},confirmButton:{disabled:false},cancelButton:{disabled:false},label:{textContent:'Confirm name'},nameInput:{value:'Robin',reportValidity:()=>true},renderer:{showNotification:text=>notices.push(text)},send:()=>{},schedule:()=>{}});
  global.window={nodie:{confirmRecognitionName:()=>new Promise(resolve=>replies.push(resolve))}};
  return {session,replies,notices};
 }
@@ -20,4 +20,12 @@ test('late completion of a replaced proposal cannot release the new confirmation
  replies[0]({status:'saved',name:'Robin'});await old;
  assert.equal(session.confirming,guard);assert.equal(session.pending.token,'second');
  replies[1]({status:'saved',name:'Other'});await current;assert.equal(session.confirming,null);assert.equal(session.pending,null);
+});
+
+test('saving disables Cancel synchronously and rejected names restore editable controls',async t=>{
+ const {session,replies}=fixture(t);const pending=session.confirm(true);
+ assert.equal(session.cancelButton.disabled,true);assert.equal(session.confirmButton.disabled,true);assert.equal(session.nameInput.disabled,true);assert.equal(session.label.textContent,'Saving the name…');
+ await session.confirm(false);assert.equal(replies.length,1);
+ replies[0]({status:'invalid-name'});await pending;
+ assert.equal(session.cancelButton.disabled,false);assert.equal(session.nameInput.disabled,false);assert.equal(session.pending.token,'first');assert.equal(session.label.textContent,'Confirm name');
 });
