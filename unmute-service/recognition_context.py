@@ -1,6 +1,19 @@
 """Bounded audio-clock observations; uncertain overlap remains unattributed."""
-import base64,io,wave,json,time,math
+import base64,io,wave,json,time,math,heapq
 import numpy as np
+
+def overlapping_voices(spans,start,end):
+    """Sweep bounded intervals; duplicate windows must not cause quadratic work."""
+    active={};heap=[]
+    for a,b,identity,_ in sorted(spans):
+        a=max(a,start);b=min(b,end)
+        if a>=b:continue
+        while heap and heap[0][0]<=a:
+            _,old=heapq.heappop(heap);active[old]-=1
+            if not active[old]:del active[old]
+        if active and (len(active)>1 or identity not in active):return True
+        heapq.heappush(heap,(b,identity));active[identity]=active.get(identity,0)+1
+    return False
 
 class AudioWindows:
     def __init__(self):self.parts=[];self.length=0;self.words=[];self.observations=[];self.audio_end=None;self.observed_at=0;self.asked=set();self.resolved={}
@@ -48,7 +61,7 @@ class AudioWindows:
                     reason='no-observation' if not observations else 'uncovered'
                     if uncertain:reason='uncertain'
                     elif len(identities)>1:
-                        reason='overlap' if any(x[2]!=y[2] and max(x[0],y[0],word['start'])<min(x[1],y[1],end) for x in spans for y in spans) else 'speaker-change'
+                        reason='overlap' if overlapping_voices(spans,word['start'],end) else 'speaker-change'
                     elif len(names)>1:reason='conflicting-observation'
                     elif len(identities)==1:
                         covered=word['start']-.05
