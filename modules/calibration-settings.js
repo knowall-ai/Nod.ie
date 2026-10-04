@@ -39,7 +39,7 @@ class CalibrationSettings {
     }
     if(op.expiresAt)this.expiry=setTimeout(()=>{if(this.operation?.token===op.token){this.clearPreview();this.el('status').textContent='Calibration expired. Capture a fresh sample.';void this.cancel();}},Math.max(0,op.expiresAt-Date.now()));
    }else this.el('status').textContent='Samples are added only after you confirm. Testing never saves a guess.';
-   this.el('cancel').disabled=!op||!['waiting','analysing','ready'].includes(op.phase);this.details();
+   this.el('cancel').disabled=this.saving||!op||!['waiting','analysing','ready'].includes(op.phase);this.details();
   }catch(e){if(generation===this.generation){this.clearPreview();this.el('status').textContent=e.message||'Calibration is unavailable. Refresh and try again.';}}
  }
  async begin(mode){
@@ -50,13 +50,13 @@ class CalibrationSettings {
   finally{clearTimeout(timer);this.busy=false;this.details();}
  }
  async confirm(){
-  const op=this.operation;if(this.busy||op?.phase!=='ready')return;this.busy=true;this.el('confirm').disabled=true;
+  const op=this.operation;if(this.busy||op?.phase!=='ready')return;this.busy=true;this.saving=true;this.el('confirm').disabled=true;this.el('cancel').disabled=true;
   let timer;
   try{await Promise.race([this.api.confirmCalibration(op.token,true),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Save did not complete. Check sample counts before retrying.')),10000);})]);await this.refresh();}
   catch(e){this.clearPreview();this.el('status').textContent=e.message||'Saving could not be confirmed. Check sample counts before retrying.';}
-  finally{clearTimeout(timer);this.busy=false;this.el('confirm').disabled=false;this.details();}
+  finally{clearTimeout(timer);this.busy=false;this.saving=false;this.el('confirm').disabled=false;this.details();}
  }
- async cancel(){this.clearPreview();try{await this.api.cancelCalibration();await this.refresh();}catch{this.el('status').textContent='Cancellation could not be confirmed. Refresh before trying again.';}}
+ async cancel(){if(this.busy||this.operation?.phase==='saving')return;this.clearPreview();try{await this.api.cancelCalibration();await this.refresh();}catch{this.el('status').textContent='Cancellation could not be confirmed. Refresh before trying again.';}}
 }
 if(typeof module!=='undefined')module.exports={CalibrationSettings};
 if(typeof window!=='undefined')window.addEventListener('DOMContentLoaded',()=>{if(window.nodie?.calibrationStatus){const p=new CalibrationSettings(window.nodie);p.start();window.addEventListener('pagehide',()=>p.stop(),{once:true});}});
