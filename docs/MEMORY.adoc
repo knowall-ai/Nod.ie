@@ -52,3 +52,19 @@ The Unmute bridge uses the existing read-only events mount and a bounded interna
 Proactive visual-curiosity turns skip person-memory lookup; a room observation alone does not request personal notes.
 
 No profiles are automatically enrolled or associated with household members. Recognition enrollment still needs a confirmed face or voice label before linking; the linking screen does not infer that the sole visible person is the speaker.
+
+== Configurable desktop brain connection
+
+Desktop Settings → _Reverie brain connection_ accepts a Neo4j connection URI, database, username and password. Supported schemes are `neo4j`, `neo4j+s`, `bolt` and `bolt+s`; embedded credentials, URL paths, query strings and self-signed-certificate bypass schemes are rejected. Configure a reachable database address on each computer to share long-term memories. This does not install or expose a database server, and does not synchronise local transcripts, event journals or recognition profiles.
+
+_Test connection_ launches the pinned Reverie MCP package, checks its tools, then makes one bounded read-only memory search. It does not save the connection or change memories. Results contain connection status only. _Save brain connection_ stores the target locally and encrypts the password with Electron's OS-backed safeStorage. Credentials are absent from public configuration, diagnostics and logs. A saved password is never returned to Settings; leaving it blank reuses it only for the same address, database and username. Linux's unprotected `basic_text` fallback is refused. See https://www.electronjs.org/docs/latest/api/safe-storage[Electron safeStorage] for platform-specific protection limits.
+
+Saved changes apply after restarting Nodie. Active local voice keeps its launch-time target, avoiding database changes halfway through a turn. _Use existing configuration_ removes the Settings override; after restarting, local voice again uses `REVERIE_CONFIG_PATH` and `REVERIE_CONFIG_SERVER`. The existing external MCP command is never executed: only its four Neo4j credential variables are imported.
+
+Each explicitly configured target has a separate local person-link registry, keyed by address, database and username. Existing links are not automatically copied: select the correct Person memory again. Renaming, merging or forgetting a recognition profile invalidates its links in every retained connection registry, including the legacy registry used by Unmute. Password changes retain the same registry. This prevents unrelated databases with overlapping record IDs from inheriting identity associations.
+
+This Settings connection applies to desktop local voice only. Browser local voice retains its environment configuration; realtime Unmute retains its backend configuration. Pointing Hulk at the same brain still requires Windows installation and network-access validation separately. Local voice currently recalls memories but does not expose conversational memory writes.
+
+Validation includes 343 unit tests, cross-connection identity invalidation, browser form/test/save/reset checks with fictional credentials, and a successful read-only query through the extracted connection code against the existing configured database. Native OS credential-store behavior on Windows remains unvalidated. Screenshots use a fictional address and username.
+
+image::images/memory-connection-settings.png[Reverie brain connection settings]

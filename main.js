@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, dialog, Notification, session, shell } = require('electron');
+const { app, BrowserWindow, globalShortcut, Tray, Menu, ipcMain, dialog, Notification, session, shell, safeStorage } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
@@ -13,6 +13,9 @@ const { dragPosition } = require('./lib/window-drag');
 if (!app.requestSingleInstanceLock()) { app.quit(); } else { start(); }
 function start() {
     const store = new Store();
+    const memorySettings=new(require('./lib/memory-settings').MemorySettings)({store,safeStorage});
+    // Snapshot the target for this launch; saved changes apply after restart.
+    const launchMemory=store.get('reverieConnection');
     const logger = new Logger(path.join(app.getPath('userData'), 'logs'));
     const diagnostics = new Diagnostics({ logger, notify: count => { if (Notification.isSupported()) new Notification({ title: 'Nod.ie: activity needs attention', body: `${count} health/activity signal(s). Open Settings to inspect; these may be expected changes.` }).show(); } });
     const historyStore = new (require('./lib/conversation-history').ConversationHistory)(path.join(require('node:os').homedir(), '.config/nodie/conversations/local.json'));
@@ -26,6 +29,7 @@ function start() {
     nodePublisher.start();app.on('before-quit',()=>nodePublisher.stop());
     const speakerRecognition = new (require('./lib/speaker-recognition').SpeakerRecognition)();
     const voice = new LocalVoice({ logger, historyStore, journal, speakerRecognition, avatarEnabled: () => config().AVATAR_ENABLED, diagnostics: () => diagnostics.status() });
+    voice.memoryCredentials=()=>launchMemory?new(require('./lib/memory-settings').MemorySettings)({store:{get:()=>launchMemory},safeStorage}).credentials():require('./lib/reverie-connection').legacyCredentials(env.getConfig);
     let windowMode;
     let mainWindow, pointerTracker, settingsWindow, tray, monitor, dragTimer, dragDeadline, dragMoved = false, updateDrag;
     const stopDrag = () => { updateDrag?.(); clearInterval(dragTimer); clearTimeout(dragDeadline); dragTimer = null; updateDrag = null; return dragMoved; };
@@ -65,6 +69,10 @@ function start() {
     }
     handle('window-action', value => windowMode.action(value));
     handle('get-config', config);
+    handle('memory-settings',()=>memorySettings.status(),true);
+    handle('memory-test',input=>memorySettings.test(input),true);
+    handle('memory-save',input=>memorySettings.save(input),true);
+    handle('memory-reset',()=>memorySettings.reset(),true);
     handle('open-settings', () => { showSettings(); return { status: 'opened' }; });
     handle('diagnostics-status', () => diagnostics.status());
     const streamLips = new (require('./lib/streaming-lip-sync').StreamingLipSync)({ url: env.getConfig('LOCAL_LIP_SYNC_URL'), enabled: () => config().AVATAR_ENABLED });
@@ -79,9 +87,9 @@ function start() {
     handle('face-cancel', () => faces.cancel());
     handle('face-status', () => faces.store.status(), true);
     handle('face-enabled', enabled => { faces.cancel(); return faces.store.configure(enabled); }, true);
-    handle('face-edit', async (id, name) => identityChange(async()=>{await people.unlink('faces',id);await faces.store.edit(id,name);if(name)recorder.record({source:'face',kind:'name-confirmed',subject:name,uncertain:false});}), true);
-    handle('face-merge', async (source, target) => identityChange(async()=>{await people.unlink('faces',source);return faces.store.merge(source, target);}), true);
-    handle('face-forget', async () => identityChange(async()=>{ faces.cancel();await people.unlink('faces');return faces.store.forget(); }), true);
+    handle('face-edit', async (id, name) => identityChange(async()=>{await unlinkPeople('faces',id);await faces.store.edit(id,name);if(name)recorder.record({source:'face',kind:'name-confirmed',subject:name,uncertain:false});}), true);
+    handle('face-merge', async (source, target) => identityChange(async()=>{await unlinkPeople('faces',source);return faces.store.merge(source, target);}), true);
+    handle('face-forget', async () => identityChange(async()=>{ faces.cancel();await unlinkPeople('faces');return faces.store.forget(); }), true);
     app.on('before-quit', () => faces.cancel());
     const {SceneDelta,CuriosityLedger}=require('./lib/curiosity');
     const sceneDelta=new SceneDelta();
@@ -130,7 +138,11 @@ function start() {
         return result;
     }, true);
 
-    const people=new(require('./lib/person-registry').PersonRegistry)(path.join(require('node:os').homedir(),'.config/nodie/events/person-links.json'));
+    const memoryLinksDir=path.join(app.getPath('userData'),'memory-links');
+    const legacyLinksFile=path.join(require('node:os').homedir(),'.config/nodie/events/person-links.json');
+    // Shared DB connections use separate registries; database IDs are not portable.
+    const people=new(require('./lib/person-registry').PersonRegistry)(launchMemory?path.join(memoryLinksDir,require('./lib/memory-settings').targetKey(launchMemory)+'.json'):legacyLinksFile);
+    const unlinkPeople=(kind,id)=>require('./lib/person-link-registries').unlinkRegistries(memoryLinksDir,legacyLinksFile,kind,id);
     const linkedMemory=require('./unmute-service/linked-people.cjs');
     const memoryOptions=()=>linkedMemory.personOptions(()=>voice.memory());
     voice.nameHints=new(require('./lib/transcription-name-hints').TranscriptionNameHints)({profiles:async()=>{const data=await Promise.all([faces.store.read(),speakerRecognition.store.read()]);return data.flatMap(d=>d.profiles).filter(p=>p.name).sort((a,b)=>b.lastSeen-a.lastSeen).map(p=>p.name);},memory:()=>voice.memoryClient});
@@ -189,9 +201,9 @@ function start() {
     app.on('before-quit', () => liveSpeakers.cancel());
     handle('speaker-status', () => speakerRecognition.store.status(), true);
     handle('speaker-enabled', enabled => speakerRecognition.store.configure(enabled), true);
-    handle('speaker-edit', async (id, name) => identityChange(async()=>{await people.unlink('voices',id);await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}), true);
-    handle('speaker-merge', async (source, target) => identityChange(async()=>{await people.unlink('voices',source);return speakerRecognition.store.merge(source, target);}), true);
-    handle('speaker-forget', async () => identityChange(async()=>{await people.unlink('voices');return speakerRecognition.store.forget();}), true);
+    handle('speaker-edit', async (id, name) => identityChange(async()=>{await unlinkPeople('voices',id);await speakerRecognition.store.edit(id,name);if(name)recorder.record({source:'voice',kind:'name-confirmed',subject:name,uncertain:false});}), true);
+    handle('speaker-merge', async (source, target) => identityChange(async()=>{await unlinkPeople('voices',source);return speakerRecognition.store.merge(source, target);}), true);
+    handle('speaker-forget', async () => identityChange(async()=>{await unlinkPeople('voices');return speakerRecognition.store.forget();}), true);
     handle('voice-cancel', () => {voice.cancel();cancelIntroduction();});
     handle('get-system-prompt', () => fs.readFileSync(path.join(__dirname, 'SYSTEM-PROMPT.md'), 'utf8'));
     handle('save-settings', settings => {
