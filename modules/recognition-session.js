@@ -5,7 +5,8 @@ function speakerPhrases(words){
   if(typeof word.text!=='string'||!Number.isFinite(word.start)||word.start<0||!Number.isFinite(word.end)||word.end<=word.start||word.end-word.start>3)continue;
   const possible=word.attribution==='possible-match'&&typeof word.profile==='string'&&Boolean(word.profile);
   const profile=possible?word.profile:null,name=possible&&typeof word.name==='string'&&word.name?word.name:null;
-  const label=possible?(name?`Possible match: ${name}`:'Unknown voice (possible match)'):'Unattributed';
+  const reasons={'overlap':'overlapping voices','speaker-change':'speaker change','uncertain':'uncertain voice match','uncovered':'incomplete audio coverage','no-observation':'no recent audio evidence','conflicting-observation':'conflicting voice evidence'};
+  const label=possible?(name?`Possible match: ${name}`:'Unknown voice (possible match)'):(reasons[word.reason]?`Unattributed (${reasons[word.reason]})`:'Unattributed');
   const previous=phrases.at(-1);
   if(previous&&previous.label===label&&previous.profile===profile&&word.start>=previous.end&&word.start-previous.end<=1){previous.text+=' '+word.text.slice(0,200);previous.end=word.end;}
   else phrases.push({profile,label,text:word.text.slice(0,200),start:word.start,end:word.end});
@@ -28,10 +29,10 @@ class RecognitionSession {
    const fresh=[];
    for(const word of (Array.isArray(data.words)?data.words:[]).slice(-50)){
     for(const target of [...this.words,...this.turns.flatMap(t=>t.words)])if(target.start===word.start&&target.text===word.text)Object.assign(target,word);
-    const key=JSON.stringify([word.start,word.end,word.text,word.profile||null,word.attribution,word.name||null]);
+    const key=JSON.stringify([word.start,word.end,word.text,word.profile||null,word.attribution,word.name||null,word.reason||null]);
     if(this.logged.has(key))continue;this.logged.add(key);if(this.logged.size>200)this.logged.delete(this.logged.values().next().value);fresh.push(word);
    }
-   for(const phrase of speakerPhrases(fresh))this.renderer.debugStream?.add('Speaker phrases',`${phrase.label}: ${phrase.text}`);
+   for(const phrase of speakerPhrases(fresh))this.renderer.debugStream?.add('Speaker phrases',`${phrase.start.toFixed(2)}–${phrase.end.toFixed(2)}s · ${phrase.label}: ${phrase.text}`);
 this.schedule();return;
   }
   if(data.type==='response.text.delta'&&typeof data.delta==='string')this.assistantText=((this.assistantText||'')+data.delta).slice(-2000);

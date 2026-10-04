@@ -12,6 +12,11 @@ test('unfinished or invalid words do not become speaker phrases and missing attr
 test('Debug deduplicates identical events but exposes a later uncertain attribution change',()=>{
  const rows=[],s=Object.create(RecognitionSession.prototype);Object.assign(s,{words:[],turns:[],logged:new Set(),schedule:()=>{},renderer:{debugStream:{add:(source,text)=>rows.push([source,text])}}});
  const words=[word('Hello',1,1.2,'a','Robin'),word('there',1.3,1.5,'a','Robin')];s.event({type:'nodie.attributed_words',words});s.event({type:'nodie.attributed_words',words});
- assert.deepEqual(rows,[['Speaker phrases','Possible match: Robin: Hello there']]);
- s.event({type:'nodie.attributed_words',words:words.map(w=>({...w,profile:null,name:null,attribution:'unattributed'}))});assert.equal(rows[1][1],'Unattributed: Hello there');
+ assert.deepEqual(rows,[['Speaker phrases','1.00–1.50s · Possible match: Robin: Hello there']]);
+ s.event({type:'nodie.attributed_words',words:words.map(w=>({...w,profile:null,name:null,attribution:'unattributed'}))});assert.equal(rows[1][1],'1.00–1.50s · Unattributed: Hello there');
+});
+
+test('Debug exposes overlap and speaker changes as separate unattributed spans',()=>{
+ const words=[{...word('both',1,1.2,null,null),reason:'overlap'},{...word('switch',1.3,1.5,null,null),reason:'speaker-change'}];
+ assert.deepEqual(speakerPhrases(words).map(p=>p.label),['Unattributed (overlapping voices)','Unattributed (speaker change)']);
 });

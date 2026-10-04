@@ -28,4 +28,34 @@ class RecognitionTests(unittest.TestCase):
    else:o['segments'].append({'speaker':1,'start':0,'end':2})
    w.observe(o);w.word('ambiguous',.2);w.end_word(.8)
    self.assertEqual(w.attributed()[0]['attribution'],'unattributed');self.assertIsNone(w.attributed()[0]['name'])
+ def test_duplicate_consistent_windows_and_adjacent_segments_combine_coverage(self):
+  w=m.AudioWindows();o=self.observation();o['segments']=[{'speaker':0,'start':0,'end':.5},{'speaker':0,'start':.5,'end':2}]
+  w.observe(o);w.observe(o);w.word('joined',.2);w.end_word(.8)
+  self.assertEqual(w.attributed()[0]['profile'],'a');self.assertEqual(w.attributed()[0]['reason'],'matched')
+ def test_gap_overlap_change_and_uncertain_have_distinct_reasons(self):
+  for reason,segments in [('uncovered',[{'speaker':0,'start':0,'end':.4},{'speaker':0,'start':.5,'end':2}]),('overlap',[{'speaker':0,'start':0,'end':2},{'speaker':1,'start':.3,'end':.7}]),('speaker-change',[{'speaker':0,'start':0,'end':.5},{'speaker':1,'start':.5,'end':2}])]:
+   w=m.AudioWindows();o=self.observation();o['segments']=segments;w.observe(o);w.word('word',.2);w.end_word(.8)
+   result=w.attributed()[0];self.assertIsNone(result['profile']);self.assertEqual(result['reason'],reason)
+ def test_new_window_does_not_refresh_expired_old_identity(self):
+  w=m.AudioWindows();w.observe(self.observation());w.observations[0]['received_at']=time.monotonic()-9
+  o=self.observation();o['start_time']=4;o['end_time']=8;w.observe(o);w.word('old',.2);w.end_word(.8)
+  self.assertIsNone(w.attributed()[0]['profile']);self.assertEqual(w.attributed()[0]['reason'],'uncovered')
+ def test_current_utterance_links_only_attributed_named_words(self):
+  w=m.AudioWindows();w.observe(self.observation())
+  for text,start,end in [('earlier',.2,.8),('current',2.2,2.8)]:w.word(text,start);w.end_word(end)
+  self.assertEqual(w.voice_profiles_for('current'),['b']);self.assertEqual(w.voice_profiles_for('earlier'),[])
+  self.assertEqual(w.voice_profiles_for('current plus unfinished'),[])
+  w.word('unfinished',3);self.assertEqual(w.voice_profiles_for('current unfinished'),['b'])
+ def test_invalid_observation_is_ignored_and_conflicting_names_are_uncertain(self):
+  w=m.AudioWindows();o=self.observation();o['end_time']=float('nan');w.observe(o);self.assertEqual(w.observations,[])
+  w.observe(self.observation());o=self.observation();o['speakers'][0]['name']='Other';w.observe(o);w.word('word',.2);w.end_word(.8)
+  self.assertEqual(w.attributed()[0]['reason'],'conflicting-observation')
+ def test_historical_labels_survive_expiry_but_do_not_recall_current_voice(self):
+  w=m.AudioWindows();w.observe(self.observation());w.word('hello',.2);w.end_word(.8)
+  self.assertEqual(w.attributed()[0]['profile'],'a')
+  w.observations[0]['received_at']=time.monotonic()-9
+  o=self.observation();o['start_time']=4;o['end_time']=8;w.observe(o)
+  self.assertEqual(w.attributed()[0]['profile'],'a');self.assertEqual(w.voice_profiles_for('hello'),[])
+  conflict=self.observation();conflict['segments'].append({'speaker':1,'start':.3,'end':.7});w.observe(conflict)
+  self.assertIsNone(w.attributed()[0]['profile']);self.assertEqual(w.attributed()[0]['reason'],'overlap')
 if __name__=='__main__':unittest.main()
