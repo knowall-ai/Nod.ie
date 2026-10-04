@@ -4,7 +4,7 @@ import ast
 from pathlib import Path
 
 root = Path(__file__).resolve().parent / 'generated'
-tree = ast.parse((root / 'unmute_handler.py').read_text())
+tree = ast.parse((root / 'unmute_handler.py').read_text(encoding='utf-8'))
 classes = [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'UnmuteHandler']
 if len(classes) != 1:
     raise SystemExit('Unsupported Unmute handler class')
@@ -39,5 +39,5 @@ if not curiosity:
     messages = self._nodie_interruption.messages(messages, self.chatbot.chat_history)
 ''').body
 ast.fix_missing_locations(tree)
-(root / 'unmute_handler.py').write_text(ast.unparse(tree) + '\n')
+(root / 'unmute_handler.py').write_text(ast.unparse(tree) + '\n', encoding='utf-8')
 print('Prepared ephemeral interrupted-response facts.')
