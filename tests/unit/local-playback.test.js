@@ -10,7 +10,7 @@ function harness(videoPlay) {
         URL: { createObjectURL: () => 'blob:test', revokeObjectURL: () => revoked++ } };
     vm.runInNewContext(fs.readFileSync('modules/local-voice-session.js', 'utf8'), context);
     const session = new context.window.LocalVoiceSession({ state: { avatarManager: { isEnabled: () => true, setSpeechVideo: value => visible = value } }, setStatus() {} });
-    return { session, video, stats: () => ({ revoked, audioStarts, visible }) };
+    return { session, video, window:context.window, stats: () => ({ revoked, audioStarts, visible }) };
 }
 test('video decoder failure falls back to audio once and clears handlers and media URLs', async () => {
     const h = harness(() => Promise.reject(new Error('Unsupported codec')));
@@ -59,4 +59,23 @@ test('local initialization preserves explicit listening intent and cancels stale
  let pending=session.initialize(true);health({ready:true});await pending;assert.equal(starts,1);
  pending=session.initialize(false);health({ready:true});await pending;assert.equal(starts,1);
  pending=session.initialize(true);session.cancel();health({ready:true});await pending;assert.equal(starts,1);assert.equal(renderer.state.isMuted,true);
+});
+
+test('local Debug does not call an intercepted or muted reply spoken before playback',async()=>{
+ const h=harness(()=>Promise.resolve()),rows=[];h.session.renderer.debugStream={add:(source,text)=>rows.push([source,text])};
+ h.session.debugTurn({transcript:'Nodie go full screen',reply:'Unplayed reply',wordAttribution:{state:'unavailable',reason:'missing-timestamps'}});
+ assert.ok(rows.some(([source])=>source==='Heard'));assert.ok(!rows.some(([source])=>source==='Said'));
+ h.session.renderer.state.speakerMuted=true;await h.session.playReply({audio:new Uint8Array(44),reply:'Muted'},0);assert.ok(!rows.some(([source])=>source==='Said'));h.session.cancel();
+ h.session.renderer.state.speakerMuted=false;await h.session.playReply({audio:new Uint8Array(44),reply:'Actually playing'},h.session.generation);assert.deepEqual(rows.filter(([source])=>source==='Said'),[['Said','Actually playing']]);h.session.cancel();
+});
+test('a cancelled delayed playback cannot claim a reply was spoken',async()=>{
+ let played;const h=harness(()=>new Promise(resolve=>played=resolve)),rows=[];h.session.renderer.debugStream={add:(source,text)=>rows.push([source,text])};
+ const pending=h.session.playReply({audio:new Uint8Array(44),video:new Uint8Array(16),reply:'Cancelled'},0);h.session.cancel();played();await pending;assert.equal(rows.length,0);
+});
+
+test('a locally intercepted command logs heard words but never calls playback or Said',async()=>{
+ const h=harness(()=>Promise.resolve()),rows=[];h.session.renderer.debugStream={add:(source,text)=>rows.push([source,text])};
+ h.window.nodie.voiceTurn=async()=>({transcript:'Nodie go full screen',reply:'Not played',wordAttribution:{state:'unavailable'}});
+ h.window.SpokenControls=class{async accept(){return true;}};let plays=0;h.session.playReply=async()=>{plays++;};
+ await h.session.send([new Blob(['synthetic audio'])],0);assert.equal(plays,0);assert.ok(rows.some(([source])=>source==='Heard'));assert.ok(!rows.some(([source])=>source==='Said'));
 });
