@@ -11,11 +11,11 @@ class Element {
  scrollIntoView(){}
  reportValidity(){return Boolean(this.value.trim());}
 }
-function fixture(t){
+function fixture(t,onLinkProfile){
  const nodes=new Map(),doc={getElementById:id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);},createElement:()=>new Element()};
  let proposal={token:'original',name:'Robin',expiresAt:Date.now()+60000,selectionRequired:true,faces:[{id:'a',thumbnail:'/9j/AAA='},{id:'b',thumbnail:'/9j/BBB='}]};
  const calls=[],api={faceIntroduction:async()=>proposal,confirmRecognitionName:async(...args)=>{calls.push(args);return {status:'saved'};}};
- const panel=new FaceIntroductionSettings(api,doc);t.after(()=>panel.stop());
+ const panel=new FaceIntroductionSettings(api,doc,onLinkProfile);t.after(()=>panel.stop());
  return {panel,api,calls,setProposal:p=>{proposal=p;},proposal};
 }
 test('Settings requires an explicit face choice and submits the corrected name with that snapshot ID',async t=>{
@@ -95,4 +95,12 @@ test('a status fetch started before confirmation cannot resurrect the saved prop
  api.faceIntroduction=()=>new Promise(resolve=>{fetched=resolve;});const stale=panel.refresh();
  await panel.confirm(true);fetched(proposal);await stale;
  assert.equal(panel.pending,null);assert.equal(panel.choices.children.length,0);assert.match(panel.status.textContent,/Name saved/);
+});
+test('the link shortcut is offered only after saving and carries the exact saved profile ID',async t=>{
+ const requests=[],{panel,api}=fixture(t,profile=>requests.push(profile));
+ await panel.refresh();panel.linkButton.onclick();assert.equal(requests.length,0);
+ panel.choices.children[1].children[1].checked=true;
+ api.confirmRecognitionName=async()=>({status:'saved',profileId:'saved-b',name:'Robin'});await panel.confirm(true);
+ assert.equal(panel.linkButton.hidden,false);panel.linkButton.onclick();assert.deepEqual(requests,[{kind:'face',profileId:'saved-b'}]);
+ panel.clear();assert.equal(panel.linkButton.hidden,true);panel.linkButton.onclick();assert.equal(requests.length,1);
 });

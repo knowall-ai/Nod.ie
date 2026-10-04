@@ -1,14 +1,16 @@
 /** Pending, snapshot-bound face choices. No images or user edits enter storage here. */
 class FaceIntroductionSettings {
-    constructor(api, doc=document) {
+    constructor(api, doc=document, onLinkProfile=()=>{}) {
         this.api=api;this.doc=doc;this.generation=0;
+        this.linkButton=doc.getElementById('face-introduction-link');
+        this.linkButton.onclick=()=>{if(this.savedProfile)onLinkProfile(this.savedProfile);};
         this.section=doc.getElementById('face-introduction');this.form=doc.getElementById('face-introduction-form');
         this.choices=doc.getElementById('face-introduction-faces');this.name=doc.getElementById('face-introduction-name');
         this.status=doc.getElementById('face-introduction-status');this.confirmButton=doc.getElementById('face-introduction-confirm');this.cancelButton=doc.getElementById('face-introduction-cancel');
         this.confirmButton.onclick=()=>void this.confirm(true);this.cancelButton.onclick=()=>void this.confirm(false);
         this.choices.onchange=()=>{this.status.textContent='';};this.name.oninput=()=>{this.status.textContent='';};
     }
-    clear() {clearTimeout(this.expiry);this.pending=null;this.choices.replaceChildren();this.name.value='';}
+    clear() {clearTimeout(this.expiry);this.pending=null;this.choices.replaceChildren();this.name.value='';this.savedProfile=null;this.linkButton.hidden=true;}
     releaseConfirmation(confirmation=this.confirmation) {
         if(!confirmation)return;
         clearTimeout(confirmation.timer);confirmation.cancel?.();
@@ -51,6 +53,7 @@ class FaceIntroductionSettings {
             if(this.confirmation!==confirmation)return;
             if(['invalid-name','select-face'].includes(result.status)){this.status.textContent=this.pending===p?(result.status==='invalid-name'?'Enter a valid name.':'Select a face from this introduction.'):'This introduction expired. Please introduce the person again.';return;}
             this.clear();this.form.hidden=true;
+            if(result.status==='saved'&&result.profileId){this.savedProfile={kind:'face',profileId:result.profileId};this.linkButton.hidden=false;}
             this.status.textContent=result.status==='saved'?'Name saved for the selected face.':result.status==='cancelled'?'Introduction cancelled.':'The face or introduction changed. Please introduce the person again.';
         }catch {if(this.confirmation===confirmation){this.clear();this.form.hidden=true;this.status.textContent='The name could not be confirmed. Check the saved profiles before trying again.';}}
         finally {if(this.confirmation===confirmation){this.releaseConfirmation(confirmation);if(this.refreshQueued){this.refreshQueued=false;void this.refresh(true);}}}
@@ -58,5 +61,5 @@ class FaceIntroductionSettings {
 }
 if(typeof module!=='undefined')module.exports={FaceIntroductionSettings};
 if(typeof window!=='undefined')window.addEventListener('DOMContentLoaded',()=>{
-    if(window.nodie?.faceIntroduction){const panel=new FaceIntroductionSettings(window.nodie);panel.start();window.addEventListener('pagehide',()=>panel.stop(),{once:true});}
+    if(window.nodie?.faceIntroduction){const panel=new FaceIntroductionSettings(window.nodie,document,profile=>window.dispatchEvent(new CustomEvent('recognition-profile-link-requested',{detail:profile})));panel.start();window.addEventListener('pagehide',()=>panel.stop(),{once:true});}
 });
