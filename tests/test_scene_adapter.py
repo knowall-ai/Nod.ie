@@ -8,6 +8,7 @@ tree=ast.parse((root/'openai_realtime_api_events.py').read_text())
 schema=ast.Module(body=[n for n in tree.body if isinstance(n,ast.ClassDef) and n.name in ['CuriosityEvent','SceneData','SpeakerSegment','FaceItem','NamingFeedback','SpeakerObservationItem','SpeakerObservation','SessionConfig']],type_ignores=[])
 sys.path.insert(0,str(root.parent))
 from recognition_context import AudioWindows,recognition_messages
+from interruption_context import InterruptionContext
 ns=dict(BaseModel=BaseModel,Field=Field,Literal=Literal,Instructions=str,AudioWindows=AudioWindows,recognition_messages=recognition_messages)
 exec(compile(schema,'schema','exec'),ns)
 Scene=ns['SceneData'];Session=ns['SessionConfig']
@@ -69,7 +70,7 @@ node_module=importlib.util.module_from_spec(node_spec);node_spec.loader.exec_mod
 sys.modules['unmute.node_context']=node_module
 image=base64.b64encode(b'\xff\xd8a\xff\xd9').decode()
 for scene in [{'status':'camera-off'},{'status':'snapshot','imageJpeg':image,'capturedAt':datetime.now(timezone.utc).isoformat()}]:
- fake=types.SimpleNamespace(chatbot=types.SimpleNamespace(preprocessed_messages=lambda:history,chat_history=history),_scene_data=scene,mcp_manager=None)
+ fake=types.SimpleNamespace(chatbot=types.SimpleNamespace(preprocessed_messages=lambda:history,chat_history=history),_scene_data=scene,mcp_manager=None,_nodie_interruption=InterruptionContext())
  result=asyncio.run(ns['_generate_response_task'](fake,2))
  assert result[-1]==history[-1] and len(history)==2
  assert history[0]['content']=='Policy'
