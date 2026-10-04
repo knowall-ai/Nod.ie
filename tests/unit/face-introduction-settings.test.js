@@ -58,3 +58,41 @@ test('a Settings result arriving before the proposal response cannot resurrect a
  for(let i=0;i<20;i++)s.result({token:String(i),status:'saved'});
  assert.equal(s.completedProposals.size,8);
 });
+test('a stalled save releases controls and replays a newer introduction without accepting late results',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const {panel,api,setProposal,proposal}=fixture(t);await panel.refresh();
+ panel.choices.children[0].children[1].checked=true;let finish;
+ api.confirmRecognitionName=()=>new Promise(resolve=>{finish=resolve;});
+ const stalled=panel.confirm(true);assert.equal(panel.cancelButton.disabled,true);assert.equal(panel.name.disabled,true);
+ setProposal({...proposal,token:'next',name:'Taylor'});await panel.refresh();assert.equal(panel.pending.token,'original');
+ t.mock.timers.tick(10001);await stalled;await Promise.resolve();
+ assert.equal(panel.saving,false);assert.equal(panel.cancelButton.disabled,false);assert.equal(panel.name.disabled,false);
+ assert.equal(panel.pending.token,'next');assert.equal(panel.name.value,'Taylor');
+ finish({status:'saved'});await Promise.resolve();assert.equal(panel.pending.token,'next');assert.equal(panel.name.value,'Taylor');
+});
+test('expiry discards crops during an accepted save while its successful feedback remains visible',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const {panel,api,setProposal,proposal}=fixture(t);
+ setProposal({...proposal,expiresAt:Date.now()+1000});await panel.refresh();panel.choices.children[0].children[1].checked=true;let finish;
+ api.confirmRecognitionName=()=>new Promise(resolve=>{finish=resolve;});const saving=panel.confirm(true);
+ t.mock.timers.tick(1001);assert.equal(panel.pending,null);assert.equal(panel.choices.children.length,0);assert.equal(panel.name.value,'');assert.match(panel.status.textContent,/in progress/);
+ setProposal(null);await panel.refresh();finish({status:'saved'});await saving;await Promise.resolve();
+ assert.match(panel.status.textContent,/Name saved/);assert.equal(panel.section.hidden,false);assert.equal(panel.saving,false);
+});
+test('a stalled save reports uncertainty and permits the next introduction',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const {panel,api,setProposal,proposal}=fixture(t);await panel.refresh();panel.choices.children[0].children[1].checked=true;
+ api.confirmRecognitionName=()=>new Promise(()=>{});const saving=panel.confirm(true);t.mock.timers.tick(10001);await saving;
+ assert.equal(panel.pending,null);assert.equal(panel.saving,false);assert.match(panel.status.textContent,/Check the saved profiles/);
+ setProposal({...proposal,token:'next'});await panel.refresh();assert.equal(panel.pending.token,'next');
+});
+test('stopping during confirmation releases the guard and late completion cannot replace a new save',async t=>{
+ const {panel,api,setProposal,proposal}=fixture(t);await panel.refresh();panel.choices.children[0].children[1].checked=true;
+ const replies=[];api.confirmRecognitionName=()=>new Promise(resolve=>replies.push(resolve));const old=panel.confirm(true);panel.stop();await old;
+ setProposal({...proposal,token:'new'});await panel.refresh();panel.choices.children[0].children[1].checked=true;const current=panel.confirm(true),guard=panel.confirmation;
+ replies[0]({status:'saved'});await Promise.resolve();assert.equal(panel.confirmation,guard);assert.equal(panel.pending.token,'new');assert.equal(panel.saving,true);
+ replies[1]({status:'saved'});await current;assert.equal(panel.saving,false);assert.match(panel.status.textContent,/Name saved/);
+});
+test('a status fetch started before confirmation cannot resurrect the saved proposal',async t=>{
+ const {panel,api,proposal}=fixture(t);await panel.refresh();panel.choices.children[0].children[1].checked=true;let fetched;
+ api.faceIntroduction=()=>new Promise(resolve=>{fetched=resolve;});const stale=panel.refresh();
+ await panel.confirm(true);fetched(proposal);await stale;
+ assert.equal(panel.pending,null);assert.equal(panel.choices.children.length,0);assert.match(panel.status.textContent,/Name saved/);
+});

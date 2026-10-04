@@ -9,15 +9,21 @@ class FaceIntroductionSettings {
         this.choices.onchange=()=>{this.status.textContent='';};this.name.oninput=()=>{this.status.textContent='';};
     }
     clear() {clearTimeout(this.expiry);this.pending=null;this.choices.replaceChildren();this.name.value='';}
-    stop() {++this.generation;this.clear();this.unsubscribe?.();}
+    releaseConfirmation(confirmation=this.confirmation) {
+        if(!confirmation)return;
+        clearTimeout(confirmation.timer);confirmation.cancel?.();
+        if(this.confirmation===confirmation){this.confirmation=null;this.saving=false;this.confirmButton.disabled=false;this.cancelButton.disabled=false;this.name.disabled=false;this.choices.inert=false;}
+    }
+    stop() {++this.generation;this.refreshQueued=false;this.releaseConfirmation();this.clear();this.unsubscribe?.();}
     start() {this.unsubscribe=this.api.onFaceIntroductionChanged?.(()=>void this.refresh());void this.refresh();}
-    async refresh() {
-        if(this.saving)return;
+    async refresh(preserveFeedback=false) {
+        if(this.saving){this.refreshQueued=true;return;}
         const generation=++this.generation;
         try {
             const proposal=await this.api.faceIntroduction();
-            if(generation!==this.generation||this.saving)return;
-            if(!proposal||Date.now()>=proposal.expiresAt){this.clear();this.section.hidden=true;return;}
+            if(generation!==this.generation)return;
+            if(this.saving){this.refreshQueued=true;return;}
+            if(!proposal||Date.now()>=proposal.expiresAt){if(!preserveFeedback||this.pending){this.clear();this.section.hidden=true;}return;}
             if(this.pending?.token===proposal.token)return;
             this.clear();this.pending=proposal;this.name.value=proposal.name;this.status.textContent='';
             this.section.hidden=false;this.form.hidden=false;
@@ -28,7 +34,7 @@ class FaceIntroductionSettings {
                 const text=this.doc.createElement('span');text.textContent=`Face ${index+1}`;label.append(image,radio,text);this.choices.append(label);
             });
             this.section.scrollIntoView({block:'start'});
-            this.expiry=setTimeout(()=>{if(this.pending===proposal){this.clear();this.form.hidden=true;this.status.textContent='This introduction expired. Please introduce the person again.';}},Math.max(0,proposal.expiresAt-Date.now()));
+            this.expiry=setTimeout(()=>{if(this.pending===proposal){this.clear();this.form.hidden=true;this.status.textContent=this.confirmation?.pending===proposal?'Name confirmation is still in progress…':'This introduction expired. Please introduce the person again.';}},Math.max(0,proposal.expiresAt-Date.now()));
         }catch {if(generation===this.generation){this.clear();this.form.hidden=true;this.section.hidden=false;this.status.textContent='The introduction is unavailable. Please try again.';}}
     }
     async confirm(accepted) {
@@ -36,15 +42,18 @@ class FaceIntroductionSettings {
         const selected=this.choices.querySelector('input:checked')?.value;
         if(accepted&&!selected){this.status.textContent='Select the person you are introducing.';return;}
         if(accepted&&!this.name.reportValidity())return;
-        this.saving=true;this.confirmButton.disabled=true;this.cancelButton.disabled=true;
+        ++this.generation;const confirmation={pending:p};this.confirmation=confirmation;
+        this.saving=true;this.confirmButton.disabled=true;this.cancelButton.disabled=true;this.name.disabled=true;this.choices.inert=true;
+        this.status.textContent=accepted?'Saving the name…':'Cancelling the introduction…';
+        const deadline=new Promise((_,reject)=>{confirmation.cancel=()=>reject(Error('Confirmation superseded'));confirmation.timer=setTimeout(()=>reject(Error('Confirmation timed out')),10000);});
         try {
-            const result=await this.api.confirmRecognitionName(p.token,accepted,this.name.value.trim(),selected);
-            if(this.pending!==p)return;
-            if(['invalid-name','select-face'].includes(result.status)){this.status.textContent=result.status==='invalid-name'?'Enter a valid name.':'Select a face from this introduction.';return;}
+            const result=await Promise.race([this.api.confirmRecognitionName(p.token,accepted,this.name.value.trim(),selected),deadline]);
+            if(this.confirmation!==confirmation)return;
+            if(['invalid-name','select-face'].includes(result.status)){this.status.textContent=this.pending===p?(result.status==='invalid-name'?'Enter a valid name.':'Select a face from this introduction.'):'This introduction expired. Please introduce the person again.';return;}
             this.clear();this.form.hidden=true;
             this.status.textContent=result.status==='saved'?'Name saved for the selected face.':result.status==='cancelled'?'Introduction cancelled.':'The face or introduction changed. Please introduce the person again.';
-        }catch {if(this.pending===p){this.clear();this.form.hidden=true;this.status.textContent='The name could not be confirmed. Check the saved profiles before trying again.';}}
-        finally {this.saving=false;this.confirmButton.disabled=false;this.cancelButton.disabled=false;}
+        }catch {if(this.confirmation===confirmation){this.clear();this.form.hidden=true;this.status.textContent='The name could not be confirmed. Check the saved profiles before trying again.';}}
+        finally {if(this.confirmation===confirmation){this.releaseConfirmation(confirmation);if(this.refreshQueued){this.refreshQueued=false;void this.refresh(true);}}}
     }
 }
 if(typeof module!=='undefined')module.exports={FaceIntroductionSettings};
