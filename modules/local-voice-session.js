@@ -109,6 +109,8 @@ class LocalVoiceSession {
     debugTurn(result){
         const debug=this.renderer.debugStream;if(!debug)return;
         debug.add('Heard',result.transcript);
+        const count=result.conversationContext?.recentQuestions?.length;
+        if(count)debug.add('Conversation context',`${count} recent assistant question${count===1?'':'s'} included to avoid uninvited repetition.`);
         const attribution=result.wordAttribution;
         if(attribution?.state==='timed'){
             for(const phrase of window.speakerPhrases?.(attribution.words)||[])debug.add('Speaker phrases',`${phrase.start.toFixed(2)}–${phrase.end.toFixed(2)}s · ${phrase.label}: ${phrase.text}`);
