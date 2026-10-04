@@ -49,3 +49,43 @@ test('local-mode introductions accept a correction and Unicode joiners remain va
  const f=fixture(),p=await f.names.proposeLocal(f.observation,turn.text);
  const name='न\u200dदी';assert.equal((await f.names.confirm(p.token,true,name)).status,'saved');assert.equal(f.saved[0].name,name);
 });
+
+function multipleFacesFixture(){
+ const f=fixture();f.names.faces={lastObservation:{receivedAt:Date.now(),faces:[{id:'face-a',name:null,uncertain:false,thumbnail:'/9j/AAA='},{id:'face-b',name:null,uncertain:false,thumbnail:'/9j/BBB='}]},store:{nameObserved:async(o,id,name)=>{f.saved.push({o,id,name});return true;}}};
+ f.names.classify=async()=>({kind:'face',name:'Example'});return f;
+}
+test('multiple faces require an explicit snapshot choice; selection never defaults to a face',async()=>{
+ const f=multipleFacesFixture(),p=await f.names.propose(turn);
+ assert.equal(p.status,'pending');assert.equal(p.selectionInSettings,true);assert.equal(f.names.pending.id,null);
+ assert.equal(f.names.selection().faces.length,2);
+ for(const id of [undefined,'another-face'])assert.equal((await f.names.confirm(p.token,true,'Correct name',id)).status,'select-face');
+ assert.equal(f.saved.length,0);
+ assert.equal((await f.names.confirm(p.token,true,'Correct name','face-b')).status,'saved');assert.equal(f.saved[0].id,'face-b');assert.equal(f.saved[0].name,'Correct name');
+ assert.equal(f.names.selection(),null);
+});
+test('selected face disappearance, uncertainty or prior naming invalidates the introduction',async()=>{
+ for(const change of ['gone','uncertain','named']){
+  const f=multipleFacesFixture(),p=await f.names.propose(turn);
+  if(change==='gone')f.names.faces.lastObservation.faces=[{id:'replacement'}];
+  if(change==='uncertain')f.names.faces.lastObservation.faces[1].uncertain=true;
+  if(change==='named')f.names.faces.lastObservation.faces[1].name='Already named';
+  assert.equal((await f.names.confirm(p.token,true,'Example','face-b')).status,'not-saved');assert.equal(f.saved.length,0);
+ }
+});
+test('crop-less, named and ambiguous faces are not selection candidates',async()=>{
+ const f=multipleFacesFixture();f.names.faces.lastObservation.faces.push({id:'named',name:'Existing',thumbnail:'/9j/CCC='},{id:'ambiguous',uncertain:true,thumbnail:'/9j/CCC='},{id:'overlapping',name:null,uncertain:false,thumbnail:null});
+ await f.names.propose(turn);assert.deepEqual(f.names.selection().faces.map(f=>f.id),['face-a','face-b']);
+});
+test('expired and cancelled face proposals release all introduction thumbnails',async()=>{
+ for(const mode of ['cancel','expire']){
+  const f=multipleFacesFixture(),p=await f.names.propose(turn);
+  if(mode==='cancel')f.names.cancel();else f.advance();
+  assert.equal(f.names.selection(),null);
+  await f.names.confirm(p.token,true,'Example','face-a');assert.equal(f.saved.length,0);
+ }
+});
+test('seeing several faces never changes a self-introduction into a face label',async()=>{
+ const f=multipleFacesFixture();f.names.classify=async()=>({kind:'voice',name:'Speaker'});
+ const p=await f.names.propose(turn);assert.equal(p.kind,'voice');assert.equal(f.names.selection(),null);
+ await f.names.confirm(p.token,true,'Speaker','face-b');assert.equal(f.saved[0].id,'original');
+});

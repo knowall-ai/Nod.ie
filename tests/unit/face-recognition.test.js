@@ -52,3 +52,18 @@ test('status polling and repeated temporary face frames do not rewrite profiles'
  assert.equal(writes,0);const o=engine.lastObservation;await s.nameObserved(o,o.faces[0].id,'Example');assert.equal(writes,1);
  for(let i=0;i<10;i++)await engine.analyse(new Uint8Array(100));assert.equal(writes,1);
 });
+
+test('multiple temporary faces can be labelled individually; preview crops are not persisted',async t=>{
+ const s=await store(t);await s.configure(true);const d=await s.load();
+ const observed=await s.observe({...result(vector(0),vector(1)),faces:[{vector:vector(0),thumbnail:'/9j/AAAA'},{vector:vector(1),thumbnail:'/9j/BBBB'}]},d.epoch,undefined,{temporary:true});
+ assert.equal(await s.nameObserved(observed,observed.faces[1].id,'Selected'),true);
+ const saved=await s.read();assert.equal(saved.profiles.length,1);assert.equal(saved.profiles[0].id,observed.faces[1].id);assert.equal(saved.profiles[0].name,'Selected');assert.doesNotMatch(await fs.readFile(s.file,'utf8'),/thumbnail|\/9j\//);
+});
+test('preview bytes remain in the main-process observation and unsafe thumbnails are discarded',async t=>{
+ const s=await store(t);await s.configure(true);
+ const engine=new FaceRecognition({store:s,analyse:async()=>({model:MODEL,faces:[{vector:vector(0),thumbnail:'/9j/AAAA'}]})});
+ const exposed=await engine.analyse(new Uint8Array(100));assert.equal(exposed.faces[0].thumbnail,undefined);assert.equal(engine.lastObservation.faces[0].thumbnail,'/9j/AAAA');engine.cancel();assert.equal(engine.lastObservation,null);
+ for(const thumbnail of ['https://example.com/photo','data:image/svg+xml,<svg/>','/9j/'+ 'A'.repeat(12000)]){
+  const d=await s.load(),o=await s.observe({model:MODEL,faces:[{vector:vector(1),thumbnail}]},d.epoch,undefined,{temporary:true});assert.equal(o.faces[0].thumbnail,null);
+ }
+});

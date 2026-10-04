@@ -50,7 +50,7 @@ python3 scripts/setup-face-models.py
 node --test tests/unit/face-recognition.test.js
 ----
 
-Local face extraction, matching, selected-frame collection, profile management and typed uncertain observations into Unmute are connected. Explicit naming supports a sole unknown visible face with on-screen confirmation. Thumbnail-based multi-face disambiguation and household calibration remain future work.
+Local face extraction, matching, selected-frame collection, profile management and typed uncertain observations into Unmute are connected. An explicit introduction opens a temporary face-selection panel in Settings. Select an isolated face crop from the captured frame, check the name spelling, then confirm. Several eligible faces require an explicit selection; named or uncertain profiles cannot be relabelled through this introduction. A face that disappears, becomes uncertain or belongs to an expired proposal cannot be saved. Crops with another detected face overlapping them are excluded from selection. Photos, posters and screens can contain detectable faces: these crops do not establish liveness or authenticate someone. Household calibration remains future work.
 
 == Direct image questions
 
@@ -60,7 +60,7 @@ After an image is supplied, model-directed memory tools remain disabled for that
 
 === Daily observations and fullscreen debug
 
-The desktop records a separate, text-only event journal with 30-day retention by default, a 6,000-event ceiling, and Settings controls to inspect or clear it. No images, audio, embeddings or full conversation transcripts are stored in this journal. Recognition remains opt-in; enabling the journal does not enable a camera, microphone, face recognition or speaker recognition. Face and voice observations remain uncertain matches. Naming a profile records the confirmed label separately.
+The desktop records a separate, text-only event journal with 30-day retention by default, a 6,000-event ceiling, and Settings controls to inspect or clear it. No images, audio, embeddings or full conversation transcripts are stored in this journal. Introduction crops stay in memory, are bounded to eight 96×96 JPEGs, and are cleared from the selection panel after confirmation, cancellation, expiry or closing Settings. They are not written into recognition profile files or sent to the voice model. Recognition remains opt-in; enabling the journal does not enable a camera, microphone, face recognition or speaker recognition. Face and voice observations remain uncertain matches. Naming a profile records the confirmed label separately.
 
 While the camera is enabled and speech/playback has been quiet for five seconds, selected frames may receive one structured observation at most every 15 seconds, with a three-second deadline and no backlog. Speech cancels pending observation work. This shares the existing local vision model and can consume GPU time during quiet periods. Debug adds no extra inference. The conversation still receives actual images independently. Two successful observations establish appearance; three successful absences spanning at least 30 seconds establish disappearance from view. Camera-off, cancelled or failed analysis never establishes departure. This is sampled presence by subject category/coat colour, not individual tracking, a full recording, or proof someone walked into/out of the room. Multiple similar animals and occlusion remain ambiguous.
 
@@ -78,7 +78,7 @@ The current presence tracker groups equal descriptions. It cannot distinguish tw
 
 == Recognition confirmation and debug styling
 
-An explicit introduction can offer a local face or voice label. Check or correct the name spelling, then confirm or cancel using the on-screen prompt. A correction labels the same captured profile and never selects a different face or voice; neither a model statement nor a nearby person's spoken confirmation saves a label. The prompt uses the same 32 px button height, 8 px radius and spacing, and 12 px inner padding as the debug controls. In compact mode its buttons lie inside the avatar's native input region. Fullscreen debug uses consistent 24 px outer insets and a slim amber scrollbar with a transparent track; forced-colour mode preserves system scroll colours.
+An explicit introduction can offer a local face or voice label. Check or correct the name spelling, then confirm or cancel using the on-screen prompt (Settings for face selection). A correction labels the same captured profile and never selects a different face or voice; neither a model statement nor a nearby person's spoken confirmation saves a label. The prompt uses the same 32 px button height, 8 px radius and spacing, and 12 px inner padding as the debug controls. In compact mode its buttons lie inside the avatar's native input region. Fullscreen debug uses consistent 24 px outer insets and a slim amber scrollbar with a transparent track; forced-colour mode preserves system scroll colours.
 
 Enable People — faces and People — voices separately in Settings. Face matching also needs the camera enabled; voice matching needs the microphone enabled and the local diarization service healthy. This is fallible recognition of enrolled local profiles, not identification of arbitrary people from the internet. Do not interpret an empty profile list as a malfunction before enrollment.
 

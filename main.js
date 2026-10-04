@@ -47,7 +47,11 @@ function start() {
     function showSettings() {
         if (settingsWindow && !settingsWindow.isDestroyed()) return settingsWindow.focus();
         settingsWindow = secureWindow({ width: 780, height: 850, parent: mainWindow, title: 'Nod.ie Settings' }, 'settings.html');
-        settingsWindow.on('closed', () => { settingsWindow = null; });
+        settingsWindow.on('closed', () => {
+            settingsWindow = null;
+            const p=recognitionNames.pending;
+            if(p?.kind==='face'){recognitionNames.cancel();mainWindow?.webContents.send('recognition-result',{token:p.token,status:'cancelled',kind:'face',name:p.name});}
+        });
     }
     function shortcuts() {
         globalShortcut.unregisterAll();
@@ -146,9 +150,20 @@ function start() {
     const liveSpeakers = new (require('./lib/live-speakers').LiveSpeakers)(speakerRecognition);
     const recognitionNames=new(require('./lib/recognition-names').RecognitionNames)({faces,voices:{store:speakerRecognition.store,forInterval:(start,end)=>liveSpeakers.forInterval(start,end)},classify:require('./lib/recognition-intent').recognitionIntent({url:env.getConfig('OLLAMA_URL'),model:env.LLM_MODEL||env.getConfig('LOCAL_LLM_MODEL')}),record:event=>recorder.record(event)});
     voice.proposeSpeakerName=async(observation,text,previousAssistant)=>{const proposal=await recognitionNames.proposeLocal(observation,text,previousAssistant);if(proposal.status==='pending')mainWindow?.webContents.send('recognition-proposal',proposal);return proposal;};
-    handle('recognition-propose',turn=>recognitionNames.propose(turn));
-    handle('recognition-confirm',(token,accepted,name)=>recognitionNames.confirm(token,accepted,name));
-    handle('recognition-cancel',()=>recognitionNames.cancel());
+    handle('recognition-propose',async turn=>{
+        const result=await recognitionNames.propose(turn);
+        if(result.selectionInSettings){showSettings();settingsWindow?.webContents.send('face-introduction-changed');}
+        return result;
+    });
+    handle('face-introduction',()=>recognitionNames.selection(),true);
+    handle('recognition-confirm',async(token,accepted,name,faceId)=>{
+        const face=recognitionNames.pending?.kind==='face';
+        const result=await recognitionNames.confirm(token,accepted,name,faceId);
+        if(face&&!['invalid-name','select-face'].includes(result.status))mainWindow?.webContents.send('recognition-result',{...result,token});
+        settingsWindow?.webContents.send('face-introduction-changed');
+        return result;
+    });
+    handle('recognition-cancel',()=>{recognitionNames.cancel();settingsWindow?.webContents.send('face-introduction-changed');});
     handle('speaker-analyse',(audio,interval)=>recorder.capture(()=>liveSpeakers.analyse(audio,interval),result=>{if(!result)return [];debug('Voice recognition',result.speakers.map(s=>s.name&&!s.uncertain?`Possible match: ${s.name}`:'Unknown speaker').join('; '));return result.speakers.map(s=>({source:'voice',kind:s.name&&!s.uncertain?'recognised':'observed',subject:s.name&&!s.uncertain?s.name:'Unknown speaker',uncertain:true}));}));
     handle('speaker-cancel', () => liveSpeakers.cancel());
     handle('speaker-live-status', async () => ({ enabled: (await speakerRecognition.store.status()).enabled }));
