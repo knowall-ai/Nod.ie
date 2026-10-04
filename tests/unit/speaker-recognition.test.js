@@ -118,3 +118,7 @@ test('disabled or expired temporary voices cannot become durable profiles',async
  store.candidates[0].lastSeen=Date.now()-91000;assert.equal(await store.nameObserved(first,first.speakers[0].id,'Example'),false);
  const next=await store.observe(result(vector(1)),d.epoch,undefined,{temporary:true});await store.configure(false);assert.equal(await store.nameObserved(next,next.speakers[0].id,'Example'),false);assert.equal((await store.status()).profiles.length,0);
 });
+test('an uncertain observation can never name or persist a temporary voice candidate',async t=>{
+ const store=await fixture(t);await store.configure(true);const d=await store.load();const observation=await store.observe(result(vector(0)),d.epoch,undefined,{temporary:true});
+ observation.speakers[0].uncertain=true;assert.equal(await store.nameObserved(observation,observation.speakers[0].id,'Example'),false);assert.equal((await store.status()).profiles.length,0);
+});

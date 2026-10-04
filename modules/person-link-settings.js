@@ -34,7 +34,7 @@ class PersonLinkSettings {
     this.guided={kind:profile.kind,profileId:saved.id,name:saved.name};
     // Reuse only a previously confirmed profile association, never a matching name.
     const owner=data.people.find(p=>p[kind].includes(saved.id));this.el('person-existing').value=owner?.id||'';this.selectPerson();
-    status.textContent=`${saved.name}'s ${profile.kind} profile is selected. Choose the person, voice and memory links you want, then confirm.`+(data.memoryAvailable?'':' Memory is unavailable; refresh when it reconnects.');
+    status.textContent=`${saved.name}'s ${profile.kind} profile is selected. Choose the person and any additional profile or memory links, then confirm.`+(data.memoryAvailable?'':' Memory is unavailable; refresh when it reconnects.');
     this.el('people-links').scrollIntoView({block:'start'});this.el('person-existing').focus();
    }
   }catch(e){if(generation===this.generation)this.el('people-status').textContent=e.message||'Person links are unavailable. Please refresh.';}

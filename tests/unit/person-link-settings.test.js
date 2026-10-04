@@ -52,3 +52,7 @@ test('failed link writes retain explicit choices and show the backend rejection'
  api.savePerson=async()=>{throw Error('Profile already linked to another person');};await panel.save();
  assert.match(panel.el('people-status').textContent,/already linked/);assert.equal(panel.el('person-face').value,'new-face');assert.equal(panel.el('person-save').disabled,false);
 });
+test('voice shortcut selects only the saved voice and waits for explicit face and memory choices',async t=>{
+ const {panel,data,calls}=fixture(t);data.people=[];await panel.refresh({kind:'voice',profileId:'another-voice'});
+ assert.equal(panel.el('person-voice').value,'another-voice');for(const field of ['person-face','person-existing','person-memory'])assert.equal(panel.el(field).value,'');assert.equal(calls.length,0);
+});

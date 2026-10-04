@@ -14,7 +14,7 @@ class StreamingTranscript {
     }
     attribute(words){
         if(!Array.isArray(words))return;
-        for(const turn of this.recentTurns){let changed=false;for(const word of turn.words||[]){const match=words.find(w=>w.start===word.start&&w.text===word.text);if(!match||!Number.isFinite(match.end)||match.end<word.start||match.end-word.start>5)continue;word.end=match.end;word.speaker=match.name||null;word.attribution=match.attribution==='possible-match'?'possible-match':'unattributed';changed=true;}if(changed)this.save(turn);}
+        for(const turn of this.recentTurns){let changed=false;for(const word of turn.words||[]){const match=words.find(w=>w.start===word.start&&w.text===word.text);if(!match||!Number.isFinite(match.end)||match.end<word.start||match.end-word.start>5)continue;word.end=match.end;const possible=match.attribution==='possible-match'&&typeof match.profile==='string'&&Boolean(match.profile);word.speaker=possible?match.name||null:null;word.attribution=possible?'possible-match':'unattributed';changed=true;}if(changed)this.save(turn);}
     }
     event(data) {
         if (['response.created', 'response.audio.done', 'response.done', 'unmute.interrupted_by_vad'].includes(data.type)) this.finish();
