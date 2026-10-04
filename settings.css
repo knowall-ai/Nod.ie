@@ -84,3 +84,14 @@ pre:empty { display: none; }
 .person-link-fields label { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .person-link-fields input, .person-link-fields select { width: 100%; min-width: 0; height: 40px; }
 @media (max-width: 560px) { .person-link-fields { grid-template-columns: 1fr; } }
+
+#face-introduction[hidden], #face-introduction-form[hidden] { display:none; }
+#face-introduction-choices { border:0;padding:0;margin:0 0 16px; }
+#face-introduction-choices legend { font-weight:600;margin-bottom:8px; }
+#face-introduction-faces { display:flex;flex-wrap:wrap;gap:12px; }
+.face-introduction-choice { display:flex;flex-direction:column;align-items:center;gap:8px;padding:10px;border:2px solid var(--line);border-radius:12px;cursor:pointer;min-width:120px; }
+.face-introduction-choice:has(input:checked) { border-color:#bd7100;background:#fff0cc; }
+.face-introduction-choice img { width:96px;height:96px;object-fit:contain;border-radius:8px; }
+.face-introduction-choice input { accent-color:#bd7100; }
+.face-introduction-actions { display:flex;flex-wrap:wrap;gap:10px;margin-top:16px; }
+#face-introduction-name { display:block;margin-top:8px; }

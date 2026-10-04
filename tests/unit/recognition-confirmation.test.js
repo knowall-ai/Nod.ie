@@ -3,7 +3,7 @@ const {RecognitionSession}=require('../../modules/recognition-session');
 function fixture(t){
  const savedWindow=global.window;t.after(()=>{global.window=savedWindow;session.clearPrompt();});
  const replies=[],notices=[],session=Object.create(RecognitionSession.prototype);
- Object.assign(session,{generation:0,pending:{token:'first',kind:'voice',name:'Robin'},prompt:{hidden:false},confirmButton:{disabled:false},cancelButton:{disabled:false},label:{textContent:'Confirm name'},nameInput:{value:'Robin',reportValidity:()=>true},renderer:{showNotification:text=>notices.push(text)},send:()=>{},schedule:()=>{}});
+ Object.assign(session,{generation:0,completedProposals:new Map(),pending:{token:'first',kind:'voice',name:'Robin'},prompt:{hidden:false},confirmButton:{disabled:false},cancelButton:{disabled:false},label:{textContent:'Confirm name'},nameInput:{value:'Robin',reportValidity:()=>true},renderer:{showNotification:text=>notices.push(text)},send:()=>{},schedule:()=>{}});
  global.window={nodie:{confirmRecognitionName:()=>new Promise(resolve=>replies.push(resolve))}};
  return {session,replies,notices};
 }

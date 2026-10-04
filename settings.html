@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http: https:; object-src 'none'; base-uri 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' http: https:; object-src 'none'; base-uri 'none'">
     <title>Nod.ie Settings</title>
     <link rel="stylesheet" href="settings.css">
 </head>
@@ -13,6 +13,18 @@
         <p>Your voice companion, your preferences.</p>
     </header>
     
+    <section class="section" id="face-introduction" hidden aria-labelledby="face-introduction-title">
+        <h2 id="face-introduction-title">Introduce someone</h2>
+        <p>Select the face you are introducing, then check their name. These are temporary crops from the introduction's camera frame. A photo or screen can also contain a detected face.</p>
+        <div id="face-introduction-form">
+            <fieldset id="face-introduction-choices"><legend>Which person?</legend><div id="face-introduction-faces"></div></fieldset>
+            <label for="face-introduction-name">Name</label>
+            <input id="face-introduction-name" type="text" maxlength="80" required autocomplete="off">
+            <div class="face-introduction-actions"><button id="face-introduction-confirm" type="button" class="btn-primary">Confirm person and name</button><button id="face-introduction-cancel" type="button">Cancel introduction</button></div>
+        </div>
+        <p id="face-introduction-status" role="status"></p>
+    </section>
+
     <div class="section">
         <h2>Avatar Settings</h2>
         
@@ -157,5 +169,6 @@
     </div>
     
     <script src="settings.js"></script>
+    <script src="modules/face-introduction-settings.js"></script>
 </body>
 </html>

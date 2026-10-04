@@ -1,4 +1,4 @@
-"""One bounded CPU frame. JPEG bytes enter stdin; only features leave stdout."""
+"""One bounded CPU frame. JPEG bytes enter stdin; features and bounded preview crops leave stdout."""
 import hashlib
 import io
 import json
@@ -7,6 +7,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 from PIL import Image
+from face_crops import isolated_crop
+import base64
 
 class FrameEngine:
     def __init__(self, root):
@@ -35,7 +37,8 @@ class FrameEngine:
         recognizer = self.recognizer
         _, faces = detector.detect(image)
         result = []
-        for face in ([] if faces is None else faces[:8]):
+        detected = [] if faces is None else faces[:8]
+        for index, face in enumerate(detected):
             if min(face[2:4]) < 64:
                 continue
             crop = recognizer.alignCrop(image, face)
@@ -45,7 +48,16 @@ class FrameEngine:
             norm = np.linalg.norm(vector)
             if len(vector) != 128 or not np.isfinite(vector).all() or norm <= 0:
                 continue
-            result.append({'box': [float(v) for v in face[:4]], 'vector': (vector / norm).tolist()})
+            box = [float(v) for v in face[:4]]
+            bounds = isolated_crop(box, [[float(v) for v in other[:4]] for j, other in enumerate(detected) if j != index], width, height)
+            thumbnail = None
+            if bounds is not None and (faces is None or len(faces) <= 8):
+                left, top, right, bottom = bounds
+                preview = cv2.resize(image[top:bottom, left:right], (96, 96), interpolation=cv2.INTER_AREA)
+                ok, encoded = cv2.imencode('.jpg', preview, [cv2.IMWRITE_JPEG_QUALITY, 70])
+                if ok and len(encoded) <= 8000:
+                    thumbnail = base64.b64encode(encoded).decode('ascii')
+            result.append({'box': box, 'vector': (vector / norm).tolist(), 'thumbnail': thumbnail})
         return {'model': self.model_id, 'faces': result}
 
 if __name__ == '__main__':
