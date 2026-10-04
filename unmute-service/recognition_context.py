@@ -5,7 +5,7 @@ import numpy as np
 def overlapping_voices(spans,start,end):
     """Sweep bounded intervals; duplicate windows must not cause quadratic work."""
     active={};heap=[]
-    for a,b,identity,_ in sorted(spans):
+    for a,b,identity,_ in sorted(spans,key=lambda span:(span[0],span[1],span[2])):
         a=max(a,start);b=min(b,end)
         if a>=b:continue
         while heap and heap[0][0]<=a:
@@ -65,7 +65,7 @@ class AudioWindows:
                     elif len(names)>1:reason='conflicting-observation'
                     elif len(identities)==1:
                         covered=word['start']-.05
-                        for a,b,_,_ in sorted(spans):
+                        for a,b,_,_ in sorted(spans,key=lambda span:(span[0],span[1],span[2])):
                             if a>covered+.001:break
                             covered=max(covered,b)
                         if covered>=end+.05:

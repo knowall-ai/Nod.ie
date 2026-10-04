@@ -58,4 +58,9 @@ class RecognitionTests(unittest.TestCase):
   self.assertEqual(w.attributed()[0]['profile'],'a');self.assertEqual(w.voice_profiles_for('hello'),[])
   conflict=self.observation();conflict['segments'].append({'speaker':1,'start':.3,'end':.7});w.observe(conflict)
   self.assertIsNone(w.attributed()[0]['profile']);self.assertEqual(w.attributed()[0]['reason'],'overlap')
+ def test_old_unnamed_and_new_named_evidence_cannot_crash_overlap_sweep(self):
+  self.assertTrue(m.overlapping_voices([(0,1,'a',None),(0,1,'a','Robin'),(.2,.8,'b','Alex')],.1,.9))
+  w=m.AudioWindows();o=self.observation();o['speakers'][0]['name']=None;w.observe(o)
+  o=self.observation();o['segments'].append({'speaker':1,'start':.3,'end':.7});w.observe(o);w.word('both',.2);w.end_word(.8)
+  self.assertEqual(w.attributed()[0]['reason'],'overlap')
 if __name__=='__main__':unittest.main()
