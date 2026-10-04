@@ -25,7 +25,7 @@ test('spelling correction saves the same captured voice and journals the correct
  assert.equal(events[0].subject,'Zephie');
 });
 test('invalid corrections keep the proposal available and never write a label',async()=>{
- for(const value of ['', '   ', 'a'.repeat(81), 'Name\nOther', '\u202eName', null, {}, 42]){
+ for(const value of ['', '   ', 'a'.repeat(81), 'Name\nOther', '\u202eName', '\u200d', ' \u200c\u200d ', null, {}, 42]){
   const f=fixture(),p=await f.names.propose(turn);
   assert.equal((await f.names.confirm(p.token,true,value)).status,'invalid-name');assert.equal(f.saved.length,0);
   assert.equal((await f.names.confirm(p.token,true,'Élodie')).status,'saved');
