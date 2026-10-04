@@ -5,6 +5,8 @@ from pathlib import Path
 
 root = Path(__file__).resolve().parent / 'generated'
 tree = ast.parse((root / 'unmute_handler.py').read_text(encoding='utf-8'))
+if any(isinstance(n, ast.Attribute) and n.attr == '_nodie_interruption' for n in ast.walk(tree)):
+    raise SystemExit('Interruption adapter already prepared; rerun prepare-backend.py instead')
 classes = [n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'UnmuteHandler']
 if len(classes) != 1:
     raise SystemExit('Unsupported Unmute handler class')

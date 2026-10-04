@@ -74,6 +74,7 @@ class InterruptionTest(unittest.TestCase):
         tree = ast.parse(generated.read_text())
         interrupt = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == 'interrupt_bot')
         body = [ast.unparse(n) for n in interrupt.body]
+        self.assertEqual(sum('_nodie_interruption.capture' in n for n in body), 1)
         capture = next(i for i, n in enumerate(body) if '_nodie_interruption.capture' in n)
         marker = next(i for i, n in enumerate(body) if 'add_chat_message_delta(INTERRUPTION_CHAR' in n)
         self.assertLess(capture, marker)
@@ -97,6 +98,7 @@ class InterruptionTest(unittest.TestCase):
         self.history[-1]['content'] = 'Ah, understood'
         response = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == '_generate_response_task')
         guard = next(n for n in response.body if isinstance(n, ast.If) and '_nodie_interruption.messages' in ast.unparse(n))
+        self.assertEqual(sum('_nodie_interruption.messages' in ast.unparse(n) for n in response.body), 1)
         self.assertEqual(ast.unparse(guard.test), 'not curiosity')
         self.interrupt()
         namespace = dict(self=types.SimpleNamespace(_nodie_interruption=self.state,
