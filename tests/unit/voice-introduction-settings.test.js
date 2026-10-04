@@ -33,3 +33,32 @@ test('a stalled save releases the guard with uncertain-write feedback; its late 
  finish({status:'saved',profileId:'late'});await Promise.resolve();assert.equal(panel.savedProfile,null);
  await panel.refresh();assert.equal(panel.pending.token,proposal.token);
 });
+test('an accepted save crossing proposal expiry still reports its successful profile',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const {panel,api,proposal,setProposal}=fixture(t);
+ setProposal({...proposal,expiresAt:Date.now()+1000});await panel.refresh();let finish;
+ api.confirmRecognitionName=()=>new Promise(r=>finish=r);
+ const saving=panel.confirm(true);t.mock.timers.tick(1500);
+ assert.notEqual(panel.pending,null);assert.equal(panel.el('cancel').disabled,true);
+ finish({status:'saved',profileId:'confirmed-voice'});await saving;
+ assert.match(panel.status.textContent,/Name saved/);assert.equal(panel.savedProfile.profileId,'confirmed-voice');
+});
+test('notifications during confirmation replay the newest proposal after the save',async t=>{
+ const {panel,api,proposal,setProposal}=fixture(t);await panel.refresh();let finish;
+ api.confirmRecognitionName=()=>new Promise(r=>finish=r);const saving=panel.confirm(true);
+ setProposal({...proposal,token:'new-voice',name:'Alex'});await panel.refresh();await panel.refresh();
+ finish({status:'saved',profileId:'first-profile'});await saving;
+ assert.equal(panel.pending.token,'new-voice');assert.equal(panel.name.value,'Alex');assert.equal(panel.form.hidden,false);
+ assert.equal(panel.savedProfile,null);assert.equal(panel.el('link').hidden,true);
+});
+test('a confirmation notification without a replacement preserves saved-profile feedback',async t=>{
+ const {panel,api,setProposal}=fixture(t);await panel.refresh();let finish;
+ api.confirmRecognitionName=()=>new Promise(r=>finish=r);const saving=panel.confirm(true);
+ setProposal(null);await panel.refresh();finish({status:'saved',profileId:'saved-voice'});await saving;
+ assert.match(panel.status.textContent,/Name saved/);assert.equal(panel.savedProfile.profileId,'saved-voice');assert.equal(panel.section.hidden,false);
+});
+test('recoverable validation failure rearms expiry and closing ignores queued refreshes',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const {panel,api}=fixture(t);await panel.refresh();api.confirmRecognitionName=async()=>({status:'invalid-name'});
+ await panel.confirm(true);assert.notEqual(panel.pending,null);t.mock.timers.tick(60001);assert.equal(panel.pending,null);assert.match(panel.status.textContent,/expired/);
+ await panel.refresh();let finish;api.confirmRecognitionName=()=>new Promise(r=>finish=r);const saving=panel.confirm(true);await panel.refresh();panel.stop();
+ finish({status:'saved',profileId:'late'});await saving;assert.equal(panel.pending,null);assert.equal(panel.savedProfile,null);
+});

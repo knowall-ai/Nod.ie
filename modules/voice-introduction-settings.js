@@ -7,22 +7,29 @@ class VoiceIntroductionSettings {
   this.name.oninput=()=>{this.status.textContent='';};this.el('link').onclick=()=>{if(this.savedProfile)this.onLinkProfile(this.savedProfile);};
  }
  clear(){clearTimeout(this.expiry);this.pending=null;this.savedProfile=null;this.name.value='';this.el('heard').textContent='';this.el('link').hidden=true;}
- stop(){++this.generation;this.clear();this.unsubscribe?.();}
+ stop(){++this.generation;this.refreshQueued=false;this.clear();this.unsubscribe?.();}
  start(){this.unsubscribe=this.api.onIntroductionChanged?.(()=>void this.refresh());void this.refresh();}
- async refresh(){
-  if(this.saving)return;const generation=++this.generation;
+ armExpiry(p){
+  clearTimeout(this.expiry);
+  const expire=()=>{if(this.pending===p&&!this.saving){this.clear();this.form.hidden=true;this.status.textContent='This introduction expired. Please introduce yourself again.';}};
+  if(Date.now()>=p.expiresAt)expire();
+  else this.expiry=setTimeout(expire,p.expiresAt-Date.now());
+ }
+ async refresh({preserveResult=false}={}){
+  if(this.saving){this.refreshQueued=true;return;}const generation=++this.generation;
   try{
-   const p=await this.api.voiceIntroduction();if(generation!==this.generation||this.saving)return;
-   if(!p||Date.now()>=p.expiresAt){this.clear();this.section.hidden=true;return;}
+   const p=await this.api.voiceIntroduction();if(generation!==this.generation)return;if(this.saving){this.refreshQueued=true;return;}
+   if(!p||Date.now()>=p.expiresAt){if(preserveResult&&!this.pending)return;this.clear();this.section.hidden=true;return;}
    if(this.pending?.token===p.token)return;
    this.clear();this.pending=p;this.name.value=p.name;this.el('heard').textContent=p.heard?`Heard: ${p.heard}`:'';
    this.section.hidden=false;this.form.hidden=false;this.status.textContent='';this.section.scrollIntoView({block:'start'});
-   this.expiry=setTimeout(()=>{if(this.pending===p){this.clear();this.form.hidden=true;this.status.textContent='This introduction expired. Please introduce yourself again.';}},Math.max(0,p.expiresAt-Date.now()));
+   this.armExpiry(p);
   }catch{if(generation===this.generation){this.clear();this.form.hidden=true;this.section.hidden=false;this.status.textContent='The voice introduction is unavailable. Please try again.';}}
  }
  async confirm(accepted){
   const p=this.pending;if(!p||this.saving||accepted&&!this.name.reportValidity())return;
-  const guard=this.saving={pending:p};this.el('confirm').disabled=true;this.el('cancel').disabled=true;
+  if(Date.now()>=p.expiresAt){this.armExpiry(p);return;}
+  const guard=this.saving={pending:p,generation:this.generation};clearTimeout(this.expiry);this.el('confirm').disabled=true;this.el('cancel').disabled=true;
   let timer;
   try{
    const result=await Promise.race([this.api.confirmRecognitionName(p.token,accepted,accepted?this.name.value.trim():undefined),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Confirmation timed out')),10000);})]);
@@ -32,7 +39,14 @@ class VoiceIntroductionSettings {
    this.status.textContent=result.status==='saved'?'Name saved for the voice in this introduction.':result.status==='cancelled'?'Introduction cancelled.':'The voice profile or introduction changed. Please introduce yourself again.';
    if(result.status==='saved'&&result.profileId){this.savedProfile={kind:'voice',profileId:result.profileId};this.el('link').hidden=false;}
   }catch{if(this.pending===p){this.clear();this.form.hidden=true;this.status.textContent='Confirmation could not be completed. Check saved voice profiles before trying again.';}}
-  finally{clearTimeout(timer);if(this.saving===guard){this.saving=null;this.el('confirm').disabled=false;this.el('cancel').disabled=false;}}
+  finally{
+   clearTimeout(timer);
+   if(this.saving===guard){
+    this.saving=null;this.el('confirm').disabled=false;this.el('cancel').disabled=false;
+    if(this.pending===p)this.armExpiry(p);
+    if(this.refreshQueued&&guard.generation===this.generation){this.refreshQueued=false;await this.refresh({preserveResult:true});}
+   }
+  }
  }
 }
 if(typeof module!=='undefined')module.exports={VoiceIntroductionSettings};
