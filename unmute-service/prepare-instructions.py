@@ -38,7 +38,7 @@ if __name__ == '__main__':
     root = Path(__file__).resolve().parent
     generated = root / 'generated'
     generated.mkdir(exist_ok=True)
-    source = (args.unmute_root / 'unmute/llm/system_prompt.py').read_text()
-    prompt = (root.parent / 'SYSTEM-PROMPT.md').read_text()
-    (generated / 'system_prompt.py').write_text(prepare(source, prompt))
+    source = (args.unmute_root / 'unmute/llm/system_prompt.py').read_text(encoding='utf-8')
+    prompt = (root.parent / 'SYSTEM-PROMPT.md').read_text(encoding='utf-8')
+    (generated / 'system_prompt.py').write_text(prepare(source, prompt), encoding='utf-8')
     print('Prepared constant instructions without inherited conversation policy.')
