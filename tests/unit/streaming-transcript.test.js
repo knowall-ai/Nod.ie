@@ -1,3 +1,4 @@
+const { assertPrivateFile, privateTempDir } = require('../helpers/private-file.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -6,7 +7,7 @@ const path = require('node:path');
 const Transcript = require('../../modules/streaming-transcript');
 const { ConversationHistory } = require('../../lib/conversation-history');
 async function fixture(t, options) {
- const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nodie-transcript-'));
+ const dir = privateTempDir(path.join(os.tmpdir(), 'nodie-transcript-'));
  t.after(() => fs.rm(dir, {recursive:true,force:true}));
  const store = new ConversationHistory(path.join(dir,'local.json'));
  const transcript = new Transcript({transcriptSession:()=>store.load(),saveTranscript:(epoch,turn)=>store.upsert(epoch,turn)},()=>assert.fail('save failed'),options);
@@ -36,7 +37,7 @@ test('bounded updates are idempotent, private, and reject invalid roles',async t
  const {store}=await fixture(t);const {epoch}=await store.load();
  for(let i=0;i<20;i++)await store.upsert(epoch,{id:'turn-'+i,role:'user',content:'\u0001'.repeat(2000)});
  const data=await store.load();assert.ok(data.turns.length<=12);assert.ok((await fs.stat(store.file)).size<=60000);
- assert.equal((await fs.stat(store.file)).mode&0o777,0o600);
+ assertPrivateFile(store.file);
  assert.throws(()=>store.upsert(epoch,{id:'bad',role:'system',content:'test'}));
 });
 test('browser transcript routes require same origin and clear works in Unmute mode',async t=>{

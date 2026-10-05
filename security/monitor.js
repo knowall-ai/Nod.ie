@@ -125,7 +125,7 @@ class SecurityMonitor {
         if (!files.length || files.some(f => !path.isAbsolute(f))) throw new Error('Compose source files unavailable');
         const entries = [];
         for (const file of [...files, path.join(item.cwd, '.env')]) {
-            try { entries.push([file, hash(await fs.readFile(file))]); } catch (error) { if (error.code === 'ENOENT' && file.endsWith('/.env')) entries.push([file, null]); else throw error; }
+            try { entries.push([file, hash(await fs.readFile(file))]); } catch (error) { if (error.code === 'ENOENT' && file === path.join(item.cwd, '.env')) entries.push([file, null]); else throw error; }
         }
         // Compose resolves env_file, includes and interpolation. Hash the resolved
         // result in memory only: it can contain credentials and must never be logged.
