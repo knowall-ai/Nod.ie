@@ -67,4 +67,4 @@ This Settings connection applies to desktop local voice only. Browser local voic
 
 Validation includes 343 unit tests, cross-connection identity invalidation, browser form/test/save/reset checks with fictional credentials, and a successful read-only query through the extracted connection code against the existing configured database. Native OS credential-store behavior on Windows remains unvalidated. Screenshots use a fictional address and username.
 
-image::images/memory-connection-settings.png[Reverie brain connection settings]
+image::memory-connection-settings.png[Reverie brain connection settings]
