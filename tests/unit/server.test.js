@@ -25,3 +25,15 @@ test('static server protects private files, traversal, symlinks, rebinding and v
     assert.equal((await request('/voice/health', { Origin: `http://127.0.0.1:${port}` }, 'POST')).status, 200);
     assert.equal(calls, 1);
 });
+test('local camera transport rejects cross-origin requests, invalid payloads and oversized uploads',async t=>{
+ const {LocalCameraScene}=require('../../lib/local-camera-scene');const scene=new LocalCameraScene();
+ const server=createServer({config:{},voice:{cameraScene:scene}});await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(async()=>{scene.dispose();server.closeAllConnections();await new Promise(r=>server.close(r));});
+ const base=`http://127.0.0.1:${server.address().port}`;
+ const post=(route,body,origin=base)=>fetch(base+route,{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await post('/voice/camera-begin',{},'http://attacker.example')).status,403);
+ const {token}=await (await post('/voice/camera-begin',{})).json();assert.ok(token);
+ assert.equal((await post('/voice/scene',{token,revision:1,status:'camera-on-awaiting-analysis'})).status,200);assert.equal(scene.current().status,'camera-on-awaiting-analysis');
+ assert.equal((await post('/voice/scene',{token,revision:2,status:'snapshot',imageJpeg:'invalid',capturedAt:new Date().toISOString()})).status,400);
+ assert.equal((await post('/voice/scene',{token,revision:3,status:'snapshot',imageJpeg:'a'.repeat(684001)})).status,413);
+ assert.equal((await post('/voice/scene',{token,revision:4,status:'camera-off'})).status,200);assert.equal(scene.current().status,'camera-off');
+});

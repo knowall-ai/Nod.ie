@@ -60,6 +60,8 @@ contextBridge.exposeInMainWorld('nodie', {
     faceForget: () => ipcRenderer.invoke('face-forget'),
     analyseVision: image => ipcRenderer.invoke('vision-analyse', image),
     cancelVision: () => ipcRenderer.invoke('vision-cancel'),
+    beginLocalCamera:()=>ipcRenderer.invoke('local-camera-begin'),
+    setLocalCameraScene:scene=>ipcRenderer.invoke('local-camera-scene',scene),
     voiceHealth: () => ipcRenderer.invoke('voice-health'),
     voiceTurn: async (audio) => {
         const result = await ipcRenderer.invoke('voice-turn', audio);

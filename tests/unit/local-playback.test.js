@@ -79,3 +79,9 @@ test('a locally intercepted command logs heard words but never calls playback or
  h.window.SpokenControls=class{async accept(){return true;}};let plays=0;h.session.playReply=async()=>{plays++;};
  await h.session.send([new Blob(['synthetic audio'])],0);assert.equal(plays,0);assert.ok(rows.some(([source])=>source==='Heard'));assert.ok(!rows.some(([source])=>source==='Said'));
 });
+test('a visual reply arriving after camera off/reopen is discarded before playback',async()=>{
+ const h=harness(()=>Promise.resolve());h.session.renderer.visionContext={cameraEpoch:1,prepareLocalTurn:async()=>{}};let resumed=0;
+ h.session.resumeListening=()=>resumed++;
+ h.window.nodie.voiceTurn=async()=>{h.session.renderer.visionContext.cameraEpoch=2;return {transcript:'What is here?',reply:'Old view',vision:{state:'snapshot'},audio:new Uint8Array(44)};};
+ await h.session.send([new Blob([new Uint8Array(200)])],0);assert.equal(h.stats().audioStarts,0);assert.equal(h.session.state,'idle');assert.equal(resumed,1);
+});

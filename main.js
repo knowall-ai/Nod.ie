@@ -125,6 +125,8 @@ function start() {
     handle('vision-analyse' , image => vision.analyse(image));
     handle('vision-cancel', () => vision.cancel());
     app.on('before-quit', () => vision.cancel());
+    handle('local-camera-begin',()=>voice.cameraScene.begin());
+    handle('local-camera-scene',scene=>voice.cameraScene.accept(scene));
     handle('voice-health', () => voice.health());
     handle('voice-turn', async audio => {
         try { return await voice.converse(audio); }

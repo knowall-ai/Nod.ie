@@ -53,3 +53,27 @@ test('invalid JPEG never replaces the current camera image',async t=>{
  const h=fixture(t);await h.context.analyse(h.frame());h.advance(2001);const scene=h.context.scene;
  const f=h.frame();f.image=new Blob(['not jpeg']);assert.deepEqual(await h.context.analyse(f),{retry:true});assert.equal(h.context.scene,scene);
 });
+test('local capture delivers actual images without websocket policy or background inference',async t=>{
+ const h=fixture(t),packets=[];h.renderer.localVoice={};h.context.api.beginLocalCamera=async()=>({token:'fixture-session'});h.context.api.setLocalCameraScene=async packet=>packets.push(packet);
+ h.context.update();await h.context.localDelivery;await h.context.analyse(h.frame());await h.context.localDelivery;
+ assert.equal(packets.at(-1).imageJpeg,Buffer.from(jpeg).toString('base64'));assert.equal(h.context.memoryBlocked,undefined);assert.equal(packets.at(-1).token,'fixture-session');
+ h.advance(10001);h.context.update();await h.context.localDelivery;assert.equal(packets.at(-1).status,'camera-on-awaiting-analysis');
+});
+test('local camera-off bypasses stalled image acknowledgements; queue retains only latest frame',async t=>{
+ const h=fixture(t),packets=[];let release;h.renderer.localVoice={};h.context.api.beginLocalCamera=async()=>({token:'fixture-session'});h.context.api.setLocalCameraScene=async packet=>{packets.push(packet);if(packet.status==='snapshot')await new Promise(r=>release=r);};
+ h.context.update();await h.context.localDelivery;await h.context.analyse(h.frame());await new Promise(r=>setImmediate(r));
+ h.advance(2001);await h.context.analyse(h.frame());const firstPending=h.context.localPending;
+ h.advance(2001);await h.context.analyse(h.frame());assert.ok(h.context.localPending.revision>firstPending.revision);assert.equal(packets.filter(p=>p.status==='snapshot').length,1);
+ h.context.setActive(false);await h.context.localDelivery;assert.equal(packets.at(-1).status,'camera-off');assert.equal(h.context.localPending,null);release();await new Promise(r=>setImmediate(r));assert.equal(packets.filter(p=>p.status==='snapshot').length,1);
+});
+test('failed local camera handshake releases readiness so next state retries',async t=>{
+ const h=fixture(t),packets=[];let attempts=0;h.renderer.localVoice={};h.context.api.beginLocalCamera=async()=>{if(++attempts===1)throw Error('Temporary network failure');return {token:'retry-session'};};h.context.api.setLocalCameraScene=async packet=>packets.push(packet);
+ h.context.update();await h.context.localDelivery;assert.equal(h.context.localReady,null);assert.equal(packets.length,0);
+ h.context.update();await h.context.localDelivery;assert.equal(attempts,2);assert.equal(packets[0].token,'retry-session');
+});
+test('timed-out camera handshake cannot later upload the retained packet',async t=>{
+ t.mock.timers.enable({apis:['setTimeout']});const h=fixture(t),packets=[];let release,attempts=0;h.renderer.localVoice={};h.context.api.beginLocalCamera=()=>++attempts===1?new Promise(r=>release=r):Promise.resolve({token:'next-session'});h.context.api.setLocalCameraScene=async packet=>packets.push(packet);
+ h.context.update();const pending=h.context.localDelivery;t.mock.timers.tick(3001);await pending;assert.equal(h.context.localReady,null);
+ release({token:'expired-session'});await new Promise(r=>setImmediate(r));assert.equal(packets.length,0);
+ h.context.update();await h.context.localDelivery;assert.equal(packets[0].token,'next-session');
+});

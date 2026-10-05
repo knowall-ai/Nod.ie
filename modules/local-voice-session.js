@@ -8,6 +8,7 @@ class LocalVoiceSession {
         this.renderer.state.isLoading = false;
         this.renderer.state.isMuted = true;
         this.renderer.state.isConnected = health.ready;
+        this.renderer.visionContext?.update();
         this.renderer.updateWSStatus(health.ready ? 'Local voice ready' : 'Unavailable');
         this.status(health.ready ? '' : `Unavailable: ${health.unavailable.join(', ')}`);
         if (startListening && health.ready) await this.toggle();
@@ -90,8 +91,12 @@ class LocalVoiceSession {
         try {
             const audio = new Uint8Array(await new Blob(chunks).arrayBuffer());
             if (generation !== this.generation) return;
+            const cameraEpoch=this.renderer.visionContext?.cameraEpoch;
+            await this.renderer.visionContext?.prepareLocalTurn();
+            if(generation!==this.generation)return;
             const result = await window.nodie.voiceTurn(audio);
             if (generation !== this.generation) return;
+            if(result.vision?.state==='snapshot'&&cameraEpoch!==this.renderer.visionContext?.cameraEpoch){this.state='idle';this.status('');this.resumeListening();return;}
             this.emptyTurns = 0;
             this.debugTurn(result);
             if(window.SpokenControls){this.renderer.spokenControls ||= new window.SpokenControls(this.renderer);if(await this.renderer.spokenControls.accept(result.transcript)){this.state='idle';this.status('');this.resumeListening();return;}}
@@ -101,7 +106,8 @@ class LocalVoiceSession {
         } catch (error) {
             if (generation === this.generation) {
                 this.releasePlayback(); this.state = 'idle';
-                if (error.code === 'no-speech' && ++this.emptyTurns < 3 && this.listeningEnabled) { this.status(''); this.resumeListening(1000); }
+                if(error.code==='cancelled'&&this.listeningEnabled){this.status('');this.resumeListening();}
+                else if (error.code === 'no-speech' && ++this.emptyTurns < 3 && this.listeningEnabled) { this.status(''); this.resumeListening(1000); }
                 else { this.listeningEnabled = false; this.status(error.message); }
             }
         }
@@ -109,6 +115,7 @@ class LocalVoiceSession {
     debugTurn(result){
         const debug=this.renderer.debugStream;if(!debug)return;
         debug.add('Heard',result.transcript);
+        if(result.vision)debug.add('Vision',result.vision.state==='snapshot'?'Actual camera image used for this turn · '+result.vision.capturedAt:result.vision.state==='camera-off'?'Camera off; no image used.':result.vision.state==='unsupported'?'Configured voice model does not support images; no image used.':'Camera on; fresh image unavailable.');
         const hints=result.transcriptionHints;
         if(hints)debug.add('Transcription hints',hints.state==='applied'?`${hints.count} saved name hints used; spelling remains uncertain.`:hints.state==='disabled'?'Saved name hints are off.':hints.state==='unsupported'?'Speech provider does not support name hints.':hints.state==='non-local'?'Name hints require an on-computer speech service.':'No saved name hints available.');
         const count=result.conversationContext?.recentQuestions?.length;
