@@ -1,3 +1,4 @@
+const { assertPrivateFile, privateTempDir } = require('../helpers/private-file.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -6,7 +7,7 @@ const path = require('node:path');
 const { SpeakerStore, SpeakerRecognition, MODEL } = require('../../lib/speaker-recognition');
 const vector = i => Array.from({ length: 512 }, (_, n) => n === i ? 1 : 0);
 const result = (...vectors) => ({ model: MODEL, duration: 4 * vectors.length, speakers: vectors.map((v, i) => ({ speaker: i, cleanSeconds: 3, embedding: v })), segments: vectors.map((_, i) => ({ start: i * 4, end: (i + 1) * 4, speaker: i })) });
-async function fixture(t) { const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nodie-speakers-')); t.after(() => fs.rm(dir, { recursive: true, force: true })); const store = new SpeakerStore(path.join(dir, 'profiles.json')); return store; }
+async function fixture(t) { const dir = privateTempDir(path.join(os.tmpdir(), 'nodie-speakers-')); t.after(() => fs.rm(dir, { recursive: true, force: true })); const store = new SpeakerStore(path.join(dir, 'profiles.json')); return store; }
 test('disabled recognition never sends audio, and enabled profiles survive restart without exposing embeddings', async t => {
     const store = await fixture(t); let calls = 0;
     const service = new SpeakerRecognition({ store, fetchImpl: async () => { calls++; return Response.json(result(vector(0))); } });
@@ -17,7 +18,7 @@ test('disabled recognition never sends audio, and enabled profiles survive resta
     const next = new SpeakerRecognition({ store: new SpeakerStore(store.file), fetchImpl: service.fetch });
     const second = await next.analyse(Buffer.alloc(200)); assert.equal(second.speakers[0].name, 'Ben'); assert.equal(second.speakers[0].id, first.speakers[0].id);
     assert.equal(JSON.stringify(second).includes('embedding'), false); assert.equal(JSON.stringify(await store.status()).includes('vector'), false);
-    assert.equal((await fs.stat(store.file)).mode & 0o777, 0o600);
+    assertPrivateFile(store.file);
 });
 test('clear/disable invalidates in-flight observations and naming; no resurrection', async t => {
     const store = await fixture(t); await store.configure(true); const { epoch } = await store.load();

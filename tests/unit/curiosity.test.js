@@ -1,3 +1,4 @@
+const { assertPrivateFile, privateTempDir } = require('../helpers/private-file.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
@@ -22,13 +23,13 @@ test('screens, flickers and unattended objects do not produce questions',()=>{
  d.observe(scene(0,[cup]),60000);assert.deepEqual(d.observe(scene(0,[cup]),75000),[]);
 });
 test('claims are atomic, persisted across restart, bounded, private and cleared',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'nodie-curiosity-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));let now=Date.parse('2026-09-24T10:00:00Z');
+ const dir=privateTempDir(path.join(os.tmpdir(),'nodie-curiosity-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));let now=Date.parse('2026-09-24T10:00:00Z');
  const file=path.join(dir,'curiosity.json'), options={now:()=>now,timezone:'Europe/London'}, ledger=new CuriosityLedger(file,options), candidate={key:'held-object:cup',type:'held-object'};
  assert.match((await ledger.claim(candidate,'low')).reason,/disabled/);assert.match((await ledger.claim(candidate,'observe')).reason,/would ask/);
  const results=await Promise.all([ledger.claim(candidate,'normal'),ledger.claim(candidate,'normal')]);assert.equal(results.filter(r=>r.token).length,1);
  now+=3600000;assert.match((await new CuriosityLedger(file,options).claim(candidate,'normal')).reason,/already/);
  await ledger.outcome(results.find(r=>r.token).token,'unanswered');
- assert.equal((await fs.stat(file)).mode&0o777,0o600);
+ assertPrivateFile(file);
  const next=await ledger.claim({key:'animal:dog',type:'animal'},'normal');assert.ok(next.token);await ledger.outcome(next.token,'unanswered');
  now+=1800000;assert.match((await ledger.claim({key:'people:person',type:'people'},'normal')).reason,/paused/);
  await ledger.clear();assert.ok((await ledger.claim(candidate,'normal')).token);
@@ -56,7 +57,7 @@ test('undelivered claims stay permitted until deadline and cancel without interr
  now+=24000;await s.tick();assert.deepEqual(outcomes,['cancelled']);assert.equal(s.blockedUntilReply,false);assert.equal(sent.at(-1).session.curiosity_allowed,false);
 });
 test('cancelled reservation does not count as a question or exhaust the budget',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'nodie-cancelled-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
+ const dir=privateTempDir(path.join(os.tmpdir(),'nodie-cancelled-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
  const l=new CuriosityLedger(path.join(dir,'ledger.json')),c={key:'animal:dog',type:'animal'};
  const a=await l.claim(c,'normal');await l.outcome(a.token,'cancelled');assert.ok((await l.claim(c,'normal')).token);assert.equal((await l.read()).ignored,0);
 });

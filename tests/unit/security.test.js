@@ -59,3 +59,16 @@ test('changes to resolved env_file or included Compose content invalidate approv
     await assert.rejects(f.monitor.apply(plan.id), /configuration changed/);
     assert.ok(!f.commands.some(args => args.includes('pull')));
 });
+
+test('only the project .env is optional and its creation invalidates a plan', async t => {
+    const f = await fixture(t);
+    await f.monitor.scan();
+    const plan = await f.monitor.prepare(f.item.id);
+    assert.equal(plan.executable, true);
+    await fs.writeFile(path.join(f.item.cwd, '.env'), 'NODIE_TEST=value\n');
+    await assert.rejects(f.monitor.apply(plan.id), /configuration changed/);
+    assert.ok(!f.commands.some(args => args.includes('pull')));
+    await fs.rm(f.file);
+    const missingCompose = await f.monitor.prepare(f.item.id);
+    assert.equal(missingCompose.executable, false);
+});

@@ -1,19 +1,20 @@
+const { assertPrivateFile, privateTempDir } = require('../helpers/private-file.cjs');
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs/promises'),os=require('node:os'),path=require('node:path');
 const {PersonRegistry}=require('../../lib/person-registry');
 const {createLinkedResolver}=require('../../unmute-service/linked-people.cjs');
 const a='11111111-1111-1111-1111-111111111111',b='22222222-2222-2222-2222-222222222222';
 test('confirmed profiles share a stable person and memory, duplicate names never merge',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'nodie-people-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const r=new PersonRegistry(path.join(dir,'links.json'));
+ const dir=privateTempDir(path.join(os.tmpdir(),'nodie-people-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const r=new PersonRegistry(path.join(dir,'links.json'));
  const profiles={faces:[{id:a,name:'Alex'}],voices:[{id:b,name:'Alex'}]},memory={id:7,name:'Alex Example'};
  const one=await r.save({id:null,name:'Alex',faceId:a,voiceId:null,memory},profiles);
  const two=await r.save({id:null,name:'Alex',faceId:null,voiceId:b,memory:null},profiles);assert.notEqual(one.id,two.id);
  await assert.rejects(r.save({id:one.id,name:'Alex',faceId:a,voiceId:b,memory},profiles),/already linked/);
  await r.remove(two.id);const linked=await r.save({id:one.id,name:'Alex',faceId:a,voiceId:b,memory},profiles);assert.equal(linked.id,one.id);
  assert.deepEqual(linked.voices,[b]);assert.equal(new PersonRegistry(r.file).file,r.file);assert.equal((await r.read()).people.length,1);
- await r.unlink('faces',a);assert.equal((await r.read()).people[0].voices.length,1);await r.unlink('voices');assert.equal((await r.read()).people.length,0);assert.equal((await fs.stat(r.file)).mode&0o777,0o600);
+ await r.unlink('faces',a);assert.equal((await r.read()).people[0].voices.length,1);await r.unlink('voices');assert.equal((await r.read()).people.length,0);assertPrivateFile(r.file);
 });
 test('unknown or removed profiles and invalid memory IDs cannot be linked',async t=>{
- const dir=await fs.mkdtemp(path.join(os.tmpdir(),'nodie-people-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const r=new PersonRegistry(path.join(dir,'links.json'));
+ const dir=privateTempDir(path.join(os.tmpdir(),'nodie-people-'));t.after(()=>fs.rm(dir,{recursive:true,force:true}));const r=new PersonRegistry(path.join(dir,'links.json'));
  assert.throws(()=>r.save({id:null,name:'Alex',faceId:a,voiceId:null,memory:null},{faces:[],voices:[]}),/changed/);
  assert.throws(()=>r.save({id:null,name:'Alex',faceId:a,voiceId:null,memory:{id:'7',name:'Alex'}},{faces:[{id:a,name:'Alex'}],voices:[]}),/memory/);
 });

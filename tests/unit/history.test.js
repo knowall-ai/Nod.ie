@@ -1,16 +1,17 @@
+const { assertPrivateFile, privateTempDir } = require('../helpers/private-file.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const { ConversationHistory } = require('../../lib/conversation-history');
-async function fixture(t) { const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'nodie-history-')); t.after(() => fs.rm(dir, { recursive: true, force: true })); return path.join(dir, 'history.json'); }
+async function fixture(t) { const dir = privateTempDir(path.join(os.tmpdir(), 'nodie-history-')); t.after(() => fs.rm(dir, { recursive: true, force: true })); return path.join(dir, 'history.json'); }
 test('history survives new instances, retains six turns and uses private file permissions', async t => {
     const file = await fixture(t); const store = new ConversationHistory(file); const initial = await store.load();
     for (let i = 0; i < 8; i++) await store.append(initial.epoch, 'question ' + i, 'answer ' + i);
     const restored = await new ConversationHistory(file).load();
     assert.equal(restored.turns.length, 12); assert.equal(restored.turns[0].content, 'question 2');
-    assert.equal((await fs.stat(file)).mode & 0o777, 0o600);
+    assertPrivateFile(file);
 });
 test('concurrent writers retain both turns and clearing invalidates in-flight writes', async t => {
     const file = await fixture(t); const a = new ConversationHistory(file); const b = new ConversationHistory(file); const saved = await a.load();
