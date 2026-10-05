@@ -60,9 +60,12 @@ contextBridge.exposeInMainWorld('nodie', {
     faceForget: () => ipcRenderer.invoke('face-forget'),
     analyseVision: image => ipcRenderer.invoke('vision-analyse', image),
     cancelVision: () => ipcRenderer.invoke('vision-cancel'),
+    beginLocalCamera:()=>ipcRenderer.invoke('local-camera-begin'),
+    setLocalCameraScene:scene=>ipcRenderer.invoke('local-camera-scene',scene),
+    visualReplyStarted:id=>ipcRenderer.invoke('visual-reply-started',id),
     voiceHealth: () => ipcRenderer.invoke('voice-health'),
-    voiceTurn: async (audio) => {
-        const result = await ipcRenderer.invoke('voice-turn', audio);
+    voiceTurn: async (audio,options) => {
+        const result = await ipcRenderer.invoke('voice-turn', audio,options);
         if (result.failure) { const error = new Error(result.failure.error); error.code = result.failure.code; throw error; }
         return result;
     },

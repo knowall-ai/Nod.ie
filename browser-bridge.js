@@ -1,7 +1,7 @@
 // Only voice operations are exposed by the loopback web app. No Docker/update API.
 if (!window.nodie && window.ENV_CONFIG) {
-    const post = async (route, body, type = 'application/octet-stream') => {
-        const response = await fetch(route, { method: 'POST', headers: { 'Content-Type': type }, body });
+    const post = async (route, body, type = 'application/octet-stream', options = {}) => {
+        const response = await fetch(route, { method: 'POST', headers: { 'Content-Type': type }, body, ...options });
         const result = await response.json();
         if (!response.ok) { const error = new Error(result.error || 'Voice request failed'); error.code = result.code; throw error; }
         return result;
@@ -22,8 +22,11 @@ if (!window.nodie && window.ENV_CONFIG) {
         onHistoryCleared: fn => window.addEventListener('history-cleared', event => fn(event.detail)),
         analyseVision: image => post('/vision/analyse', image, 'image/jpeg'),
         cancelVision: () => post('/vision/cancel'),
+        beginLocalCamera:()=>post('/voice/camera-begin',undefined,'application/json',{signal:AbortSignal.timeout(3000)}),
+        setLocalCameraScene:scene=>post('/voice/scene',JSON.stringify(scene),'application/json',{signal:AbortSignal.timeout(3000),keepalive:scene.status==='camera-off'}),
+        visualReplyStarted:id=>post('/voice/visual-reply-started',JSON.stringify({turnId:id}),'application/json'),
         voiceHealth: () => post('/voice/health'),
-        voiceTurn: async audio => { const result = await post('/voice/turn', audio); result.audio = Uint8Array.from(atob(result.audio), c => c.charCodeAt(0)); if (result.video) result.video = Uint8Array.from(atob(result.video), c => c.charCodeAt(0)); return result; },
+        voiceTurn: async (audio,options={}) => { const result = await post('/voice/turn', audio,'application/octet-stream',options.cameraOff?{headers:{'Content-Type':'application/octet-stream','X-Nodie-Camera-Off':'true'}}:{}); result.audio = Uint8Array.from(atob(result.audio), c => c.charCodeAt(0)); if (result.video) result.video = Uint8Array.from(atob(result.video), c => c.charCodeAt(0)); return result; },
         voiceCancel: () => post('/voice/cancel'),
         onToggleMute: () => {}, onQuit: () => {}, onConfigChanged: () => {}
     };

@@ -79,3 +79,25 @@ test('a locally intercepted command logs heard words but never calls playback or
  h.window.SpokenControls=class{async accept(){return true;}};let plays=0;h.session.playReply=async()=>{plays++;};
  await h.session.send([new Blob(['synthetic audio'])],0);assert.equal(plays,0);assert.ok(rows.some(([source])=>source==='Heard'));assert.ok(!rows.some(([source])=>source==='Said'));
 });
+test('a visual reply arriving after camera off/reopen is discarded before playback',async()=>{
+ const h=harness(()=>Promise.resolve());h.session.renderer.visionContext={cameraEpoch:1,prepareLocalTurn:async()=>{}};let resumed=0;
+ h.session.resumeListening=()=>resumed++;
+ h.window.nodie.voiceTurn=async()=>{h.session.renderer.visionContext.cameraEpoch=2;return {transcript:'What is here?',reply:'Old view',vision:{state:'snapshot'},audio:new Uint8Array(44)};};
+ await h.session.send([new Blob([new Uint8Array(200)])],0);assert.equal(h.stats().audioStarts,0);assert.equal(h.session.state,'idle');assert.equal(resumed,1);
+});
+test('visual history acknowledgement follows actual audible playback, never muted playback',async()=>{
+ for(const muted of [false,true]){const h=harness(()=>Promise.resolve());let acks=0;h.window.nodie.visualReplyStarted=async id=>{assert.equal(id,'fixture-turn');acks++;};h.session.renderer.state.speakerMuted=muted;await h.session.playReply({audio:new Uint8Array(44),reply:'The mug is red.',vision:{turnId:'fixture-turn'}},0);assert.equal(acks,muted?0:1);h.session.cancel();}
+});
+test('camera change during awaited control parsing prevents a visual reply from starting',async()=>{
+ const h=harness(()=>Promise.resolve());h.session.renderer.visionContext={active:true,cameraEpoch:1,prepareLocalTurn:async()=>{}};h.session.resumeListening=()=>{};
+ h.window.nodie.voiceTurn=async()=>({transcript:'What is here?',reply:'Old view',vision:{state:'snapshot'},audio:new Uint8Array(44)});
+ h.window.SpokenControls=class{async accept(){h.session.renderer.visionContext.cameraEpoch=2;h.session.cameraChanged(2);return false;}};
+ await h.session.send([new Blob([new Uint8Array(200)])],0);assert.equal(h.stats().audioStarts,0);assert.ok(!h.session.player);
+});
+test('camera change stops an already-playing visual reply',async()=>{
+ const h=harness(()=>Promise.resolve());h.session.renderer.visionContext={cameraEpoch:1};h.session.resumeListening=()=>{};await h.session.playReply({audio:new Uint8Array(44),reply:'The mug is red.'},0,true,1);assert.equal(h.stats().audioStarts,1);h.session.renderer.visionContext.cameraEpoch=2;h.session.cameraChanged(2);assert.equal(h.session.player,null);assert.equal(h.session.state,'idle');assert.equal(h.session.generation,1);
+});
+test('accepted commands and silent turns clear the visual tracker before another recording',async()=>{
+ for(const silent of [false,true]){const h=harness(()=>Promise.resolve());h.session.renderer.visionContext={active:true,cameraEpoch:1,prepareLocalTurn:async()=>{}};h.session.resumeListening=()=>{};h.window.nodie.voiceTurn=async()=>({transcript:'Nodie, stop listening',reply:'',silent,vision:{state:'snapshot'}});h.window.SpokenControls=class{async accept(){return !silent;}};
+ await h.session.send([new Blob([new Uint8Array(200)])],0);assert.equal(h.session.visualEpoch,undefined);h.session.state='recording';h.session.cameraChanged(2);assert.equal(h.session.generation,0);assert.equal(h.session.state,'recording');}
+});

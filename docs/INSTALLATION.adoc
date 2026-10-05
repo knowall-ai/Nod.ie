@@ -21,7 +21,7 @@ On Ubuntu systems restricting unprivileged user namespaces, Electron may need an
 
 === Configuration
 
-`VOICE_MODE=local` selects the lightweight path. Set `LOCAL_STT_URL`, `LOCAL_STT_MODEL`, `LOCAL_TTS_URL`, `OLLAMA_URL` and `LOCAL_LLM_MODEL`. The selected local model is `qwen3.5:9b` (download with `ollama pull qwen3.5:9b`); set `LOCAL_LLM_MODEL=qwen3.5:9b`. Its voice requests disable thinking. Camera input remains a separate, unimplemented capability. The speech service must implement `/api/tts` returning WAV; the transcription service must implement `/v1/audio/transcriptions`.
+`VOICE_MODE=local` selects the lightweight path. Set `LOCAL_STT_URL`, `LOCAL_STT_MODEL`, `LOCAL_TTS_URL`, `OLLAMA_URL` and `LOCAL_LLM_MODEL`. The selected local model is `qwen3.5:9b` (download with `ollama pull qwen3.5:9b`); set `LOCAL_LLM_MODEL=qwen3.5:9b`. Its voice requests disable thinking. Local voice can receive actual camera images when the selected conversational model supports images; enable the camera explicitly. The speech service must implement `/api/tts` returning WAV; the transcription service must implement `/v1/audio/transcriptions`.
 
 Realtime mode requires `UNMUTE_BACKEND_URL`, `LLM_MODEL` and `VOICE_MODEL`. Keep dedicated speech models stopped when unused on constrained hosts. Nod.ie does not automatically start them.
 
