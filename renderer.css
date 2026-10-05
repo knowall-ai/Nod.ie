@@ -114,6 +114,10 @@ body[data-platform="web"] #circle.loading {
     position: relative;
     width: 250px;
     height: 250px;
+    /* Clip the entire media stack, including GPU-composited video on Windows. */
+    border-radius: 50%;
+    overflow: hidden;
+    clip-path: circle(50% at 50% 50%);
     display: flex;
     align-items: center;
     justify-content: center;
