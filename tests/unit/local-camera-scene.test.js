@@ -21,5 +21,9 @@ test('camera-off revision and replacement session reject delayed old snapshots',
  const scene=new LocalCameraScene();t.after(()=>scene.dispose());const {token}=scene.begin(),capturedAt=new Date().toISOString();
  scene.accept({token,revision:1,status:'snapshot',imageJpeg:jpeg,capturedAt});scene.accept({token,revision:3,status:'camera-off'});
  assert.deepEqual(scene.accept({token,revision:2,status:'snapshot',imageJpeg:jpeg,capturedAt}),{status:'ignored'});assert.equal(scene.current().status,'camera-off');
- const next=scene.begin();assert.notEqual(next.token,token);assert.equal(scene.accept({token,revision:4,status:'snapshot',imageJpeg:jpeg,capturedAt}).status,'ignored');assert.equal(scene.current().status,'camera-off');
+ const next=scene.begin();assert.notEqual(next.token,token);assert.equal(scene.accept({token,revision:4,status:'snapshot',imageJpeg:jpeg,capturedAt}).status,'stale-session');assert.equal(scene.current().status,'camera-off');
+});
+test('abandoned camera lease expires to unavailable and repeated off does not repeat cancellation',t=>{
+ let now=Date.now(),off=0;const scene=new LocalCameraScene({now:()=>now,onOff:()=>off++});t.after(()=>scene.dispose());
+ scene.update({status:'camera-off'});assert.equal(off,0);scene.update({status:'camera-on-awaiting-analysis'});now+=90001;assert.equal(scene.current().status,'camera-unavailable');assert.equal(off,1);scene.update({status:'camera-off'});assert.equal(off,1);
 });

@@ -12,7 +12,7 @@ class VisionContext {
     canAnalyse() { return this.active && this.renderer.state.isConnected && !this.pending && this.now()-this.lastAnalysis>=2000; }
     setActive(active) {
         if(active && !this.active)this.lastAnalysis=-Infinity;
-        if(active!==this.active)this.cameraEpoch++;
+        if(active!==this.active){this.cameraEpoch++;this.renderer.localVoice?.cameraChanged?.(this.cameraEpoch);}
         this.active=active;
         if(!active){++this.sequence;this.scene=null;clearTimeout(this.expiry);}
         this.update();
@@ -51,14 +51,27 @@ class VisionContext {
         const text=this.renderer.unmuteBasePrompt+'\n'+camera+'\n'+policy+(this.memoryBlocked?'\nModel-directed memory tools are disabled after camera context. Person references may still be supplied by read-only lookup of spoken names. Do not claim a new search or save.':'');
         this.renderer.state.wsHandler?.send({type:'session.update',session:{allow_recording:false,instructions:{type:'constant',text},scene_data:state}});
     }
-    deliverLocal(state){
+    ensureLocalReady(){
         if(!this.localReady){
             let timer;
             const ready=Promise.race([this.api.beginLocalCamera(),new Promise((_resolve,reject)=>{timer=setTimeout(()=>reject(Error('Camera handshake timeout')),3000);})]).catch(error=>{if(this.localReady===ready)this.localReady=null;throw error;}).finally(()=>clearTimeout(timer));
             this.localReady=ready;
         }
+        return this.localReady;
+    }
+    deliverLocal(state){
         const packet={...state,revision:++this.localRevision};
-        const send=async value=>{let timer;try{return await Promise.race([(async()=>{const {token}=await this.localReady;return this.api.setLocalCameraScene({...value,token});})(),new Promise((_resolve,reject)=>{timer=setTimeout(()=>reject(Error('Camera delivery timeout')),3000);})]);}finally{clearTimeout(timer);}};
+        const send=async value=>{
+            for(let attempt=0;attempt<2;attempt++){
+                const ready=this.ensureLocalReady();let timer,result;
+                try{result=await Promise.race([(async()=>{const {token}=await ready;return this.api.setLocalCameraScene({...value,token});})(),new Promise((_resolve,reject)=>{timer=setTimeout(()=>reject(Error('Camera delivery timeout')),3000);})]);}finally{clearTimeout(timer);}
+                if(result?.status!=='stale-session')return result;
+                if(this.localReady===ready)this.localReady=null;
+                // A newer state/off supersedes this packet; never re-enrol its old image.
+                if(value.revision!==this.localRevision)return;
+            }
+            throw Error('Camera session changed');
+        };
         const failed=()=>this.renderer.debugStream?.add('Camera','Current image could not be supplied to local voice.');
         if(state.status==='camera-off'){
             this.localPending=null;
@@ -69,14 +82,17 @@ class VisionContext {
         if(this.localSending)return;
         this.localSending=true;
         this.localDelivery=(async()=>{
-            try{while(this.localPending){const next=this.localPending;this.localPending=null;await send(next);}}
-            catch{failed();this.localPending=null;}
+            try{while(this.localPending){const next=this.localPending;this.localPending=null;try{await send(next);}catch{failed();}}}
             finally{this.localSending=false;}
         })();
     }
     async prepareLocalTurn(){
-        if(!this.active){this.update();return;}
+        if(!this.active){this.update();let timer;await Promise.race([this.localDelivery,new Promise(resolve=>{timer=setTimeout(resolve,100);})]);clearTimeout(timer);return;}
+        if(this.scene&&this.now()-Date.parse(this.scene.capturedAt)>=0&&this.now()-Date.parse(this.scene.capturedAt)<2000){
+            let timer;await Promise.race([this.localDelivery,new Promise(resolve=>{timer=setTimeout(resolve,100);})]);clearTimeout(timer);return;
+        }
         const captured=this.scene?.capturedAt,epoch=this.cameraEpoch;
+        this.lastAnalysis=-Infinity;
         this.renderer.controls?.cameraSource?.requestFrame();
         const start=Date.now();
         // Capture/transport only, no model inference. Slow capture never blocks speech indefinitely.

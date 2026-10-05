@@ -94,19 +94,20 @@ class LocalVoiceSession {
             const cameraEpoch=this.renderer.visionContext?.cameraEpoch;
             await this.renderer.visionContext?.prepareLocalTurn();
             if(generation!==this.generation)return;
-            const result = await window.nodie.voiceTurn(audio);
+            const result = await window.nodie.voiceTurn(audio,{cameraOff:!this.renderer.visionContext?.active});
             if (generation !== this.generation) return;
             if(result.vision?.state==='snapshot'&&cameraEpoch!==this.renderer.visionContext?.cameraEpoch){this.state='idle';this.status('');this.resumeListening();return;}
+            this.visualEpoch=result.vision?.state==='snapshot'?cameraEpoch:undefined;
             this.emptyTurns = 0;
             this.debugTurn(result);
-            if(window.SpokenControls){this.renderer.spokenControls ||= new window.SpokenControls(this.renderer);if(await this.renderer.spokenControls.accept(result.transcript)){this.state='idle';this.status('');this.resumeListening();return;}}
+            if(window.SpokenControls){this.renderer.spokenControls ||= new window.SpokenControls(this.renderer);const accepted=await this.renderer.spokenControls.accept(result.transcript);if(generation!==this.generation)return;if(accepted){this.visualEpoch=undefined;this.state='idle';this.status('');this.resumeListening();return;}}
             if (result.controls) this.renderer.controls.applyVoiceControls(result.controls);
-            if (result.silent) { this.state = 'idle'; this.status(''); this.resumeListening(); return; }
+            if (result.silent) { this.visualEpoch=undefined;this.state = 'idle'; this.status(''); this.resumeListening(); return; }
             await this.playReply(result, generation);
         } catch (error) {
             if (generation === this.generation) {
                 this.releasePlayback(); this.state = 'idle';
-                if(error.code==='cancelled'&&this.listeningEnabled){this.status('');this.resumeListening();}
+                if(error.code==='cancelled'&&this.listeningEnabled){this.renderer.debugStream?.add('Voice','Voice turn cancelled; listening resumed.');this.status('');this.resumeListening();}
                 else if (error.code === 'no-speech' && ++this.emptyTurns < 3 && this.listeningEnabled) { this.status(''); this.resumeListening(1000); }
                 else { this.listeningEnabled = false; this.status(error.message); }
             }
@@ -115,7 +116,7 @@ class LocalVoiceSession {
     debugTurn(result){
         const debug=this.renderer.debugStream;if(!debug)return;
         debug.add('Heard',result.transcript);
-        if(result.vision)debug.add('Vision',result.vision.state==='snapshot'?'Actual camera image used for this turn · '+result.vision.capturedAt:result.vision.state==='camera-off'?'Camera off; no image used.':result.vision.state==='unsupported'?'Configured voice model does not support images; no image used.':'Camera on; fresh image unavailable.');
+        if(result.vision)debug.add('Vision',result.vision.state==='snapshot'?'Actual camera image used for this turn · '+result.vision.capturedAt:result.vision.state==='camera-off'?'Camera off; no image used.':result.vision.state==='camera-unavailable'?'Camera connection unavailable; no image used.':result.vision.state==='unsupported'?'Configured voice model does not support images; no image used.':'Camera on; fresh image unavailable.');
         const hints=result.transcriptionHints;
         if(hints)debug.add('Transcription hints',hints.state==='applied'?`${hints.count} saved name hints used; spelling remains uncertain.`:hints.state==='disabled'?'Saved name hints are off.':hints.state==='unsupported'?'Speech provider does not support name hints.':hints.state==='non-local'?'Name hints require an on-computer speech service.':'No saved name hints available.');
         const count=result.conversationContext?.recentQuestions?.length;
@@ -125,8 +126,16 @@ class LocalVoiceSession {
             for(const phrase of window.speakerPhrases?.(attribution.words)||[])debug.add('Speaker phrases',`${phrase.start.toFixed(2)}–${phrase.end.toFixed(2)}s · ${phrase.label}: ${phrase.text}`);
         }else debug.add('Speaker phrases','Word attribution unavailable: '+(attribution?.reason==='inconsistent-transcript'?'word timings differ from the transcript':attribution?.reason==='invalid-timestamps'?'invalid word timings':'provider did not supply word timings'));
     }
-    async playReply(result, generation, useVideo = true) {
-        if (generation !== this.generation) return;
+    cameraChanged(epoch){
+        if(this.visualEpoch===undefined||this.visualEpoch===epoch||!['processing','speaking'].includes(this.state))return;
+        ++this.generation;this.releasePlayback();this.state='idle';this.status('');
+        window.nodie.voiceCancel().catch(()=>{});
+        this.renderer.debugStream?.add('Vision','Visual reply cancelled because the camera changed.');
+        this.resumeListening();
+    }
+    async playReply(result, generation, useVideo = true, cameraEpoch=this.visualEpoch) {
+        if (generation !== this.generation || (cameraEpoch!==undefined&&cameraEpoch!==this.renderer.visionContext?.cameraEpoch)) return;
+        this.visualEpoch=cameraEpoch;
         this.state = 'speaking';
         const manager = this.renderer.state.avatarManager;
         const video = useVideo && result.video && manager?.isEnabled() ? document.getElementById('avatar-video') : null;
@@ -144,7 +153,7 @@ class LocalVoiceSession {
             if (this.player !== player || generation !== this.generation) return;
             this.releasePlayback();
             if (video) {
-                this.playReply({ ...result, lipSync: 'unavailable' }, generation, false).catch(() => {
+                this.playReply({ ...result, lipSync: 'unavailable' }, generation, false,cameraEpoch).catch(() => {
                     if (generation === this.generation) { this.releasePlayback(); this.state = 'idle'; this.listeningEnabled = false; this.status('Playback failed'); }
                 });
             } else { this.state = 'idle'; this.listeningEnabled = false; this.status('Playback failed'); }
@@ -152,10 +161,14 @@ class LocalVoiceSession {
         player.onerror = failed;
         try {
             await player.play();
-            if(this.player===player&&generation===this.generation&&!player.muted&&!result.silent)this.renderer.debugStream?.add('Said',result.reply);
+            if(this.player===player&&generation===this.generation&&!player.muted&&!result.silent){
+                this.renderer.debugStream?.add('Said',result.reply);
+                if(result.vision?.turnId)await window.nodie.visualReplyStarted?.(result.vision.turnId).catch(()=>{this.renderer.debugStream?.add('Conversation context','Spoken visual reply could not be saved to recent history.');});
+            }
         } catch { failed(); }
     }
     releasePlayback() {
+        this.visualEpoch=undefined;
         if (this.player) {
             this.player.onended = null; this.player.onerror = null;
             this.player.pause(); this.player.removeAttribute('src'); this.player.load(); this.player = null;

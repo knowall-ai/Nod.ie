@@ -127,9 +127,10 @@ function start() {
     app.on('before-quit', () => vision.cancel());
     handle('local-camera-begin',()=>voice.cameraScene.begin());
     handle('local-camera-scene',scene=>voice.cameraScene.accept(scene));
+    handle('visual-reply-started',id=>voice.confirmVisualReply(id));
     handle('voice-health', () => voice.health());
-    handle('voice-turn', async audio => {
-        try { return await voice.converse(audio); }
+    handle('voice-turn', async (audio,options) => {
+        try { return await voice.converse(audio,options); }
         catch (error) { return { failure: require('./lib/voice-error').publicError(error) }; }
     });
     handle('transcript-session', async () => ({ epoch: (await historyStore.load()).epoch }));

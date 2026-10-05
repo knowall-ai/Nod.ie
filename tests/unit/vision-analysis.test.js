@@ -77,3 +77,16 @@ test('timed-out camera handshake cannot later upload the retained packet',async 
  release({token:'expired-session'});await new Promise(r=>setImmediate(r));assert.equal(packets.length,0);
  h.context.update();await h.context.localDelivery;assert.equal(packets[0].token,'next-session');
 });
+test('stale camera lease re-handshakes once and retries only the current packet',async t=>{
+ const h=fixture(t);h.renderer.localVoice={};let leases=0;const packets=[];h.context.api.beginLocalCamera=async()=>({token:'lease-'+ ++leases});h.context.api.setLocalCameraScene=async packet=>{packets.push(packet);return {status:packet.token==='lease-1'?'stale-session':'camera-on-awaiting-analysis'};};
+ h.context.update();await h.context.localDelivery;assert.equal(leases,2);assert.equal(packets.length,2);assert.equal(packets[1].token,'lease-2');
+});
+test('recent local snapshot avoids capture polling and old snapshots bypass capture throttle',async t=>{
+ const h=fixture(t);h.renderer.localVoice={};h.context.api.beginLocalCamera=async()=>({token:'fixture'});h.context.api.setLocalCameraScene=async()=>({status:'snapshot'});let requested=0;h.renderer.controls={updateCamera(){},cameraSource:{requestFrame(){requested++;void h.context.analyse(h.frame());}}};
+ await h.context.analyse(h.frame());await h.context.localDelivery;await h.context.prepareLocalTurn();assert.equal(requested,0);
+ h.advance(2100);await h.context.prepareLocalTurn();assert.equal(requested,1);assert.equal(h.context.scene.capturedAt,h.frame().capturedAt);
+});
+test('failed old upload preserves and delivers a newer camera-on state after off/reopen',async t=>{
+ const h=fixture(t),packets=[];h.renderer.localVoice={};let rejectUpload;h.context.api.beginLocalCamera=async()=>({token:'fixture'});h.context.api.setLocalCameraScene=async packet=>{packets.push(packet);if(packet.status==='snapshot')await new Promise((_resolve,reject)=>rejectUpload=reject);return {status:packet.status};};
+ h.context.update();await h.context.localDelivery;await h.context.analyse(h.frame());const original=h.context.localDelivery;await new Promise(r=>setImmediate(r));h.context.setActive(false);await h.context.localDelivery;h.context.setActive(true);rejectUpload(Error('Upload failed'));await original;assert.equal(packets.at(-1).status,'camera-on-awaiting-analysis');
+});
