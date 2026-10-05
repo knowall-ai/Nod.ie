@@ -147,3 +147,41 @@ el('journal-clear').onclick=()=>{if(confirm('Permanently clear all saved events?
 el('journal-enabled').onchange=()=>api.journalEnabled(el('journal-enabled').checked).then(loadJournal).catch(error);
 el('journal-retention').onchange=()=>api.journalRetention(Number(el('journal-retention').value)).then(loadJournal).catch(error);
 loadJournal().catch(error);
+
+// Credentials use dedicated Settings-only IPC, never public configuration.
+async function loadMemoryConnection(){
+    if(!api.memorySettings)return;
+    el('memory-connection').hidden=false;
+    const status=await api.memorySettings();
+    for(const field of ['uri','database','username'])el('memory-'+field).value=status[field];
+    el('memory-password').value='';
+    el('memory-password').placeholder=status.hasPassword?'Saved; leave blank to keep':'Enter password';
+    el('memory-save').disabled=!status.secureStorage;
+    el('memory-password-help').textContent=status.secureStorage?'Stored using this computer’s OS credential protection. A saved password is reused only for the same address, database and username.':'Secure password storage is unavailable. Configure an OS credential store to save a connection.';
+    el('memory-reset').disabled=status.mode==='legacy';
+    el('memory-status').textContent=status.mode==='legacy'?'Using existing Reverie configuration.':'Saved connection loaded. Changes require a restart.';
+}
+let memoryBusy=false;
+async function memoryAction(action){
+    if(memoryBusy)return;
+    memoryBusy=true;
+    const fields=['uri','database','username','password'];fields.forEach(field=>el('memory-'+field).disabled=true);
+    const buttons=['memory-test','memory-save','memory-reset'];buttons.forEach(id=>el(id).disabled=true);
+    const input=Object.fromEntries(['uri','database','username','password'].map(field=>[field,el('memory-'+field).value]));
+    el('memory-status').textContent=action==='test'?'Testing connection…':'Saving connection…';
+    try{
+        if(action==='test'){const result=await api.testMemoryConnection(input);el('memory-status').textContent=result.message;}
+        else{
+            if(action==='save')await api.saveMemoryConnection(input);else await api.resetMemoryConnection();
+            await loadMemoryConnection();
+            el('memory-status').textContent=action==='save'?'Brain connection saved. Restart Nodie to apply.':'Existing configuration restored. Restart Nodie to apply.';
+        }
+    }catch(err){el('memory-status').textContent=err.message||'Memory connection unavailable.';}
+    finally{
+        el('memory-password').value='';memoryBusy=false;fields.forEach(field=>el('memory-'+field).disabled=false);
+        buttons.forEach(id=>el(id).disabled=false);
+        try{const status=await api.memorySettings();el('memory-save').disabled=!status.secureStorage;el('memory-reset').disabled=status.mode==='legacy';}catch{/* Keep the action result visible. */}
+    }
+}
+for(const action of ['test','save','reset'])el('memory-'+action).onclick=()=>memoryAction(action);
+loadMemoryConnection().catch(()=>{el('memory-status').textContent='Memory connection settings unavailable.';});

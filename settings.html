@@ -13,6 +13,18 @@
         <p>Your voice companion, your preferences.</p>
     </header>
     
+    <section class="section" id="memory-connection" hidden aria-labelledby="memory-connection-title">
+        <h2 id="memory-connection-title">Reverie brain connection</h2>
+        <p>Connect local voice to a shared memory database. Other computers can use the same address and database to recall the same long-term memories.</p>
+        <div class="setting-row"><div class="setting-label"><h3><label for="memory-uri">Brain address</label></h3><p>Neo4j connection URI, including its port.</p></div><input id="memory-uri" type="text" placeholder="neo4j+s://brain.example:7687" maxlength="512" autocomplete="off" spellcheck="false"></div>
+        <div class="setting-row"><div class="setting-label"><h3><label for="memory-database">Database</label></h3></div><input id="memory-database" type="text" maxlength="128" autocomplete="off" spellcheck="false"></div>
+        <div class="setting-row"><div class="setting-label"><h3><label for="memory-username">Username</label></h3></div><input id="memory-username" type="text" maxlength="128" autocomplete="off" spellcheck="false"></div>
+        <div class="setting-row"><div class="setting-label"><h3><label for="memory-password">Password</label></h3><p id="memory-password-help">Stored using this computer's OS credential protection.</p></div><input id="memory-password" type="password" maxlength="4096" autocomplete="new-password"></div>
+        <div class="memory-actions"><button id="memory-test" type="button">Test connection</button><button id="memory-save" type="button" class="btn-primary">Save brain connection</button><button id="memory-reset" type="button">Use existing configuration</button></div>
+        <p id="memory-status" role="status" aria-live="polite"></p>
+        <p>Saved changes apply after restarting Nodie. This configures desktop local voice; realtime Unmute uses its backend configuration. Conversation history, event journals and recognition profiles stay on each computer. Person-to-memory links are separate for each connection and may need selecting again.</p>
+    </section>
+
     <section class="section" id="name-transcription">
         <h2>Name transcription</h2>
         <div class="setting-row">
