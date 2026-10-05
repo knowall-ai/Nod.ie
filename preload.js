@@ -12,7 +12,7 @@ contextBridge.exposeInMainWorld('nodie', {
     proposeRecognitionName:turn=>ipcRenderer.invoke('recognition-propose',turn),
     onRecognitionProposal:callback=>{const listener=(_event,value)=>callback(value);ipcRenderer.on('recognition-proposal',listener);return ()=>ipcRenderer.removeListener('recognition-proposal',listener);},
     cancelRecognition:()=>ipcRenderer.invoke('recognition-cancel'),
-    confirmRecognitionName:(token,accepted)=>ipcRenderer.invoke('recognition-confirm',token,accepted),
+    confirmRecognitionName:(token,accepted,name)=>ipcRenderer.invoke('recognition-confirm',token,accepted,name),
     onDebugEvent:callback=>subscribe('debug-event',callback),
     journalFrame:(image,capturedAt)=>ipcRenderer.invoke('journal-frame',image,capturedAt),
     claimCuriosity:token=>ipcRenderer.invoke('curiosity-claim',token),
