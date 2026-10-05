@@ -139,4 +139,4 @@ All 360 unit tests pass, including actual same-origin/invalid/oversized HTTP che
 
 An actual local synthetic speech → transcription → image/model → speech synthesis check asked “What colour is the mug in this picture?” about a generated red mug and received “The mug in the picture appears to be red.” It used one model call and stored no image in history. The turn took 20,686 ms: transcription 198 ms, model 19,903 ms and speech synthesis 575 ms. This single check is functional evidence, not a latency or visual-accuracy guarantee. A subsequent GPU check showed 23,099 MiB used of 24,576 MiB and another model loaded; concurrent service use complicates attribution. Live household detail/recognition accuracy and sustained performance remain unvalidated. This PR removes an extra visual inference pass but does not solve shared GPU contention.
 
-image::images/local-vision-debug.png[Actual camera image status in local voice Debug]
+image::local-vision-debug.png[Actual camera image status in local voice Debug]
